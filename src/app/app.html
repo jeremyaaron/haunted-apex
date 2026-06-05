@@ -4,35 +4,261 @@
       <p class="eyebrow">District Zero Prototype</p>
       <h1>The Black Ledger</h1>
     </div>
-    <div class="status-strip" aria-label="Prototype status">
-      <span>Week 1 / 8</span>
-      <span>2 Command</span>
-      <span>Phase 0</span>
+
+    <div class="header-controls">
+      <label class="seed-control">
+        <span>Seed</span>
+        <input [(ngModel)]="seedInput" autocomplete="off" />
+      </label>
+      <button type="button" class="secondary" (click)="startNewRun()">New Run</button>
+      <button type="button" class="secondary" (click)="resetRun()">Reset</button>
+      <button
+        type="button"
+        class="advance-button"
+        [disabled]="!isAdvanceEnabled()"
+        (click)="advanceWeek()"
+      >
+        Advance Week
+      </button>
     </div>
   </header>
 
-  <section class="ledger-grid" aria-label="Prototype panels">
-    <article>
-      <p class="panel-label">Pressure Meters</p>
-      <h2>Dominion, Heat, Loyalty, Resources, Intel, Ruin</h2>
-      <p>Reserved for the core pressure surface.</p>
-    </article>
-
-    <article>
-      <p class="panel-label">Command Board</p>
-      <h2>Available Actions and Queued Orders</h2>
-      <p>Reserved for weekly order planning.</p>
-    </article>
-
-    <article>
-      <p class="panel-label">Operative Roster</p>
-      <h2>Mara, Juno, Saint</h2>
-      <p>Reserved for assignment state and dossier summaries.</p>
-    </article>
+  <section class="status-strip" aria-label="Run status">
+    <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
+    <span>{{ game.commandPointsRemaining() }} Command</span>
+    <span>{{ game.state().phase }}</span>
+    <span>Seed {{ game.state().seed }}</span>
+    @if (game.state().gameOver; as gameOver) {
+      <span class="danger">{{ gameOver.result }}: {{ gameOver.reason }}</span>
+    }
   </section>
 
-  <section class="fallout-panel">
-    <p class="panel-label">Event Feed</p>
-    <h2>The city is quiet enough to hear the machinery under it.</h2>
+  <section class="ledger-grid" aria-label="Black Ledger panels">
+    <aside class="panel pressure-panel">
+      <div class="panel-heading">
+        <p class="panel-label">Pressure Meters</p>
+        <h2>Network State</h2>
+      </div>
+
+      <div class="pressure-list">
+        @for (pressure of pressureViews(); track pressure.id) {
+          <div class="pressure-row" [class.warning]="pressure.status === 'warning'" [class.critical]="pressure.status === 'critical'">
+            <div class="pressure-copy">
+              <span>{{ pressure.label }}</span>
+              <strong>{{ pressure.displayValue }}</strong>
+            </div>
+            <div class="meter" aria-hidden="true">
+              <div class="meter-fill" [style.width.%]="pressure.meterValue"></div>
+            </div>
+          </div>
+        }
+      </div>
+    </aside>
+
+    <section class="panel command-panel">
+      <div class="panel-heading">
+        <p class="panel-label">Command Board</p>
+        <h2>Available Actions</h2>
+      </div>
+
+      @if (game.state().phase === 'COMMAND') {
+        <div class="action-grid">
+          @for (action of actionViews(); track action.actionId) {
+            <article class="action-card" [class.queued]="action.state === 'queued'" [class.unavailable]="action.state === 'unavailable'">
+              <div class="card-topline">
+                <h3>{{ action.label }}</h3>
+                <span class="risk" [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'">
+                  {{ action.riskLabel }}
+                </span>
+              </div>
+
+              <div class="cost-line">
+                <span>{{ action.commandCost }} Command</span>
+                <span>{{ action.adjustedResourceCost }} Resources</span>
+              </div>
+
+              <div class="delta-list">
+                @for (delta of deltaRows(action.adjustedEffects); track delta.id) {
+                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                }
+              </div>
+
+              <label class="assignment-control">
+                <span>Assign</span>
+                <select
+                  [ngModel]="selectedOperative(action.actionId)"
+                  (ngModelChange)="setSelectedOperative(action.actionId, $event)"
+                  [disabled]="action.availableOperatives.length === 0 || action.state === 'queued'"
+                >
+                  <option value="">No operative</option>
+                  @for (operative of action.availableOperatives; track operative.id) {
+                    <option [value]="operative.id" [disabled]="operative.disabled">
+                      {{ operative.name }}
+                    </option>
+                  }
+                </select>
+              </label>
+
+              <button
+                type="button"
+                [disabled]="action.state !== 'available'"
+                (click)="queueAction(action.actionId)"
+              >
+                {{ action.state === 'queued' ? 'Queued' : 'Queue Order' }}
+              </button>
+
+              @if (action.unavailableReason && action.state === 'unavailable') {
+                <p class="inline-warning">{{ action.unavailableReason }}</p>
+              }
+            </article>
+          }
+        </div>
+      } @else if (game.state().phase === 'EVENT_CHOICE') {
+        <div class="event-choice-panel">
+          @if (game.pendingEventDefinition(); as event) {
+            <p class="panel-label">Intercepted Transmission</p>
+            <h3>{{ event.title }}</h3>
+            <p>{{ event.text }}</p>
+
+            <div class="choice-list">
+              @for (choice of event.choices; track choice.id) {
+                <button
+                  type="button"
+                  class="choice-card"
+                  [disabled]="!canChoose(choice.id)"
+                  (click)="chooseEvent(choice.id)"
+                >
+                  <span>{{ choice.label }}</span>
+                  <small>Cost: {{ formatCost(choice.cost) }}</small>
+                  <small>
+                    @for (delta of deltaRows(choice.effects); track delta.id) {
+                      <b [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</b>
+                    }
+                  </small>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      } @else if (game.state().phase === 'GAME_OVER') {
+        <div class="game-over-panel">
+          <p class="panel-label">Run Closed</p>
+          <h3>{{ game.state().gameOver?.result }}</h3>
+          <p>{{ game.state().gameOver?.reason }}</p>
+          <button type="button" (click)="startNewRun()">New Run</button>
+        </div>
+      } @else {
+        <div class="event-choice-panel">
+          <p class="panel-label">Resolution</p>
+          <h3>Week Complete</h3>
+        </div>
+      }
+
+      <div class="queued-orders">
+        <div class="panel-heading compact">
+          <p class="panel-label">Queued Orders</p>
+        </div>
+
+        @if (game.queuedOrders().length > 0) {
+          @for (order of game.queuedOrders(); track order.id) {
+            <div class="queued-order">
+              <div>
+                <strong>{{ order.label }}</strong>
+                <span>{{ order.assignedOperativeName || 'Unassigned' }}</span>
+              </div>
+              <div class="delta-list">
+                @for (delta of deltaRows(order.adjustedEffects); track delta.id) {
+                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                }
+              </div>
+              <button type="button" class="secondary" (click)="removeOrder(order.id)">Remove</button>
+            </div>
+          }
+        } @else {
+          <p class="muted">No orders queued.</p>
+        }
+      </div>
+    </section>
+
+    <aside class="panel operative-panel">
+      <div class="panel-heading">
+        <p class="panel-label">Operative Roster</p>
+        <h2>Assets</h2>
+      </div>
+
+      <div class="operative-list">
+        @for (operative of game.state().operatives; track operative.id) {
+          <article class="operative-card" [class.compromised]="operative.status === 'compromised'">
+            <div>
+              <h3>{{ operative.name }}</h3>
+              <p>{{ operative.archetype }} · {{ operative.status }}</p>
+            </div>
+            <dl>
+              <div>
+                <dt>Loyalty</dt>
+                <dd>{{ operative.loyalty }}</dd>
+              </div>
+              <div>
+                <dt>Stress</dt>
+                <dd>{{ operative.stress }}</dd>
+              </div>
+              <div>
+                <dt>Violence</dt>
+                <dd>{{ operative.violence }}</dd>
+              </div>
+              <div>
+                <dt>Charm</dt>
+                <dd>{{ operative.charm }}</dd>
+              </div>
+              <div>
+                <dt>Tech</dt>
+                <dd>{{ operative.tech }}</dd>
+              </div>
+              <div>
+                <dt>Subtlety</dt>
+                <dd>{{ operative.subtlety }}</dd>
+              </div>
+            </dl>
+            <div class="trait-list">
+              @for (trait of operative.traitIds; track trait) {
+                <span>{{ trait }}</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </aside>
+  </section>
+
+  <section class="panel fallout-panel">
+    <div class="panel-heading">
+      <p class="panel-label">Event Feed</p>
+      <h2>Weekly Fallout</h2>
+    </div>
+
+    @if (game.state().eventLog.length > 0) {
+      <div class="log-list">
+        @for (entry of game.state().eventLog.slice().reverse(); track entry.id) {
+          <article class="log-entry">
+            <div>
+              <span>Week {{ entry.week }}</span>
+              <strong>{{ entry.title }}</strong>
+            </div>
+            @if (entry.body) {
+              <p>{{ entry.body }}</p>
+            }
+            @if (entry.pressureDelta) {
+              <div class="delta-list">
+                @for (delta of deltaRows(entry.pressureDelta); track delta.id) {
+                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    } @else {
+      <h2>The city is quiet enough to hear the machinery under it.</h2>
+    }
   </section>
 </main>
