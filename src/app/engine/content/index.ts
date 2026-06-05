@@ -10,3 +10,10 @@ export {
   DISTRICT_ZERO_RECRUIT_POOL,
   DISTRICT_ZERO_STARTING_OPERATIVES,
 } from './district-zero-operatives';
+export {
+  DISTRICT_ZERO_ACTIONS,
+  DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS,
+  getActionDefinition,
+  getOperativeActionModifier,
+} from './district-zero-actions';
+export type { OperativeActionModifier, OperativeActionModifierMap } from './district-zero-actions';
