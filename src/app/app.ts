@@ -41,6 +41,7 @@ export class App {
       displayValue: this.formatPressureValue(id, this.game.state().pressures[id]),
       meterValue: this.getPressureMeterValue(id, this.game.state().pressures[id]),
       status: this.getPressureStatus(id, this.game.state().pressures[id]),
+      statusLabel: this.getPressureStatusLabel(id, this.game.state().pressures[id]),
       targetLabel: this.getPressureTargetLabel(id),
     })),
   );
@@ -183,6 +184,15 @@ export class App {
     return value > 0 ? `+${value}` : `${value}`;
   }
 
+  protected initials(name: string): string {
+    return name
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
   protected trackById<T extends { id: string }>(_index: number, item: T): string {
     return item.id;
   }
@@ -263,6 +273,31 @@ export class App {
         return 'Unlocks options';
       case 'ruin':
         return 'Warning at 25';
+    }
+  }
+
+  private getPressureStatusLabel(id: PressureId, value: number): string {
+    const status = this.getPressureStatus(id, value);
+
+    if (id === 'dominion' && status === 'critical') {
+      return 'Target';
+    }
+
+    if (id === 'dominion' && status === 'warning') {
+      return 'Close';
+    }
+
+    if (id === 'intel') {
+      return 'Signal';
+    }
+
+    switch (status) {
+      case 'critical':
+        return 'Critical';
+      case 'warning':
+        return 'Warning';
+      case 'stable':
+        return 'Stable';
     }
   }
 

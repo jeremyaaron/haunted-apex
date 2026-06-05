@@ -3,6 +3,7 @@
     <div>
       <p class="eyebrow">District Zero Prototype</p>
       <h1>The Black Ledger</h1>
+      <p class="header-deck">Haunted Apex command channel // District Zero uplink</p>
     </div>
 
     <div class="header-controls">
@@ -16,6 +17,7 @@
         type="button"
         class="advance-button"
         [disabled]="!isAdvanceEnabled()"
+        [class.ready]="isAdvanceEnabled()"
         (click)="advanceWeek()"
       >
         Advance Week
@@ -46,7 +48,10 @@
           <div class="pressure-row" [class.warning]="pressure.status === 'warning'" [class.critical]="pressure.status === 'critical'">
             <div class="pressure-copy">
               <span>{{ pressure.label }}</span>
-              <strong>{{ pressure.displayValue }}</strong>
+              <div>
+                <strong>{{ pressure.displayValue }}</strong>
+                <em>{{ pressure.statusLabel }}</em>
+              </div>
             </div>
             <div class="meter" aria-hidden="true">
               <div class="meter-fill" [style.width.%]="pressure.meterValue"></div>
@@ -72,7 +77,7 @@
               <div class="card-topline">
                 <h3>{{ action.label }}</h3>
                 <span class="risk" [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'">
-                  {{ action.riskLabel }}
+                  {{ action.riskLabel }} {{ action.riskChance }}%
                 </span>
               </div>
 
@@ -105,6 +110,7 @@
 
               <button
                 type="button"
+                class="queue-button"
                 [disabled]="action.state !== 'available'"
                 (click)="queueAction(action.actionId)"
               >
@@ -120,9 +126,17 @@
       } @else if (game.state().phase === 'EVENT_CHOICE') {
         <div class="event-choice-panel">
           @if (game.pendingEventDefinition(); as event) {
-            <p class="panel-label">Intercepted Transmission</p>
-            <h3>{{ event.title }}</h3>
-            <p>{{ event.text }}</p>
+            <div class="event-layout">
+              <div class="event-art" [attr.data-event-tags]="event.tags.join(' / ')">
+                <span>TX</span>
+              </div>
+
+              <div>
+                <p class="panel-label">Intercepted Transmission</p>
+                <h3>{{ event.title }}</h3>
+                <p>{{ event.text }}</p>
+              </div>
+            </div>
 
             <div class="choice-list">
               @for (choice of event.choices; track choice.id) {
@@ -133,8 +147,8 @@
                   (click)="chooseEvent(choice.id)"
                 >
                   <span>{{ choice.label }}</span>
-                  <small>Cost: {{ formatCost(choice.cost) }}</small>
-                  <small>
+                  <small class="choice-meta">Cost: {{ formatCost(choice.cost) }}</small>
+                  <small class="choice-effects">
                     @for (delta of deltaRows(choice.effects); track delta.id) {
                       <b [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</b>
                     }
@@ -166,7 +180,7 @@
         @if (game.queuedOrders().length > 0) {
           @for (order of game.queuedOrders(); track order.id) {
             <div class="queued-order">
-              <div>
+              <div class="queued-summary">
                 <strong>{{ order.label }}</strong>
                 <span>{{ order.assignedOperativeName || 'Unassigned' }}</span>
               </div>
@@ -193,9 +207,15 @@
       <div class="operative-list">
         @for (operative of game.state().operatives; track operative.id) {
           <article class="operative-card" [class.compromised]="operative.status === 'compromised'">
-            <div>
-              <h3>{{ operative.name }}</h3>
-              <p>{{ operative.archetype }} · {{ operative.status }}</p>
+            <div class="operative-topline">
+              <div class="portrait-slot">
+                <span>{{ initials(operative.name) }}</span>
+              </div>
+              <div>
+                <h3>{{ operative.name }}</h3>
+                <p>{{ operative.archetype }}</p>
+              </div>
+              <span class="status-pill">{{ operative.status }}</span>
             </div>
             <dl>
               <div>
