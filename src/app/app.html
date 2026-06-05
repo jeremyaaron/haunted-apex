@@ -265,4 +265,72 @@
       <h2>The city is quiet enough to hear the machinery under it.</h2>
     }
   </section>
+
+  <section class="panel debug-panel">
+    <div class="panel-heading">
+      <p class="panel-label">Debug Panel</p>
+      <h2>Tuning State</h2>
+      <button type="button" class="secondary" (click)="runHarnessBatch()">Run Harness</button>
+    </div>
+
+    <div class="debug-grid">
+      <div class="debug-block">
+        <dl>
+          <div>
+            <dt>Seed</dt>
+            <dd>{{ debugView().seed }}</dd>
+          </div>
+          <div>
+            <dt>RNG Cursor</dt>
+            <dd>{{ debugView().rngCursor }}</dd>
+          </div>
+          <div>
+            <dt>Phase</dt>
+            <dd>{{ debugView().phase }}</dd>
+          </div>
+          <div>
+            <dt>Pending Event</dt>
+            <dd>{{ debugView().pendingEventId }}</dd>
+          </div>
+          <div>
+            <dt>Recent Tags</dt>
+            <dd>{{ debugView().recentEventTags }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="debug-block">
+        <h3>Exact Risk</h3>
+        <div class="debug-risk-list">
+          @for (risk of debugView().riskRows; track risk.id) {
+            <div>
+              <span>{{ risk.label }}</span>
+              <strong>{{ risk.riskChance }}%</strong>
+              <small>{{ risk.riskLabel }}</small>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="debug-block">
+        <h3>Pressures JSON</h3>
+        <pre>{{ debugView().pressuresJson }}</pre>
+      </div>
+
+      <div class="debug-block">
+        <h3>Flags JSON</h3>
+        <pre>{{ debugView().flagsJson }}</pre>
+      </div>
+
+      <div class="debug-block wide">
+        <h3>Queued Orders JSON</h3>
+        <pre>{{ debugView().queuedOrdersJson }}</pre>
+      </div>
+
+      <div class="debug-block harness-output">
+        <h3>Harness CSV</h3>
+        <pre>{{ harnessOutput() || 'Run Harness to simulate 100 games per strategy.' }}</pre>
+      </div>
+    </div>
+  </section>
 </main>

@@ -4,7 +4,10 @@ import {
   getActionPreview,
   getOrderAvailability,
   PRESSURE_IDS,
+  STRATEGY_AGENTS,
+  formatBatchReport,
   pressureDeltaToView,
+  simulateBatch,
   type ActionCardView,
   type ActionId,
   type EventChoiceDefinition,
@@ -24,6 +27,7 @@ import { GameFacade } from './game';
 export class App {
   protected readonly game = inject(GameFacade);
   protected readonly selectedOperatives = signal<Partial<Record<ActionId, string>>>({});
+  protected readonly harnessOutput = signal('');
   protected seedInput = 'VIOLET-ASH-1047';
 
   protected readonly actionViews = computed(() =>
@@ -40,6 +44,30 @@ export class App {
       targetLabel: this.getPressureTargetLabel(id),
     })),
   );
+  protected readonly debugView = computed(() => {
+    const state = this.game.state();
+    const recentEventTags = state.eventLog
+      .slice(-5)
+      .flatMap((entry) => entry.tags ?? [])
+      .filter((tag, index, tags) => tags.indexOf(tag) === index);
+
+    return {
+      seed: state.seed,
+      rngCursor: state.rngCursor,
+      phase: state.phase,
+      pendingEventId: state.pendingEvent?.definitionId ?? 'None',
+      pressuresJson: JSON.stringify(state.pressures, null, 2),
+      flagsJson: JSON.stringify(state.flags, null, 2),
+      queuedOrdersJson: JSON.stringify(state.queuedOrders, null, 2),
+      recentEventTags: recentEventTags.length > 0 ? recentEventTags.join(', ') : 'None',
+      riskRows: this.actionViews().map((action) => ({
+        id: action.actionId,
+        label: action.label,
+        riskChance: action.riskChance,
+        riskLabel: action.riskLabel,
+      })),
+    };
+  });
 
   protected startNewRun(): void {
     this.selectedOperatives.set({});
@@ -88,6 +116,16 @@ export class App {
     }
 
     this.game.resolveEventChoice(pendingEvent.id, choiceId);
+  }
+
+  protected runHarnessBatch(): void {
+    const report = simulateBatch({
+      agents: STRATEGY_AGENTS,
+      runsPerAgent: 100,
+      seedPrefix: `UI-${this.game.state().seed}`,
+    });
+
+    this.harnessOutput.set(formatBatchReport(report));
   }
 
   protected isAdvanceEnabled(): boolean {

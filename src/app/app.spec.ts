@@ -40,6 +40,11 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Dominion target 60');
     expect(compiled.textContent).toContain('Win at 60');
     expect(compiled.textContent).toContain('Warning at 25');
+    expect(compiled.textContent).toContain('Debug Panel');
+    expect(compiled.textContent).toContain('RNG Cursor');
+    expect(compiled.textContent).toContain('Exact Risk');
+    expect(compiled.textContent).toContain('Run Harness');
+    expect(compiled.textContent).toContain('Run Harness to simulate 100 games per strategy.');
   });
 
   it('should queue an action from the dashboard', () => {
