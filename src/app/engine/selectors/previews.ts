@@ -272,6 +272,10 @@ export function calculateRiskChance(action: ActionDefinition, operative?: Operat
   riskChance += Math.floor(operative.stress / 10);
   riskChance -= Math.floor(operative.loyalty / 20);
 
+  if (operative.stress >= 60) {
+    riskChance += 10;
+  }
+
   return clampRisk(riskChance);
 }
 
@@ -396,4 +400,3 @@ function unavailable(reason: QueueOrderUnavailableReason): OrderAvailability {
     reason,
   };
 }
-
