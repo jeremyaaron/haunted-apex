@@ -17,3 +17,4 @@ export {
   getOperativeActionModifier,
 } from './district-zero-actions';
 export type { OperativeActionModifier, OperativeActionModifierMap } from './district-zero-actions';
+export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './district-zero-events';

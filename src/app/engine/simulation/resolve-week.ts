@@ -1,8 +1,8 @@
 import type { GameState } from '../model';
 import { applyIdleStressRecovery } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
-import { applyWinLoss } from './win-loss';
 import { resolveQueuedOrder } from './resolve-action';
+import { selectWeeklyEvent } from './select-weekly-event';
 
 export type AdvanceWeekResult =
   | {
@@ -43,16 +43,28 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
   next = applyWeeklyDrift(next);
+  const selectedEvent = selectWeeklyEvent(next);
   next = {
     ...next,
+    rngCursor: selectedEvent.rng.cursor,
     queuedOrders: [],
-    phase: 'WEEK_COMPLETE',
+    pendingEvent: selectedEvent.event,
+    phase: 'EVENT_CHOICE',
+    eventLog: [
+      ...next.eventLog,
+      {
+        id: `log_${next.week}_${next.eventLog.length + 1}_event_presented`,
+        week: next.week,
+        type: 'event_presented',
+        title: selectedEvent.definition.title,
+        body: selectedEvent.definition.text,
+        tags: selectedEvent.definition.tags,
+      },
+    ],
   };
-  next = applyWinLoss(next);
 
   return {
     ok: true,
     state: next,
   };
 }
-

@@ -51,6 +51,11 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     ...state,
     rngCursor: roll.rng.cursor,
     pressures: applyPressureDelta(state.pressures, totalDelta),
+    flags: {
+      ...state.flags,
+      ...(action.id === 'run_small_job' ? { ran_small_job_this_week: true } : {}),
+      ...(action.id === 'lay_low' ? { laid_low_this_week: true } : {}),
+    },
   };
 
   next = resolveRecruitment(next, action);

@@ -1,4 +1,4 @@
-import type { PressureDelta } from './pressures';
+import type { PressureDelta, PressureId } from './pressures';
 
 export type EventTag =
   | 'HEAT'
@@ -10,10 +10,12 @@ export type EventTag =
   | 'VIOLENCE'
   | 'SAFEHOUSE'
   | 'RUIN'
-  | 'INTEL';
+  | 'INTEL'
+  | 'CORP'
+  | 'BLACKMAIL';
 
 export type EventWeightRule = {
-  pressure?: keyof PressureDelta;
+  pressure?: PressureId;
   flag?: string;
   min?: number;
   max?: number;
@@ -48,4 +50,3 @@ export type GameEventInstance = {
   definitionId: string;
   week: number;
 };
-

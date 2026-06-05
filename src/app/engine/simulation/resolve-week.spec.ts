@@ -19,10 +19,15 @@ describe('advanceWeek', () => {
       return;
     }
 
-    expect(result.state.phase).toBe('WEEK_COMPLETE');
+    expect(result.state.phase).toBe('EVENT_CHOICE');
     expect(result.state.week).toBe(1);
-    expect(result.state.rngCursor).toBe(1);
+    expect(result.state.rngCursor).toBe(2);
     expect(result.state.queuedOrders).toEqual([]);
+    expect(result.state.pendingEvent).toEqual(
+      jasmine.objectContaining({
+        week: 1,
+      }),
+    );
     expect(result.state.pressures).toEqual({
       dominion: 12,
       heat: 17,
@@ -40,7 +45,11 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_saint_calder')?.stress).toBe(
       18,
     );
-    expect(result.state.eventLog.map((entry) => entry.type)).toEqual(['order_resolved', 'drift']);
+    expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
+      'order_resolved',
+      'drift',
+      'event_presented',
+    ]);
   });
 
   it('applies dangerous action stress for Run a Small Job', () => {
@@ -87,6 +96,7 @@ describe('advanceWeek', () => {
       'order_resolved',
       'complication',
       'drift',
+      'event_presented',
     ]);
   });
 
@@ -310,4 +320,3 @@ function withPressures(pressures: Partial<GameState['pressures']>): GameState {
     },
   };
 }
-
