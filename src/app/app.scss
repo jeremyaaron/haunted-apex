@@ -207,6 +207,10 @@ p {
   border-color: rgba(255, 113, 113, 0.55);
 }
 
+.pressure-row.critical .meter-fill {
+  background: linear-gradient(90deg, #81d8d0, #e5c46b, #ff7d6e);
+}
+
 .pressure-copy {
   display: flex;
   align-items: center;
@@ -231,6 +235,13 @@ dt {
 .meter-fill {
   height: 100%;
   background: linear-gradient(90deg, #81d8d0, #e5c46b);
+}
+
+.pressure-target {
+  display: flex;
+  justify-content: flex-end;
+  color: #71808f;
+  font-size: 0.72rem;
 }
 
 .action-grid {

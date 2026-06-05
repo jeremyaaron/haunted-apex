@@ -37,6 +37,7 @@ export class App {
       displayValue: this.formatPressureValue(id, this.game.state().pressures[id]),
       meterValue: this.getPressureMeterValue(id, this.game.state().pressures[id]),
       status: this.getPressureStatus(id, this.game.state().pressures[id]),
+      targetLabel: this.getPressureTargetLabel(id),
     })),
   );
 
@@ -171,14 +172,26 @@ export class App {
   }
 
   private getPressureMeterValue(id: PressureId, value: number): number {
+    if (id === 'dominion') {
+      return Math.max(0, Math.min(100, Math.round((value / 60) * 100)));
+    }
+
     if (id === 'resources') {
       return Math.max(0, Math.min(100, Math.round((value / 5000) * 100)));
+    }
+
+    if (id === 'ruin') {
+      return Math.max(0, Math.min(100, Math.round((value / 25) * 100)));
     }
 
     return Math.max(0, Math.min(100, value));
   }
 
   private getPressureStatus(id: PressureId, value: number): 'stable' | 'warning' | 'critical' {
+    if (id === 'dominion') {
+      return value >= 60 ? 'critical' : value >= 45 ? 'warning' : 'stable';
+    }
+
     if (id === 'heat') {
       return value >= 80 ? 'critical' : value >= 60 ? 'warning' : 'stable';
     }
@@ -192,10 +205,27 @@ export class App {
     }
 
     if (id === 'ruin') {
-      return value >= 60 ? 'critical' : value >= 30 ? 'warning' : 'stable';
+      return value >= 50 ? 'critical' : value >= 25 ? 'warning' : 'stable';
     }
 
     return 'stable';
+  }
+
+  private getPressureTargetLabel(id: PressureId): string {
+    switch (id) {
+      case 'dominion':
+        return 'Win at 60';
+      case 'heat':
+        return 'Lose at 100';
+      case 'loyalty':
+        return 'Lose at 0';
+      case 'resources':
+        return 'Lose below 0';
+      case 'intel':
+        return 'Unlocks options';
+      case 'ruin':
+        return 'Warning at 25';
+    }
   }
 
   private isSpecialCost(cost: EventChoiceDefinition['cost']): cost is SpecialCost {
