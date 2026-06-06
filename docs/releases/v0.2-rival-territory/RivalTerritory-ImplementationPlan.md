@@ -775,6 +775,31 @@ Manual analysis:
 - Does rival territory meaningfully increase danger?
 - Do target choices alter event distributions?
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Kept legal action-operative-target enumeration in the engine harness so agents do not duplicate queue validation.
+- Added target-aware policies for all five strategies:
+  - Random samples every legal combination.
+  - Cautious prefers low-Heat, uncontrolled territory and The Pale Circuit.
+  - Aggressive values Dominion, local control gains and tolerates rival attention.
+  - Greedy values Resource/Intel yield and favors Zero Mercy and Black Halo Exchange.
+  - Operator avoids rival pressure at 60 or above unless an order can immediately win, and prefers lower local Heat when global Heat is elevated.
+- Renamed the Operator report label to `Operator / Sane`.
+- Added structured order-resolution diagnostics to `advanceWeek` so target complication rates are measured without parsing log copy.
+- Added per-run target selection, target complication and contextual-event counters.
+- Added per-agent target reports with most-selected and minimum-sample most-dangerous targets.
+- Added average final rival pressure, district control, district Heat, and loss-cause reporting.
+- Expanded CSV output into readable summary, target, rival, district, loss-cause, and contextual-event sections.
+- Preserved deterministic batches; identical seed prefixes produce identical expanded summaries.
+- Verified 100 runs for each of the five agents with no incomplete runs.
+- Verified target-tag and rival-pressure context both influence selected events across the batch.
+- Verified the UI Run Harness action displays every expanded report section.
+- Added 3 Phase 9 tests and extended week-resolution coverage; all 154 tests pass.
+- TypeScript and the Pages-subpath production build pass.
+- No game balance values were changed in this phase.
+
 ### Review Gate
 
 Review system behavior before modifying balance values. Distinguish policy bugs from game-number problems.
