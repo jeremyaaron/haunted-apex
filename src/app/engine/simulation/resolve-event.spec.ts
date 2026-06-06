@@ -1,4 +1,4 @@
-import type { GameState } from '../model';
+import type { EventId, GameState } from '../model';
 import { newGame } from './new-game';
 import { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
 
@@ -127,7 +127,7 @@ describe('resolveEventChoice', () => {
   });
 });
 
-function withPendingEvent(definitionId: string): GameState {
+function withPendingEvent(definitionId: EventId): GameState {
   return {
     ...newGame({ seed: 'VIOLET-ASH-1047' }),
     phase: 'EVENT_CHOICE',

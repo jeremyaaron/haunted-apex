@@ -24,3 +24,5 @@ export {
 } from './rival-territory-districts';
 export { getVenueDefinition, RIVAL_TERRITORY_VENUES } from './rival-territory-venues';
 export { getRivalDefinition, RIVAL_TERRITORY_RIVALS } from './rival-territory-rivals';
+export { getOperativeDefinition, ROSTER_OPERATIVES } from './roster-operatives';
+export { getTraitDefinition, ROSTER_TRAITS } from './roster-traits';

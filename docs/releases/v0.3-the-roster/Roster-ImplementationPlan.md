@@ -105,6 +105,53 @@ average final pressures
 current target/rival reports
 ```
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Development is isolated on branch `v0.3`, tracking `github/v0.3`.
+- The approved v0.2 baseline is commit `d5be4b3` on `main`; no `v0.2.0` Git tag exists,
+  so the baseline is recorded by commit rather than tag.
+- The Pages workflow deploys only pushes to `main`; incremental `v0.3` branch pushes do
+  not trigger deployment.
+- All four v0.3 design documents are organized under
+  `docs/releases/v0.3-the-roster/`.
+- Runtime validation used Node `24.16.0` from `.nvmrc` and npm `11.13.0`.
+- `npm ci` installed 542 packages and reported zero vulnerabilities.
+- All 156 existing tests passed in ChromeHeadless.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed.
+- The production build with base href `/haunted-apex/` passed.
+- The Pages browser artifact was 312 KB.
+- Current package metadata remains `0.0.0`; version `0.3.0` is reserved for Phase 11.
+- The current persistence key is `haunted-apex:v0.2:current-run`.
+- The v0.2 state stores full mutable `Operative[]` values and a
+  `RecruitCandidate[]` pool, with no save schema version. Phase 2 and Phase 7 will replace
+  these contracts as planned.
+- Captured a deterministic 100-runs-per-agent baseline using seed prefix
+  `V03-PHASE0-BASELINE`:
+
+```text
+Random:          3% wins, 0 incomplete
+Aggressive:     31% wins, 0 incomplete
+Cautious:        0% wins, 0 incomplete
+Greedy:         42% wins, 0 incomplete
+Operator / Sane: 69% wins, 0 incomplete
+```
+
+- Primary baseline loss patterns:
+
+```text
+Random:     45 bankrupt, 45 out of time, 7 Heat lockdown
+Aggressive: 69 Heat lockdown
+Cautious:   97 out of time, 3 bankrupt
+Greedy:     44 out of time, 9 bankrupt, 4 Heat lockdown, 1 Loyalty collapse
+Operator:   24 bankrupt, 7 Heat lockdown
+```
+
+- The temporary harness entrypoint was removed after use.
+- No development, Karma, or browser-debug process remains running.
+
 ### Review Gate
 
 Confirm the baseline and documentation before replacing the operative model.
@@ -178,6 +225,28 @@ Unit tests:
 - No operative begins Unstable or Breaking.
 - Existing six stats match the current release.
 - Stress tiers resolve correctly at `39/40`, `59/60`, and `79/80`.
+
+### Completion Record
+
+Completed June 6, 2026:
+
+- Added explicit operative, trait, Stress, affinity, assignment, and event identifier
+  contracts to the pure TypeScript engine model.
+- Added the ten authored operative definitions with the TDD rarity, role, stat, Loyalty,
+  Stress, trait, affinity, event, and flavor contracts.
+- Added all seventeen visible signature and liability traits with their initial
+  data-driven modifier anchors.
+- Added registry lookup helpers and public engine barrel exports.
+- Added pure Stress-tier and Stress-risk helpers using the documented
+  `40/60/80` thresholds.
+- Preserved the fixed v0.2 starting roster, recruit pool, and operative action modifiers
+  as temporary compatibility paths; Phase 1 does not change new-game generation or
+  action resolution behavior.
+- Added content-integrity tests for roster size, unique IDs, supported rarity and role
+  tags, trait references, affinity IDs, starting values, legacy stats, lookup behavior,
+  and Stress boundaries.
+- The suite passes with `165` tests, and both application and spec TypeScript checks are
+  green.
 
 ### Review Gate
 

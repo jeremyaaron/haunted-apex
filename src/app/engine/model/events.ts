@@ -1,5 +1,23 @@
 import type { PressureDelta, PressureId } from './pressures';
 
+export type EventId =
+  | 'corp_patrol_sweep'
+  | 'rival_tests_border'
+  | 'liaison_favor'
+  | 'operative_wants_more'
+  | 'blackmail_lead'
+  | 'job_goes_loud'
+  | 'heat_cools'
+  | 'safehouse_compromised'
+  | 'unexpected_windfall'
+  | 'rival_sends_flowers'
+  | 'event_mara_ghost_debt'
+  | 'event_juno_static_in_her_voice'
+  | 'event_saint_lie_comes_due'
+  | 'event_knox_blood_applause'
+  | 'event_iris_velvet_access'
+  | 'event_orchid_route_memory';
+
 export type EventTag =
   | 'HEAT'
   | 'LOYALTY'
@@ -36,7 +54,7 @@ export type EventChoiceDefinition = {
 };
 
 export type EventDefinition = {
-  id: string;
+  id: EventId;
   title: string;
   text: string;
   tags: EventTag[];
@@ -47,6 +65,6 @@ export type EventDefinition = {
 
 export type GameEventInstance = {
   id: string;
-  definitionId: string;
+  definitionId: EventId;
   week: number;
 };

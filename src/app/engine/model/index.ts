@@ -26,12 +26,28 @@ export type {
 export type {
   EventChoiceDefinition,
   EventDefinition,
+  EventId,
   EventTag,
   EventWeightRule,
   GameEventInstance,
   SpecialCost,
 } from './events';
-export type { Operative, OperativeSkill, OperativeStatus, RecruitCandidate } from './operatives';
+export type {
+  Operative,
+  OperativeAffinity,
+  OperativeDefinition,
+  OperativeId,
+  OperativeRarity,
+  OperativeRoleTag,
+  OperativeSkill,
+  OperativeState,
+  OperativeStats,
+  OperativeStatus,
+  RecentAssignment,
+  RecruitCandidate,
+  StressProfile,
+  StressTier,
+} from './operatives';
 export { PRESSURE_IDS } from './pressures';
 export type { PressureDelta, PressureId, Pressures } from './pressures';
 export type {
@@ -42,3 +58,10 @@ export type {
   RivalState,
 } from './rivals';
 export type { VenueArchetype, VenueDefinition, VenueId } from './venues';
+export type {
+  ModifierCondition,
+  TraitDefinition,
+  TraitId,
+  TraitKind,
+  TraitModifier,
+} from './traits';
