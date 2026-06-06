@@ -5,6 +5,7 @@ import {
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
+  getOrderAvailability,
   newGame,
   queueOrder,
   removeQueuedOrder,
@@ -21,6 +22,7 @@ import {
   type EventChoiceAvailability,
   type GameState,
   type NewGameConfig,
+  type OrderAvailability,
   type QueueOrderResult,
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
@@ -81,6 +83,18 @@ export class GameFacade {
     target?: ActionTarget,
   ): ActionPreview | undefined {
     return getActionPreview(this.stateSignal(), actionId, assignedOperativeId, target);
+  }
+
+  getOrderAvailability(
+    actionId: ActionId,
+    assignedOperativeId?: string,
+    target?: ActionTarget,
+  ): OrderAvailability {
+    return getOrderAvailability(this.stateSignal(), {
+      actionId,
+      assignedOperativeId,
+      target,
+    });
   }
 
   queueOrder(

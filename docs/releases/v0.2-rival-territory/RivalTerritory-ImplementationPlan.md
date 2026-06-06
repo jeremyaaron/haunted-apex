@@ -680,6 +680,25 @@ Manual checks:
 - Territory and rival panels remain tolerable at narrower widths.
 - No dev server remains running after validation.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Added transient target selection per action card with explicit optional and required target states.
+- Target and operative selections now recompute adjusted effects, exact risk, rival pressure, and local district impact together.
+- Required-target actions remain disabled with player-facing guidance until a valid target is selected.
+- Successful queueing, New Run, Reset, and week advancement clear transient selections.
+- Queued orders now display their selected target.
+- Added dense district and venue views showing control, current/base local Heat, controllers, and venue modifiers.
+- Added rival views showing pressure, tier, disposition, attack pressure, and controlled territory.
+- Event logs render mechanical tags, including rival passive-effect context.
+- Extended the debug panel with district, rival, recent-activity, and exact selected-target preview JSON.
+- Added responsive constraints and mobile compositions for action, operative, territory, rival, and header controls.
+- Added 6 Phase 8 component tests; all 151 tests pass.
+- Verified a full UI-driven run through Week 8 to a terminal state.
+- Verified desktop rendering and a true 390px mobile viewport with no horizontal overflow.
+- TypeScript and the Pages-subpath production build pass.
+
 ### Review Gate
 
 Review the central v0.2 question:

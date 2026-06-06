@@ -76,6 +76,7 @@ export type OperativeOptionView = {
 export type ActionPreview = {
   actionId: ActionId;
   label: string;
+  requiresTarget: boolean;
   commandCost: number;
   resourceCost: number;
   adjustedResourceCost: number;
@@ -255,6 +256,7 @@ export function getActionPreview(
   return {
     actionId: action.id,
     label: action.label,
+    requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
     adjustedResourceCost: getAdjustedResourceCost(action, assignedOperativeId),

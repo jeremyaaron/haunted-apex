@@ -92,6 +92,27 @@
                 }
               </div>
 
+              @if (action.targetOptions.length > 0) {
+                <label class="target-control">
+                  <span>Target @if (action.requiresTarget) { <b>Required</b> }</span>
+                  <select
+                    [ngModel]="selectedTarget(action.actionId)"
+                    (ngModelChange)="setSelectedTarget(action.actionId, $event)"
+                    [disabled]="action.state === 'queued'"
+                    [attr.aria-label]="action.label + ' target'"
+                  >
+                    <option value="">
+                      {{ action.requiresTarget ? 'Select a target' : 'No target' }}
+                    </option>
+                    @for (option of action.targetOptions; track option.target.type + ':' + option.target.id) {
+                      <option [value]="option.target.type + ':' + option.target.id">
+                        {{ targetOptionLabel(option) }}
+                      </option>
+                    }
+                  </select>
+                </label>
+              }
+
               <label class="assignment-control">
                 <span>Assign</span>
                 <select
@@ -108,6 +129,22 @@
                 </select>
               </label>
 
+              @if (action.rivalAttention; as attention) {
+                <div class="impact-strip rival-warning">
+                  <span>{{ attention.rivalName }}</span>
+                  <strong>Pressure +{{ attention.pressureGain }}</strong>
+                  <small>{{ attention.currentPressure }} → {{ attention.projectedPressure }} / {{ attention.projectedTier }}</small>
+                </div>
+              }
+
+              @if (action.localImpact; as impact) {
+                <div class="impact-strip local-impact">
+                  <span>{{ impact.districtName }}</span>
+                  <strong>Control +{{ impact.controlGain }}</strong>
+                  <small>Local Heat +{{ impact.localHeatGain }}</small>
+                </div>
+              }
+
               <button
                 type="button"
                 class="queue-button"
@@ -118,7 +155,13 @@
               </button>
 
               @if (action.unavailableReason && action.state === 'unavailable') {
-                <p class="inline-warning">{{ action.unavailableReason }}</p>
+                <p class="inline-warning">
+                  {{
+                    action.unavailableReason === 'target_required'
+                      ? 'Select a target to queue this order.'
+                      : action.unavailableReason
+                  }}
+                </p>
               }
             </article>
           }
@@ -183,6 +226,9 @@
               <div class="queued-summary">
                 <strong>{{ order.label }}</strong>
                 <span>{{ order.assignedOperativeName || 'Unassigned' }}</span>
+                @if (order.targetLabel) {
+                  <span class="queued-target">{{ order.targetLabel }}</span>
+                }
               </div>
               <div class="delta-list">
                 @for (delta of deltaRows(order.adjustedEffects); track delta.id) {
@@ -254,6 +300,116 @@
     </aside>
   </section>
 
+  <section class="territory-rival-grid" aria-label="Territory and rival intelligence">
+    <section class="panel territory-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="panel-label">Territory Network</p>
+          <h2>Districts and Venues</h2>
+        </div>
+        <span class="panel-count">{{ game.districts().length }} districts</span>
+      </div>
+
+      <div class="district-grid">
+        @for (district of game.districts(); track district.id) {
+          <article class="district-row">
+            <div class="district-heading">
+              <div>
+                <h3>{{ district.name }}</h3>
+                <p>{{ district.archetype }}</p>
+              </div>
+              @if (district.controllingRivalName) {
+                <span class="controller-label">{{ district.controllingRivalName }}</span>
+              } @else {
+                <span class="controller-label neutral">Uncontrolled</span>
+              }
+            </div>
+
+            <div class="district-metrics">
+              <div>
+                <span>Control</span>
+                <strong>{{ district.control }}</strong>
+              </div>
+              <div>
+                <span>Local Heat</span>
+                <strong>{{ district.heat }}</strong>
+                <small>Base {{ district.baseHeat }}</small>
+              </div>
+            </div>
+
+            <div class="venue-list">
+              @for (venue of district.venues; track venue.id) {
+                <div class="venue-row">
+                  <div>
+                    <strong>{{ venue.name }}</strong>
+                    <span>{{ venue.archetype }}</span>
+                  </div>
+                  <div class="venue-modifiers">
+                    @if (venue.wealthMod) { <span>Wealth {{ signed(venue.wealthMod) }}</span> }
+                    @if (venue.intelMod) { <span>Intel {{ signed(venue.intelMod) }}</span> }
+                    @if (venue.heatMod) { <span>Heat {{ signed(venue.heatMod) }}</span> }
+                    @if (venue.loyaltyMod) { <span>Loyalty {{ signed(venue.loyaltyMod) }}</span> }
+                    @if (venue.ruinMod) { <span>Ruin {{ signed(venue.ruinMod) }}</span> }
+                  </div>
+                </div>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+
+    <aside class="panel rival-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="panel-label">Rival Channels</p>
+          <h2>Kingpin Pressure</h2>
+        </div>
+        <span class="panel-count">{{ game.rivals().length }} active files</span>
+      </div>
+
+      <div class="rival-list">
+        @for (rival of game.rivals(); track rival.id) {
+          <article class="rival-row" [class.inactive]="!rival.active">
+            <div class="rival-heading">
+              <div>
+                <h3>{{ rival.name }}</h3>
+                <p>{{ rival.archetype }}</p>
+              </div>
+              <span class="tier-label">{{ rival.pressureTier }}</span>
+            </div>
+
+            <div class="rival-pressure-line">
+              <span>Pressure</span>
+              <strong>{{ rival.pressure }}</strong>
+              <div class="meter" aria-hidden="true">
+                <div class="meter-fill" [style.width.%]="rival.pressure"></div>
+              </div>
+            </div>
+
+            <dl class="rival-facts">
+              <div>
+                <dt>Disposition</dt>
+                <dd>{{ rival.disposition }}</dd>
+              </div>
+              <div>
+                <dt>Attack</dt>
+                <dd>{{ pressureLabel(rival.preferredPressureAttack) }}</dd>
+              </div>
+            </dl>
+
+            <p class="controlled-territory">
+              {{ rival.controlledDistrictNames.join(', ') }}
+              @if (rival.controlledVenueNames.length > 0) {
+                <span>// {{ rival.controlledVenueNames.join(', ') }}</span>
+              }
+            </p>
+          </article>
+        }
+      </div>
+    </aside>
+  </section>
+
   <section class="panel fallout-panel">
     <div class="panel-heading">
       <p class="panel-label">Event Feed</p>
@@ -275,6 +431,13 @@
               <div class="delta-list">
                 @for (delta of deltaRows(entry.pressureDelta); track delta.id) {
                   <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                }
+              </div>
+            }
+            @if (entry.tags?.length) {
+              <div class="log-tags">
+                @for (tag of entry.tags; track tag) {
+                  <span>{{ tag }}</span>
                 }
               </div>
             }
@@ -345,6 +508,26 @@
       <div class="debug-block wide">
         <h3>Queued Orders JSON</h3>
         <pre>{{ debugView().queuedOrdersJson }}</pre>
+      </div>
+
+      <div class="debug-block wide">
+        <h3>Districts JSON</h3>
+        <pre>{{ debugView().districtsJson }}</pre>
+      </div>
+
+      <div class="debug-block wide">
+        <h3>Rivals JSON</h3>
+        <pre>{{ debugView().rivalsJson }}</pre>
+      </div>
+
+      <div class="debug-block wide">
+        <h3>Recent Activity JSON</h3>
+        <pre>{{ debugView().recentActivityJson }}</pre>
+      </div>
+
+      <div class="debug-block wide">
+        <h3>Target Preview JSON</h3>
+        <pre>{{ debugView().targetPreviewsJson }}</pre>
       </div>
 
       <div class="debug-block harness-output">

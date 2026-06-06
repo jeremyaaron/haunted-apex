@@ -1,8 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
-  getActionPreview,
-  getOrderAvailability,
   PRESSURE_IDS,
   STRATEGY_AGENTS,
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
@@ -11,6 +9,8 @@ import {
   simulateBatch,
   type ActionCardView,
   type ActionId,
+  type ActionTarget,
+  type ActionTargetOption,
   type EventChoiceDefinition,
   type PressureDelta,
   type PressureDeltaView,
@@ -18,6 +18,10 @@ import {
   type SpecialCost,
 } from './engine';
 import { GameFacade } from './game';
+
+type ActionCardUiView = ActionCardView & {
+  targetOptions: ActionTargetOption[];
+};
 
 @Component({
   selector: 'app-root',
@@ -28,6 +32,7 @@ import { GameFacade } from './game';
 export class App {
   protected readonly game = inject(GameFacade);
   protected readonly selectedOperatives = signal<Partial<Record<ActionId, string>>>({});
+  protected readonly selectedTargets = signal<Partial<Record<ActionId, ActionTarget>>>({});
   protected readonly harnessOutput = signal('');
   protected seedInput = 'VIOLET-ASH-1047';
 
@@ -62,6 +67,21 @@ export class App {
       pressuresJson: JSON.stringify(state.pressures, null, 2),
       flagsJson: JSON.stringify(state.flags, null, 2),
       queuedOrdersJson: JSON.stringify(state.queuedOrders, null, 2),
+      districtsJson: JSON.stringify(state.districts, null, 2),
+      rivalsJson: JSON.stringify(state.rivals, null, 2),
+      recentActivityJson: JSON.stringify(state.recentActivity, null, 2),
+      targetPreviewsJson: JSON.stringify(
+        this.actionViews().map((action) => ({
+          actionId: action.actionId,
+          target: action.selectedTarget,
+          adjustedEffects: action.adjustedEffects,
+          riskChance: action.riskChance,
+          rivalAttention: action.rivalAttention,
+          localImpact: action.localImpact,
+        })),
+        null,
+        2,
+      ),
       recentEventTags: recentEventTags.length > 0 ? recentEventTags.join(', ') : 'None',
       riskRows: this.actionViews().map((action) => ({
         id: action.actionId,
@@ -73,12 +93,12 @@ export class App {
   });
 
   protected startNewRun(): void {
-    this.selectedOperatives.set({});
+    this.clearTransientSelections();
     this.game.startNewGame(this.seedInput.trim() ? { seed: this.seedInput } : {});
   }
 
   protected resetRun(): void {
-    this.selectedOperatives.set({});
+    this.clearTransientSelections();
     this.game.resetCurrentRun(this.seedInput.trim() ? { seed: this.seedInput } : {});
   }
 
@@ -93,12 +113,38 @@ export class App {
     return this.selectedOperatives()[actionId] ?? '';
   }
 
+  protected setSelectedTarget(actionId: ActionId, targetKey: string): void {
+    const target = this.game
+      .getTargetOptions(actionId)
+      .find((option) => this.targetKey(option.target) === targetKey)?.target;
+
+    this.selectedTargets.update((selected) => ({
+      ...selected,
+      [actionId]: target,
+    }));
+  }
+
+  protected selectedTarget(actionId: ActionId): string {
+    const target = this.selectedTargets()[actionId];
+    return target ? this.targetKey(target) : '';
+  }
+
+  protected targetOptionLabel(option: ActionTargetOption): string {
+    if (option.targetType === 'venue' && option.districtName) {
+      return `${option.districtName} / ${option.label}`;
+    }
+
+    return option.label;
+  }
+
   protected queueAction(actionId: ActionId): void {
     const assignedOperativeId = this.selectedOperatives()[actionId];
-    const result = this.game.queueOrder(actionId, assignedOperativeId);
+    const target = this.selectedTargets()[actionId];
+    const result = this.game.queueOrder(actionId, assignedOperativeId, target);
 
     if (result.ok) {
       this.setSelectedOperative(actionId, '');
+      this.setSelectedTarget(actionId, '');
     }
   }
 
@@ -107,7 +153,7 @@ export class App {
   }
 
   protected advanceWeek(): void {
-    this.selectedOperatives.set({});
+    this.clearTransientSelections();
     this.game.advanceWeek();
   }
 
@@ -199,22 +245,36 @@ export class App {
     return item.id;
   }
 
-  private withSelectedOperative(card: ActionCardView): ActionCardView {
+  private withSelectedOperative(card: ActionCardView): ActionCardUiView {
     const assignedOperativeId = this.selectedOperatives()[card.actionId];
-    const state = this.game.state();
-    const preview = getActionPreview(state, card.actionId, assignedOperativeId) ?? card;
-    const availability = getOrderAvailability(state, {
-      actionId: card.actionId,
+    const target = this.selectedTargets()[card.actionId];
+    const preview =
+      this.game.getActionPreview(card.actionId, assignedOperativeId, target) ?? card;
+    const availability = this.game.getOrderAvailability(
+      card.actionId,
       assignedOperativeId,
-    });
-    const queued = state.queuedOrders.some((order) => order.actionId === card.actionId);
+      target,
+    );
+    const queued = this.game
+      .state()
+      .queuedOrders.some((order) => order.actionId === card.actionId);
 
     return {
       ...card,
       ...preview,
+      targetOptions: this.game.getTargetOptions(card.actionId),
       state: queued ? 'queued' : availability.available ? 'available' : 'unavailable',
       unavailableReason: availability.reason,
     };
+  }
+
+  private clearTransientSelections(): void {
+    this.selectedOperatives.set({});
+    this.selectedTargets.set({});
+  }
+
+  private targetKey(target: ActionTarget): string {
+    return `${target.type}:${target.id}`;
   }
 
   private formatPressureValue(id: PressureId, value: number): string {
