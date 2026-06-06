@@ -28,6 +28,8 @@ describe('advanceWeek', () => {
         week: 1,
       }),
     );
+    expect(result.eventSelection.event).toEqual(result.state.pendingEvent!);
+    expect(result.eventSelection.diagnostics.finalWeight).toBeGreaterThan(0);
     expect(result.state.pressures).toEqual({
       dominion: 12,
       heat: 17,

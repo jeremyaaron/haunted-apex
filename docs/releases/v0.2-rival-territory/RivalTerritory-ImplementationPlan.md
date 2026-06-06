@@ -519,6 +519,21 @@ Unit tests:
 - Recent penalty still applies after additions.
 - Deterministic selection remains stable.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Added `EventWeightContext` built from recent target tags, recent rival IDs, recently targeted districts, current rival pressure, and current district Heat.
+- Nightlife, violence, and memory activity now raise the specified existing event weights.
+- Nyx and Knox pressure at 50 or higher now raise their intended event weights.
+- Recently targeted districts at 60 or higher local Heat add weight to all Heat-tagged events.
+- Existing pressure/flag rules remain unchanged, and repetition penalties apply after positive context additions.
+- Added structured diagnostics containing base/rule weight, named context modifiers, pre-penalty weight, penalty state, and final weight.
+- Successful week resolution exposes the selected event diagnostics without persisting debug metadata into `GameState`.
+- Seeded selection remains deterministic.
+- Added 8 Phase 6 tests; all 137 tests pass.
+- TypeScript and the Pages-subpath production build pass.
+
 ### Review Gate
 
 Compare event weights across at least three recent-activity contexts. Confirm that context matters without making one event inevitable.

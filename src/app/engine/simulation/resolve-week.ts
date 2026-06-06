@@ -5,12 +5,13 @@ import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
 import { applyRivalPassiveEffects } from './rival-effects';
 import { resolveQueuedOrder } from './resolve-action';
-import { selectWeeklyEvent } from './select-weekly-event';
+import { selectWeeklyEvent, type EventSelection } from './select-weekly-event';
 
 export type AdvanceWeekResult =
   | {
       ok: true;
       state: GameState;
+      eventSelection: EventSelection;
     }
   | {
       ok: false;
@@ -73,5 +74,6 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
   return {
     ok: true,
     state: next,
+    eventSelection: selectedEvent,
   };
 }
