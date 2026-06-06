@@ -1,5 +1,8 @@
 import type { OperativeSkill } from './operatives';
 import type { PressureDelta } from './pressures';
+import type { DistrictId } from './districts';
+import type { RivalId } from './rivals';
+import type { VenueId } from './venues';
 
 export type ActionId =
   | 'gather_intel'
@@ -13,6 +16,11 @@ export type ActionStressType = 'normal' | 'dangerous' | 'recovery' | 'none';
 
 export type ActionAssignmentRule = 'optional' | 'required' | 'none';
 
+export type ActionTarget =
+  | { type: 'district'; id: DistrictId }
+  | { type: 'venue'; id: VenueId }
+  | { type: 'rival'; id: RivalId };
+
 export type ActionDefinition = {
   id: ActionId;
   label: string;
@@ -23,11 +31,13 @@ export type ActionDefinition = {
   baseRisk: number;
   stressType: ActionStressType;
   assignment: ActionAssignmentRule;
+  requiresTarget: boolean;
+  allowedTargetTypes: readonly ActionTarget['type'][];
 };
 
 export type QueuedOrder = {
   id: string;
   actionId: ActionId;
   assignedOperativeId?: string;
+  target?: ActionTarget;
 };
-

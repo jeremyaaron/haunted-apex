@@ -1,5 +1,7 @@
 export {
   calculateRiskChance,
+  applyDistrictModifiers,
+  applyVenueModifiers,
   getActionPreview,
   getAdjustedEffects,
   getAdjustedResourceCost,
@@ -15,12 +17,24 @@ export {
 export type {
   ActionCardView,
   ActionPreview,
+  LocalImpactPreview,
   OperativeOptionView,
   OrderAvailability,
   PressureDeltaView,
   QueueOrderRequest,
   QueueOrderUnavailableReason,
   QueuedOrderView,
+  RivalAttentionPreview,
   RiskLabel,
 } from './previews';
-
+export {
+  getTargetControllerId,
+  getTargetLabel,
+  getTargetTags,
+  calculateTargetControlGain,
+  calculateTargetLocalHeatGain,
+  resolveTargetDistrictId,
+  selectActionTargetOptions,
+} from './territory';
+export type { ActionTargetOption } from './territory';
+export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';

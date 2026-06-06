@@ -54,6 +54,7 @@ export function queueOrder(state: GameState, request: QueueOrderRequest): QueueO
     id: nextOrderId(state),
     actionId: action.id,
     assignedOperativeId: request.assignedOperativeId,
+    ...(request.target ? { target: { ...request.target } } : {}),
   };
 
   return {
@@ -123,4 +124,3 @@ function markOperativeStatus(
       : operative,
   );
 }
-

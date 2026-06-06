@@ -12,8 +12,8 @@ The prototype should be playable in a 10-15 minute session. It should prioritize
 
 ## Source Documents
 
-- `Layer1.md`: product identity, core fantasy, pressure model, procedural direction, UI philosophy.
-- `Layer1A.md`: District Zero rules, starting values, actions, operatives, events, risk/stress tuning.
+- `../../foundation/Layer1.md`: product identity, core fantasy, pressure model, procedural direction, UI philosophy.
+- `../../foundation/Layer1A.md`: District Zero rules, starting values, actions, operatives, events, risk/stress tuning.
 - `v0.md`: playable UI shape, turn model, determinism, action preview, assignment rules.
 
 ## Goals
@@ -464,7 +464,7 @@ Other actions can use generic complications in v0, such as extra Heat, stress, o
 
 Operative modifiers should be content-driven.
 
-Examples from `Layer1A.md`:
+Examples from `../../foundation/Layer1A.md`:
 
 ```ts
 const operativeActionModifiers = {

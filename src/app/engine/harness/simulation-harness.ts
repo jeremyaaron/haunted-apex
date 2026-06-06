@@ -13,6 +13,7 @@ import {
   getActionPreview,
   getCommandPointsRemaining,
   getOrderAvailability,
+  selectActionTargetOptions,
   type QueueOrderRequest,
 } from '../selectors';
 import {
@@ -224,7 +225,12 @@ export function getLegalOrderOptions(state: GameState): LegalOrderOption[] {
 
     for (const request of requests) {
       const availability = getOrderAvailability(state, request);
-      const preview = getActionPreview(state, request.actionId, request.assignedOperativeId);
+      const preview = getActionPreview(
+        state,
+        request.actionId,
+        request.assignedOperativeId,
+        request.target,
+      );
 
       if (availability.available && preview) {
         options.push({
@@ -284,6 +290,7 @@ function queueAgentOrders(
     const queued = queueOrder(next, {
       actionId: decision.actionId,
       assignedOperativeId: decision.assignedOperativeId,
+      target: decision.target,
     });
 
     if (!queued.ok) {
@@ -307,7 +314,7 @@ function getOrderRequestsForAction(state: GameState, actionId: ActionId): QueueO
   }
 
   if (action.assignment === 'none') {
-    return [{ actionId }];
+    return withLegalTargets(state, actionId, [{ actionId }]);
   }
 
   const operativeRequests = state.operatives.map((operative) => ({
@@ -315,7 +322,31 @@ function getOrderRequestsForAction(state: GameState, actionId: ActionId): QueueO
     assignedOperativeId: operative.id,
   }));
 
-  return action.assignment === 'required' ? operativeRequests : [{ actionId }, ...operativeRequests];
+  const assignmentRequests =
+    action.assignment === 'required' ? operativeRequests : [{ actionId }, ...operativeRequests];
+
+  return withLegalTargets(state, actionId, assignmentRequests);
+}
+
+function withLegalTargets(
+  state: GameState,
+  actionId: ActionId,
+  requests: QueueOrderRequest[],
+): QueueOrderRequest[] {
+  const action = DISTRICT_ZERO_ACTIONS.find((candidate) => candidate.id === actionId);
+
+  if (!action) {
+    return [];
+  }
+
+  const targetedRequests = selectActionTargetOptions(state, actionId).flatMap((option) =>
+    requests.map((request) => ({
+      ...request,
+      target: option.target,
+    })),
+  );
+
+  return action.requiresTarget ? targetedRequests : [...requests, ...targetedRequests];
 }
 
 function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResult[]): AgentBatchSummary {

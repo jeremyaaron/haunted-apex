@@ -3,8 +3,16 @@ export type {
   ActionDefinition,
   ActionId,
   ActionStressType,
+  ActionTarget,
   QueuedOrder,
 } from './actions';
+export type { RecentActivityEntry } from './activity';
+export type {
+  DistrictArchetype,
+  DistrictDefinition,
+  DistrictId,
+  DistrictState,
+} from './districts';
 export type {
   Difficulty,
   GameLogEntry,
@@ -26,3 +34,11 @@ export type {
 export type { Operative, OperativeSkill, OperativeStatus, RecruitCandidate } from './operatives';
 export { PRESSURE_IDS } from './pressures';
 export type { PressureDelta, PressureId, Pressures } from './pressures';
+export type {
+  RivalArchetype,
+  RivalDefinition,
+  RivalId,
+  RivalPressureTier,
+  RivalState,
+} from './rivals';
+export type { VenueArchetype, VenueDefinition, VenueId } from './venues';

@@ -1,7 +1,10 @@
 import type { QueuedOrder } from './actions';
+import type { RecentActivityEntry } from './activity';
+import type { DistrictId, DistrictState } from './districts';
 import type { GameEventInstance } from './events';
 import type { Operative, RecruitCandidate } from './operatives';
 import type { PressureDelta, Pressures } from './pressures';
+import type { RivalId, RivalState } from './rivals';
 
 export type Difficulty = 'standard';
 
@@ -60,6 +63,9 @@ export type GameState = {
   operatives: Operative[];
   recruitPool: RecruitCandidate[];
   queuedOrders: QueuedOrder[];
+  districts: Record<DistrictId, DistrictState>;
+  rivals: Record<RivalId, RivalState>;
+  recentActivity: RecentActivityEntry[];
   pendingEvent?: GameEventInstance;
   eventLog: GameLogEntry[];
   flags: Record<string, boolean | number | string>;

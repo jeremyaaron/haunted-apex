@@ -41,10 +41,16 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
     : undefined;
-  const riskChance = calculateRiskChance(action, operative);
+  const riskChance = calculateRiskChance(action, operative, state, order.target);
   const roll = nextInt(createRng(state.seed, state.rngCursor), 1, 100);
   const complication = roll.value <= riskChance;
-  const actionDelta = getResolvedActionDelta(action, order.assignedOperativeId, complication);
+  const actionDelta = getResolvedActionDelta(
+    action,
+    order.assignedOperativeId,
+    complication,
+    state,
+    order.target,
+  );
   const complicationDelta = getComplicationDelta(action, complication);
   const totalDelta = mergePressureDeltas(actionDelta, complicationDelta);
   let next = {
@@ -88,8 +94,10 @@ export function getResolvedActionDelta(
   action: ActionDefinition,
   assignedOperativeId: string | undefined,
   complication: boolean,
+  state?: GameState,
+  target?: QueuedOrder['target'],
 ): PressureDelta {
-  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId);
+  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId, state, target);
   const adjustedResourceCost = getAdjustedResourceCost(action, assignedOperativeId);
   const effects =
     action.id === 'bribe_official' && complication

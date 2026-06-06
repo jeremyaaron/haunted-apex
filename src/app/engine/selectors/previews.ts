@@ -1,25 +1,43 @@
 import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
+  getDistrictDefinition,
   getOperativeActionModifier,
+  getRivalDefinition,
+  getVenueDefinition,
 } from '../content';
 import type {
   ActionDefinition,
   ActionId,
+  ActionTarget,
+  DistrictDefinition,
+  DistrictId,
   GameState,
   Operative,
   OperativeSkill,
   PressureDelta,
   PressureId,
   QueuedOrder,
+  RivalId,
+  RivalPressureTier,
+  VenueDefinition,
 } from '../model';
 import { PRESSURE_IDS } from '../model';
+import {
+  calculateTargetControlGain,
+  calculateTargetLocalHeatGain,
+  getTargetControllerId,
+  getTargetLabel,
+  resolveTargetDistrictId,
+} from './territory';
+import { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
 
 export type RiskLabel = 'Very Low' | 'Low' | 'Moderate' | 'High' | 'Severe';
 
 export type QueueOrderRequest = {
   actionId: ActionId;
   assignedOperativeId?: string;
+  target?: ActionTarget;
 };
 
 export type QueueOrderUnavailableReason =
@@ -32,7 +50,11 @@ export type QueueOrderUnavailableReason =
   | 'operative_not_found'
   | 'operative_unavailable'
   | 'operative_already_assigned'
-  | 'roster_full';
+  | 'roster_full'
+  | 'target_required'
+  | 'target_not_allowed'
+  | 'target_not_found'
+  | 'target_inactive';
 
 export type OrderAvailability = {
   available: boolean;
@@ -60,8 +82,28 @@ export type ActionPreview = {
   baseEffects: PressureDelta;
   adjustedEffects: PressureDelta;
   selectedOperativeId?: string;
+  selectedTarget?: ActionTarget;
+  targetLabel?: string;
   riskChance: number;
   riskLabel: RiskLabel;
+  rivalAttention?: RivalAttentionPreview;
+  localImpact?: LocalImpactPreview;
+};
+
+export type RivalAttentionPreview = {
+  rivalId: RivalId;
+  rivalName: string;
+  pressureGain: number;
+  currentPressure: number;
+  projectedPressure: number;
+  projectedTier: RivalPressureTier;
+};
+
+export type LocalImpactPreview = {
+  districtId: DistrictId;
+  districtName: string;
+  controlGain: number;
+  localHeatGain: number;
 };
 
 export type ActionCardView = ActionPreview & {
@@ -75,6 +117,7 @@ export type QueuedOrderView = {
   actionId: ActionId;
   label: string;
   assignedOperativeName?: string;
+  targetLabel?: string;
   adjustedEffects: PressureDelta;
   adjustedResourceCost: number;
   riskLabel: RiskLabel;
@@ -117,6 +160,12 @@ export function getOrderAvailability(
     return unavailable('action_not_found');
   }
 
+  const targetAvailability = getTargetAvailability(state, action, request.target);
+
+  if (!targetAvailability.available) {
+    return targetAvailability;
+  }
+
   if (getCommandPointsRemaining(state) < action.commandCost) {
     return unavailable('not_enough_command_points');
   }
@@ -152,10 +201,44 @@ export function getOrderAvailability(
   };
 }
 
+function getTargetAvailability(
+  state: GameState,
+  action: ActionDefinition,
+  target: ActionTarget | undefined,
+): OrderAvailability {
+  if (!target) {
+    return action.requiresTarget ? unavailable('target_required') : { available: true };
+  }
+
+  if (!action.allowedTargetTypes.includes(target.type)) {
+    return unavailable('target_not_allowed');
+  }
+
+  switch (target.type) {
+    case 'district':
+      return getDistrictDefinition(target.id)
+        ? { available: true }
+        : unavailable('target_not_found');
+    case 'venue':
+      return getVenueDefinition(target.id)
+        ? { available: true }
+        : unavailable('target_not_found');
+    case 'rival':
+      if (!getRivalDefinition(target.id) || !state.rivals[target.id]) {
+        return unavailable('target_not_found');
+      }
+
+      return state.rivals[target.id].active
+        ? { available: true }
+        : unavailable('target_inactive');
+  }
+}
+
 export function getActionPreview(
   state: GameState,
   actionId: ActionId,
   assignedOperativeId?: string,
+  target?: ActionTarget,
 ): ActionPreview | undefined {
   const action = getActionDefinition(actionId);
 
@@ -166,8 +249,8 @@ export function getActionPreview(
   const operative = assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === assignedOperativeId)
     : undefined;
-  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId);
-  const riskChance = calculateRiskChance(action, operative);
+  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId, state, target);
+  const riskChance = calculateRiskChance(action, operative, state, target);
 
   return {
     actionId: action.id,
@@ -178,8 +261,12 @@ export function getActionPreview(
     baseEffects: { ...action.effects },
     adjustedEffects,
     selectedOperativeId: assignedOperativeId,
+    selectedTarget: target,
+    targetLabel: getTargetLabel(target),
     riskChance,
     riskLabel: riskLabel(riskChance),
+    rivalAttention: getRivalAttentionPreview(state, action.id, target),
+    localImpact: getLocalImpactPreview(state, action.id, adjustedEffects, target),
   };
 }
 
@@ -220,7 +307,7 @@ export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
     const operative = order.assignedOperativeId
       ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
       : undefined;
-    const preview = getActionPreview(state, order.actionId, order.assignedOperativeId);
+    const preview = getActionPreview(state, order.actionId, order.assignedOperativeId, order.target);
 
     if (!preview) {
       throw new Error(`Missing preview for queued order ${order.id}`);
@@ -231,6 +318,7 @@ export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
       actionId: action.id,
       label: action.label,
       assignedOperativeName: operative?.name,
+      targetLabel: preview.targetLabel,
       adjustedEffects: preview.adjustedEffects,
       adjustedResourceCost: preview.adjustedResourceCost,
       riskLabel: preview.riskLabel,
@@ -248,9 +336,82 @@ export function pressureDeltaToView(delta: PressureDelta): PressureDeltaView[] {
 export function getAdjustedEffects(
   action: ActionDefinition,
   assignedOperativeId?: string,
+  state?: GameState,
+  target?: ActionTarget,
 ): PressureDelta {
   const modifier = getOperativeActionModifier(assignedOperativeId, action.id);
-  return mergePressureDeltas(action.effects, modifier?.effects);
+  let effects = mergePressureDeltas(action.effects, modifier?.effects);
+  const districtId = resolveTargetDistrictId(target);
+
+  if (state && districtId) {
+    const districtDefinition = getDistrictDefinition(districtId);
+    const districtState = state.districts[districtId];
+
+    if (districtDefinition && districtState) {
+      effects = applyDistrictModifiers(effects, districtDefinition, districtState.heat);
+    }
+  }
+
+  if (target?.type === 'venue') {
+    const venue = getVenueDefinition(target.id);
+
+    if (venue) {
+      effects = applyVenueModifiers(effects, venue);
+    }
+  }
+
+  return effects;
+}
+
+export function applyDistrictModifiers(
+  effects: PressureDelta,
+  district: DistrictDefinition,
+  currentDistrictHeat: number,
+): PressureDelta {
+  const next = { ...effects };
+
+  if (effects.resources !== undefined) {
+    next.resources = effects.resources + Math.round((district.wealth - 50) * 8);
+  }
+
+  if (effects.intel !== undefined) {
+    next.intel = effects.intel + Math.round((district.secrecy - 50) / 15);
+  }
+
+  if (effects.heat !== undefined && effects.heat > 0) {
+    next.heat = effects.heat + Math.round(currentDistrictHeat / 20);
+  }
+
+  return normalizePressureDelta(next);
+}
+
+export function applyVenueModifiers(
+  effects: PressureDelta,
+  venue: VenueDefinition,
+): PressureDelta {
+  const next = { ...effects };
+
+  if (effects.resources !== undefined) {
+    next.resources = effects.resources + venue.wealthMod * 150;
+  }
+
+  if (effects.intel !== undefined) {
+    next.intel = effects.intel + venue.intelMod;
+  }
+
+  if (effects.heat !== undefined) {
+    next.heat = effects.heat + venue.heatMod;
+  }
+
+  if (effects.loyalty !== undefined) {
+    next.loyalty = effects.loyalty + venue.loyaltyMod;
+  }
+
+  if (effects.ruin !== undefined) {
+    next.ruin = effects.ruin + venue.ruinMod;
+  }
+
+  return normalizePressureDelta(next);
 }
 
 export function getAdjustedResourceCost(
@@ -261,22 +422,95 @@ export function getAdjustedResourceCost(
   return Math.max(0, action.resourceCost + (modifier?.resourceCost ?? 0));
 }
 
-export function calculateRiskChance(action: ActionDefinition, operative?: Operative): number {
-  if (!operative || !action.operativeSkill) {
-    return clampRisk(action.baseRisk);
+export function calculateRiskChance(
+  action: ActionDefinition,
+  operative?: Operative,
+  state?: GameState,
+  target?: ActionTarget,
+): number {
+  let riskChance = action.baseRisk;
+
+  if (operative && action.operativeSkill) {
+    const skill = getSkill(operative, action.operativeSkill);
+    riskChance -= Math.floor((skill - 50) / 4);
+    riskChance += Math.floor(operative.stress / 10);
+    riskChance -= Math.floor(operative.loyalty / 20);
+
+    if (operative.stress >= 60) {
+      riskChance += 10;
+    }
   }
 
-  const skill = getSkill(operative, action.operativeSkill);
-  let riskChance = action.baseRisk - Math.floor((skill - 50) / 4);
+  const districtId = resolveTargetDistrictId(target);
 
-  riskChance += Math.floor(operative.stress / 10);
-  riskChance -= Math.floor(operative.loyalty / 20);
+  if (state && districtId) {
+    const district = state.districts[districtId];
+    const definition = getDistrictDefinition(districtId);
 
-  if (operative.stress >= 60) {
-    riskChance += 10;
+    if (district && definition) {
+      riskChance += Math.floor(Math.max(0, district.heat - definition.baseHeat) / 10);
+      riskChance -= district.control >= 70 ? 4 : district.control >= 40 ? 2 : 0;
+    }
   }
 
   return clampRisk(riskChance);
+}
+
+function getRivalAttentionPreview(
+  state: GameState,
+  actionId: ActionId,
+  target?: ActionTarget,
+): RivalAttentionPreview | undefined {
+  const rivalId = getTargetControllerId(target);
+
+  if (!rivalId) {
+    return undefined;
+  }
+
+  const rival = getRivalDefinition(rivalId);
+  const rivalState = state.rivals[rivalId];
+
+  if (!rival || !rivalState) {
+    return undefined;
+  }
+
+  const pressureGain = calculateRivalPressureGain(actionId);
+  const projectedPressure = Math.min(100, Math.max(0, rivalState.pressure + pressureGain));
+
+  return {
+    rivalId,
+    rivalName: rival.name,
+    pressureGain,
+    currentPressure: rivalState.pressure,
+    projectedPressure,
+    projectedTier: getRivalPressureTier(projectedPressure),
+  };
+}
+
+function getLocalImpactPreview(
+  state: GameState,
+  actionId: ActionId,
+  effects: PressureDelta,
+  target?: ActionTarget,
+): LocalImpactPreview | undefined {
+  const districtId = resolveTargetDistrictId(target);
+
+  if (!districtId) {
+    return undefined;
+  }
+
+  const district = getDistrictDefinition(districtId);
+
+  if (!district || !state.districts[districtId]) {
+    return undefined;
+  }
+
+  return {
+    districtId,
+    districtName: district.name,
+    controlGain: calculateTargetControlGain(actionId, target),
+    localHeatGain: calculateTargetLocalHeatGain(effects, target),
+  };
 }
 
 export function riskLabel(chance: number): RiskLabel {
@@ -365,6 +599,20 @@ function mergePressureDeltas(base: PressureDelta, modifier: PressureDelta = {}):
   }
 
   return merged;
+}
+
+function normalizePressureDelta(delta: PressureDelta): PressureDelta {
+  const normalized: PressureDelta = {};
+
+  for (const id of PRESSURE_IDS) {
+    const value = delta[id];
+
+    if (value !== undefined && value !== 0) {
+      normalized[id] = value;
+    }
+  }
+
+  return normalized;
 }
 
 function getSkill(operative: Operative, skill: OperativeSkill): number {

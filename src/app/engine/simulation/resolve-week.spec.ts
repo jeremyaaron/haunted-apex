@@ -1,4 +1,4 @@
-import type { GameState } from '../model';
+import type { ActionTarget, GameState } from '../model';
 import { getGameOverState } from './win-loss';
 import { advanceWeek } from './resolve-week';
 import { clampPressures } from './clamps';
@@ -56,6 +56,10 @@ describe('advanceWeek', () => {
     const queued = mustQueue(newGame({ seed: 'VIOLET-ASH-1047' }), {
       actionId: 'run_small_job',
       assignedOperativeId: 'op_mara_voss',
+      target: {
+        type: 'venue',
+        id: 'venue_zero_mercy',
+      },
     });
     const result = advanceWeek(queued);
 
@@ -67,9 +71,9 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       28,
     );
-    expect(result.state.pressures.resources).toBe(5600);
+    expect(result.state.pressures.resources).toBe(6050);
     expect(result.state.pressures.dominion).toBe(16);
-    expect(result.state.pressures.heat).toBe(23);
+    expect(result.state.pressures.heat).toBe(28);
   });
 
   it('applies Bribe Official failure behavior and sets bribe_exposed', () => {
@@ -103,6 +107,10 @@ describe('advanceWeek', () => {
   it('applies generic complications for non-bribe failed risks', () => {
     const queued = mustQueue(newGame({ seed: 'E' }), {
       actionId: 'run_small_job',
+      target: {
+        type: 'district',
+        id: 'district_chrome_narrows',
+      },
     });
     const result = advanceWeek(queued);
 
@@ -113,7 +121,7 @@ describe('advanceWeek', () => {
 
     expect(result.state.pressures).toEqual({
       dominion: 16,
-      heat: 29,
+      heat: 30,
       loyalty: 63,
       resources: 6000,
       intel: 10,
@@ -305,6 +313,7 @@ function mustQueue(
   request: {
     actionId: 'gather_intel' | 'run_small_job' | 'bribe_official' | 'recruit_operative' | 'lay_low';
     assignedOperativeId?: string;
+    target?: ActionTarget;
   },
 ): GameState {
   const result = queueOrder(state, request);

@@ -18,3 +18,9 @@ export {
 } from './district-zero-actions';
 export type { OperativeActionModifier, OperativeActionModifierMap } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './district-zero-events';
+export {
+  getDistrictDefinition,
+  RIVAL_TERRITORY_DISTRICTS,
+} from './rival-territory-districts';
+export { getVenueDefinition, RIVAL_TERRITORY_VENUES } from './rival-territory-venues';
+export { getRivalDefinition, RIVAL_TERRITORY_RIVALS } from './rival-territory-rivals';

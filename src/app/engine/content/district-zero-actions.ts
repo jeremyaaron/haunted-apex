@@ -23,6 +23,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 10,
     stressType: 'normal',
     assignment: 'optional',
+    requiresTarget: false,
+    allowedTargetTypes: ['district', 'venue', 'rival'],
   },
   {
     id: 'run_small_job',
@@ -39,6 +41,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 22,
     stressType: 'dangerous',
     assignment: 'optional',
+    requiresTarget: true,
+    allowedTargetTypes: ['district', 'venue'],
   },
   {
     id: 'bribe_official',
@@ -54,6 +58,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 14,
     stressType: 'normal',
     assignment: 'optional',
+    requiresTarget: false,
+    allowedTargetTypes: ['district', 'rival'],
   },
   {
     id: 'recruit_operative',
@@ -67,6 +73,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 12,
     stressType: 'none',
     assignment: 'none',
+    requiresTarget: false,
+    allowedTargetTypes: ['district', 'venue'],
   },
   {
     id: 'expand_influence',
@@ -83,6 +91,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 18,
     stressType: 'normal',
     assignment: 'optional',
+    requiresTarget: true,
+    allowedTargetTypes: ['district', 'venue'],
   },
   {
     id: 'lay_low',
@@ -97,6 +107,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 4,
     stressType: 'recovery',
     assignment: 'optional',
+    requiresTarget: false,
+    allowedTargetTypes: ['district', 'venue'],
   },
 ] as const;
 

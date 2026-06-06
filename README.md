@@ -1,12 +1,12 @@
 # Haunted Apex
 
-Haunted Apex is a cyber-noir strategy/sim prototype. The current implementation target is **District Zero**, a browser-based Angular vertical slice described in:
+Haunted Apex is a cyber-noir strategy/sim prototype. The completed first release is **v0.1.0: District Zero**. The current development target is **v0.2.0: Rival Territory**.
 
-- `DistrictZero-TDD.md`
-- `DistrictZero-ImplementationPlan.md`
-- `Layer1.md`
-- `Layer1A.md`
-- `v0.md`
+Development documentation is organized under [`docs/`](docs/README.md):
+
+- [`docs/foundation/`](docs/foundation/) contains the original product and simulation direction.
+- [`docs/releases/v0.1-district-zero/`](docs/releases/v0.1-district-zero/) preserves the District Zero specification, TDD, and implementation plan.
+- [`docs/releases/v0.2-rival-territory/`](docs/releases/v0.2-rival-territory/) contains the Rival Territory direction, clarifications, TDD, and implementation plan.
 
 ## Runtime
 
@@ -37,6 +37,16 @@ Then open:
 http://localhost:4200/
 ```
 
+## Playable Build
+
+GitHub Pages deployment is planned for v0.2.0 at:
+
+```text
+https://jeremyaaron.github.io/haunted-apex/
+```
+
+The README will identify it as live after the first successful deployment.
+
 ## Verification
 
 Build:
@@ -50,5 +60,3 @@ Tests:
 ```bash
 npm test
 ```
-
-Phase 0 only establishes the Angular shell, Node pin, and source layout. Game engine implementation begins in Phase 1.
