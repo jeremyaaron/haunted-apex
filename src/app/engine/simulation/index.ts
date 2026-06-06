@@ -8,6 +8,7 @@ export {
   applyLocalDistrictCooling,
   applyTargetedActionConsequences,
 } from './district-effects';
+export { applyRivalPassiveEffects } from './rival-effects';
 export { pruneRecentActivity, recordRecentActivity } from './recent-activity';
 export { applyWinLoss, getGameOverState } from './win-loss';
 export { clampPressures, clampStress } from './clamps';

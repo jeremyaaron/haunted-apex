@@ -450,6 +450,20 @@ Unit tests:
 - Local cooling occurs before rival effects.
 - Event selection occurs after rival effects.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Added deterministic passive resolution for Nyx Ardent and Knox Marrow at pressure 60.
+- Nyx reduces Loyalty by 3 only while Intel is below 20; Knox increases Heat by 3.
+- Inactive rivals do nothing, and rival-tagged logs prevent duplicate effects within one week.
+- Passive pressure deltas use the shared global pressure clamps.
+- Weekly resolution now runs actions, recovery, drift, local cooling, rival effects, activity pruning, and event selection in canonical order.
+- Removed the pre-event win/loss checkpoint so the weekly event response resolves before final outcome evaluation.
+- Added a dedicated `rival_effect` log type with rival name, reason, exact delta, and rival tags.
+- Added 7 Phase 5 tests; all 129 tests pass.
+- TypeScript and the Pages-subpath production build pass.
+
 ### Review Gate
 
 Review whether rival pressure has a legible consequence without behaving like full rival AI.

@@ -206,6 +206,53 @@ describe('advanceWeek', () => {
     );
   });
 
+  it('cools districts, applies rival effects, then presents an event before win/loss', () => {
+    const baseState = newGame({ seed: 'VIOLET-ASH-1047' });
+    const pressuredState: GameState = {
+      ...baseState,
+      pressures: {
+        ...baseState.pressures,
+        heat: 98,
+      },
+      districts: {
+        ...baseState.districts,
+        district_chrome_narrows: {
+          ...baseState.districts.district_chrome_narrows,
+          heat: 30,
+        },
+      },
+      rivals: {
+        ...baseState.rivals,
+        rival_knox_marrow: {
+          ...baseState.rivals.rival_knox_marrow,
+          pressure: 60,
+        },
+      },
+    };
+    const queued = mustQueue(pressuredState, {
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const result = advanceWeek(queued);
+
+    if (!result.ok) {
+      fail(`Expected week resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.districts.district_chrome_narrows.heat).toBe(29);
+    expect(result.state.pressures.heat).toBe(100);
+    expect(result.state.phase).toBe('EVENT_CHOICE');
+    expect(result.state.pendingEvent).toBeDefined();
+    expect(result.state.gameOver).toBeUndefined();
+    expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
+      'order_resolved',
+      'drift',
+      'rival_effect',
+      'event_presented',
+    ]);
+  });
+
   it('refuses to advance without queued orders', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 

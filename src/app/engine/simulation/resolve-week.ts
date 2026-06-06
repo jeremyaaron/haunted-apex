@@ -3,9 +3,9 @@ import { applyIdleStressRecovery } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
 import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
+import { applyRivalPassiveEffects } from './rival-effects';
 import { resolveQueuedOrder } from './resolve-action';
 import { selectWeeklyEvent } from './select-weekly-event';
-import { applyWinLoss } from './win-loss';
 
 export type AdvanceWeekResult =
   | {
@@ -47,18 +47,8 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
   next = applyIdleStressRecovery(next, state.queuedOrders);
   next = applyWeeklyDrift(next);
   next = applyLocalDistrictCooling(next);
+  next = applyRivalPassiveEffects(next);
   next = pruneRecentActivity(next);
-  next = applyWinLoss(next);
-
-  if (next.gameOver) {
-    return {
-      ok: true,
-      state: {
-        ...next,
-        queuedOrders: [],
-      },
-    };
-  }
 
   const selectedEvent = selectWeeklyEvent(next);
   next = {

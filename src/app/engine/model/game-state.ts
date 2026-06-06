@@ -37,6 +37,7 @@ export type GameLogEntryType =
   | 'order_resolved'
   | 'complication'
   | 'drift'
+  | 'rival_effect'
   | 'event_presented'
   | 'event_choice'
   | 'win_loss';
