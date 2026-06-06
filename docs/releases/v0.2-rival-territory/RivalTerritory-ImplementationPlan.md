@@ -1042,8 +1042,9 @@ Pending before final v0.2.0 approval:
 - Replaced the obsolete `District Zero Prototype` eyebrow with `Rival Territory`.
 - Relabeled action complication percentages as `Risk: <tier> <percent>%`.
 - Added a bounded, scrollable Field Guide beneath the Event Feed covering victory and
-  loss conditions, action skills, risk, district Control, Local Heat, venue modifiers,
-  rival Pressure tiers, reprisals, and weekly fallout.
+  loss conditions, weekly turn flow, Command spending, queueing orders, event responses,
+  action skills, risk, district Control, Local Heat, venue modifiers, rival Pressure
+  tiers, reprisals, and weekly fallout.
 - Explicitly documents that Control is the player's foothold rather than territory
   ownership, and that ownership cannot change in v0.2.
 - Explicitly identifies rival Disposition and profile ratings as non-mechanical in this

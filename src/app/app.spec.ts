@@ -46,6 +46,8 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Win at 85');
     expect(compiled.textContent).toContain('Warning at 25');
     expect(compiled.textContent).not.toContain('Debug Panel');
+    expect(compiled.textContent).toContain('Each week begins on the Command Board');
+    expect(compiled.textContent).toContain('Unspent Command does not carry forward');
     expect(compiled.textContent).toContain('Control is your network foothold');
     expect(compiled.textContent).toContain('Watching (0-24)');
     expect(compiled.textContent).toContain('do not modify actions in this release');
