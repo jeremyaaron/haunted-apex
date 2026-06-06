@@ -17,3 +17,10 @@
 - [`v0.2A.md`](releases/v0.2-rival-territory/v0.2A.md): implementation clarifications.
 - [`RivalTerritory-TDD.md`](releases/v0.2-rival-territory/RivalTerritory-TDD.md): technical design.
 - [`RivalTerritory-ImplementationPlan.md`](releases/v0.2-rival-territory/RivalTerritory-ImplementationPlan.md): phased implementation plan.
+
+## v0.3.0: The Roster
+
+- [`v0.3.md`](releases/v0.3-the-roster/v0.3.md): release direction and product scope.
+- [`v0.3A.md`](releases/v0.3-the-roster/v0.3A.md): locked mechanical decisions.
+- [`Roster-TDD.md`](releases/v0.3-the-roster/Roster-TDD.md): technical design.
+- [`Roster-ImplementationPlan.md`](releases/v0.3-the-roster/Roster-ImplementationPlan.md): phased implementation plan.

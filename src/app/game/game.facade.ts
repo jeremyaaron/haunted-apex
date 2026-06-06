@@ -5,6 +5,8 @@ import {
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
+  getOperativeDefinition,
+  getTraitDefinition,
   getOrderAvailability,
   newGame,
   queueOrder,
@@ -41,6 +43,27 @@ export class GameFacade {
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly districts = computed(() => selectDistrictTerritoryViews(this.stateSignal()));
   readonly rivals = computed(() => selectRivalTerritoryViews(this.stateSignal()));
+  readonly operatives = computed(() =>
+    this.stateSignal().operatives.flatMap((operative) => {
+      const definition = getOperativeDefinition(operative.id);
+
+      if (!definition) {
+        return [];
+      }
+
+      return [
+        {
+          ...operative,
+          name: definition.name,
+          archetype: definition.archetype,
+          ...definition.baseStats,
+          traits: operative.revealedTraits.map(
+            (traitId) => getTraitDefinition(traitId)?.name ?? traitId,
+          ),
+        },
+      ];
+    }),
+  );
   readonly commandPointsRemaining = computed(() => getCommandPointsRemaining(this.stateSignal()));
   readonly pendingEventDefinition = computed(() => {
     const pendingEvent = this.stateSignal().pendingEvent;

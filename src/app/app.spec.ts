@@ -41,7 +41,7 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Field Guide');
     expect(compiled.textContent).toContain('Risk: Low 10%');
     expect(compiled.textContent).toContain('Gather Intel');
-    expect(compiled.textContent).toContain('Mara Voss');
+    expect(compiled.querySelectorAll('.operative-card').length).toBe(3);
     expect(compiled.textContent).toContain('Dominion target 85');
     expect(compiled.textContent).toContain('Win at 85');
     expect(compiled.textContent).toContain('Warning at 25');

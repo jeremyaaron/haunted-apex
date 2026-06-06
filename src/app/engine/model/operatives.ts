@@ -104,28 +104,15 @@ export type OperativeState = {
   recentAssignments: RecentAssignment[];
 };
 
-// Compatibility models retained until Phase 2 replaces fixed roster initialization.
-export type Operative = {
-  id: string;
-  name: string;
-  archetype: string;
-  loyalty: number;
-  stress: number;
-  violence: number;
-  charm: number;
-  tech: number;
-  subtlety: number;
-  traitIds: string[];
-  status: OperativeStatus;
+export type RosterGenerationConfig = {
+  startingRosterSize: number;
+  hirePoolSize: number;
+  maxStartingRares: number;
+  rarityWeights: Record<OperativeRarity, number>;
 };
 
-export type RecruitCandidate = {
-  id: string;
-  name: string;
-  archetype: string;
-  violence: number;
-  charm: number;
-  tech: number;
-  subtlety: number;
-  traitIds: string[];
+export type GeneratedRoster = {
+  startingOperativeIds: OperativeId[];
+  hirePoolIds: OperativeId[];
+  rngCursor: number;
 };

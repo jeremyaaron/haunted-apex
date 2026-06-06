@@ -251,7 +251,7 @@
       </div>
 
       <div class="operative-list">
-        @for (operative of game.state().operatives; track operative.id) {
+        @for (operative of game.operatives(); track operative.id) {
           <article class="operative-card" [class.compromised]="operative.status === 'compromised'">
             <div class="operative-topline">
               <div class="portrait-slot">
@@ -290,7 +290,7 @@
               </div>
             </dl>
             <div class="trait-list">
-              @for (trait of operative.traitIds; track trait) {
+              @for (trait of operative.traits; track trait) {
                 <span>{{ trait }}</span>
               }
             </div>

@@ -1,0 +1,12 @@
+{
+  "latestRelease": {
+    "version": "v0.2.0",
+    "name": "Rival Territory",
+    "docsPath": "docs/releases/v0.2-rival-territory/"
+  },
+  "developmentTarget": {
+    "version": "v0.3.0",
+    "name": "The Roster",
+    "docsPath": "docs/releases/v0.3-the-roster/"
+  }
+}

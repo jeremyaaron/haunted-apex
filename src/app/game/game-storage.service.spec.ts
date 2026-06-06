@@ -50,7 +50,7 @@ describe('GameStorageService', () => {
     expect(service.loadCurrentRun()).toBeUndefined();
   });
 
-  it('round-trips complete v0.2 territory, rival, activity, and target state', () => {
+  it('round-trips complete schema 3 territory, rival, activity, and target state', () => {
     const baseState = newGame({ seed: 'VIOLET-ASH-1047' });
     const queued = queueOrder(baseState, {
       actionId: 'run_small_job',
@@ -88,6 +88,18 @@ describe('GameStorageService', () => {
     service.saveCurrentRun(state);
 
     expect(service.loadCurrentRun()).toEqual(state);
+  });
+
+  it('rejects saves without the schema 3 state contract', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const legacyState = {
+      ...state,
+      schemaVersion: 2,
+    };
+
+    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(legacyState));
+
+    expect(service.loadCurrentRun()).toBeUndefined();
   });
 
   it('rejects a v0.1-shaped save under the v0.2 key', () => {

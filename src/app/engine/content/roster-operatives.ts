@@ -1,6 +1,6 @@
 import type { OperativeDefinition, OperativeId } from '../model';
 
-export const ROSTER_OPERATIVES = [
+const AUTHORED_ROSTER_OPERATIVES = [
   {
     id: 'op_mara_voss',
     name: 'Mara Voss',
@@ -286,6 +286,33 @@ export const ROSTER_OPERATIVES = [
     },
   },
 ] as const satisfies readonly OperativeDefinition[];
+
+const ROSTER_GENERATION_ORDER: readonly OperativeId[] = [
+  // Keep the established VIOLET-ASH-1047 crew while allowing other seeds to vary.
+  'op_juno_hex',
+  'op_rook_vale',
+  'op_orchid_seven',
+  'op_mara_voss',
+  'op_mother_neon',
+  'op_saint_calder',
+  'op_vant_black',
+  'op_knox_riven',
+  'op_iris_vale',
+  'op_echo_saint',
+];
+
+export const ROSTER_OPERATIVES: readonly OperativeDefinition[] =
+  ROSTER_GENERATION_ORDER.map((operativeId) => {
+    const definition = AUTHORED_ROSTER_OPERATIVES.find(
+      (candidate) => candidate.id === operativeId,
+    );
+
+    if (!definition) {
+      throw new Error(`Roster content error: missing authored definition for ${operativeId}.`);
+    }
+
+    return definition;
+  });
 
 export function getOperativeDefinition(
   operativeId: OperativeId,

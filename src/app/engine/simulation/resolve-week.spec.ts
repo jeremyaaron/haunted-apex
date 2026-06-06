@@ -1,4 +1,5 @@
 import type { ActionTarget, GameState } from '../model';
+import { getOperativeDefinition } from '../content';
 import { getGameOverState } from './win-loss';
 import { advanceWeek } from './resolve-week';
 import { clampPressures } from './clamps';
@@ -21,7 +22,7 @@ describe('advanceWeek', () => {
 
     expect(result.state.phase).toBe('EVENT_CHOICE');
     expect(result.state.week).toBe(1);
-    expect(result.state.rngCursor).toBe(2);
+    expect(result.state.rngCursor).toBe(12);
     expect(result.state.queuedOrders).toEqual([]);
     expect(result.state.pendingEvent).toEqual(
       jasmine.objectContaining({
@@ -175,7 +176,7 @@ describe('advanceWeek', () => {
     ]);
   });
 
-  it('recruits the first candidate from the recruit pool', () => {
+  it('recruits the first candidate from the hire pool', () => {
     const queued = mustQueue(newGame({ seed: 'VIOLET-ASH-1047' }), {
       actionId: 'recruit_operative',
     });
@@ -186,15 +187,14 @@ describe('advanceWeek', () => {
       return;
     }
 
-    expect(result.state.operatives.map((operative) => operative.name)).toContain('Iris Vale');
-    expect(result.state.recruitPool.map((candidate) => candidate.name)).toEqual([
-      'Knox Riven',
-      'Orchid Seven',
-    ]);
-    expect(result.state.operatives.find((operative) => operative.name === 'Iris Vale')).toEqual(
+    expect(result.state.operatives.map((operative) => operative.id)).toContain('op_iris_vale');
+    expect(result.state.hirePool).not.toContain('op_iris_vale');
+    expect(result.state.hirePool.length).toBe(3);
+    expect(getOperativeDefinition(result.state.hirePool[0])?.name).toBe('Rook Vale');
+    expect(result.state.operatives.find((operative) => operative.id === 'op_iris_vale')).toEqual(
       jasmine.objectContaining({
-        loyalty: 55,
-        stress: 8,
+        loyalty: 58,
+        stress: 12,
         status: 'available',
       }),
     );

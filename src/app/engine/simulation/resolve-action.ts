@@ -1,5 +1,6 @@
 import {
   getActionDefinition,
+  getOperativeDefinition,
   getOperativeActionModifier,
   getRivalDefinition,
 } from '../content';
@@ -7,10 +8,9 @@ import type {
   ActionDefinition,
   GameLogEntry,
   GameState,
-  Operative,
+  OperativeState,
   PressureDelta,
   QueuedOrder,
-  RecruitCandidate,
 } from '../model';
 import {
   calculateRiskChance,
@@ -25,6 +25,7 @@ import {
   resolveTargetDistrictId,
 } from '../selectors';
 import { createRng, nextInt, type RngState } from '../rng';
+import { materializeOperativeState } from '../roster';
 import { clampStress } from './clamps';
 import { applyTargetedActionConsequences } from './district-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
@@ -189,33 +190,23 @@ function getComplicationDelta(action: ActionDefinition, complication: boolean): 
 }
 
 function resolveRecruitment(state: GameState, action: ActionDefinition): GameState {
-  if (action.id !== 'recruit_operative' || state.recruitPool.length === 0) {
+  if (action.id !== 'recruit_operative' || state.hirePool.length === 0) {
     return state;
   }
 
-  const [candidate, ...remainingRecruitPool] = state.recruitPool;
+  const [operativeId, ...remainingHirePool] = state.hirePool;
 
   return {
     ...state,
-    operatives: [...state.operatives, recruitCandidateToOperative(candidate)],
-    recruitPool: remainingRecruitPool,
-  };
-}
-
-function recruitCandidateToOperative(candidate: RecruitCandidate): Operative {
-  return {
-    ...candidate,
-    loyalty: 55,
-    stress: 10,
-    status: 'available',
-    traitIds: [...candidate.traitIds],
+    operatives: [...state.operatives, materializeOperativeState(operativeId)],
+    hirePool: remainingHirePool,
   };
 }
 
 function applyAssignedOperativeStress(
   state: GameState,
   action: ActionDefinition,
-  operative: Operative | undefined,
+  operative: OperativeState | undefined,
   assignedOperativeId: string | undefined,
 ): GameState {
   if (!operative || !assignedOperativeId) {
@@ -279,14 +270,15 @@ function applyComplicationSideEffects(
 
 function createResolutionBody(
   action: ActionDefinition,
-  operative: Operative | undefined,
+  operative: OperativeState | undefined,
   order: QueuedOrder,
   resolvedDelta: PressureDelta,
   roll: number,
   riskChance: number,
   complication: boolean,
 ): string {
-  const assignment = operative ? ` Assigned: ${operative.name}.` : '';
+  const operativeName = operative ? getOperativeDefinition(operative.id)?.name : undefined;
+  const assignment = operativeName ? ` Assigned: ${operativeName}.` : '';
   const targetLabel = getTargetLabel(order.target);
   const target = targetLabel ? ` Target: ${targetLabel}.` : '';
   const districtImpact = resolveTargetDistrictId(order.target)

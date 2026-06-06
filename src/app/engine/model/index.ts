@@ -33,9 +33,9 @@ export type {
   SpecialCost,
 } from './events';
 export type {
-  Operative,
   OperativeAffinity,
   OperativeDefinition,
+  GeneratedRoster,
   OperativeId,
   OperativeRarity,
   OperativeRoleTag,
@@ -44,7 +44,7 @@ export type {
   OperativeStats,
   OperativeStatus,
   RecentAssignment,
-  RecruitCandidate,
+  RosterGenerationConfig,
   StressProfile,
   StressTier,
 } from './operatives';

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
   getActionDefinition,
   getDistrictDefinition,
+  getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
   RIVAL_TERRITORY_DISTRICTS,
@@ -10,6 +11,7 @@ import {
   type ActionTarget,
   type DistrictId,
   type GameState,
+  type OperativeId,
   type Pressures,
   type RivalId,
   type TurnPhase,
@@ -73,6 +75,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
+    value['schemaVersion'] === 3 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     typeof value['rngCursor'] === 'number' &&
@@ -81,14 +84,65 @@ function isGameState(value: unknown): value is GameState {
     isTurnPhase(value['phase']) &&
     typeof value['commandPointsPerWeek'] === 'number' &&
     isPressures(value['pressures']) &&
-    Array.isArray(value['operatives']) &&
-    Array.isArray(value['recruitPool']) &&
+    isOperatives(value['operatives']) &&
+    isHirePool(value['hirePool'], value['operatives']) &&
+    isStringArray(value['seenSignatureEventIds']) &&
     isQueuedOrders(value['queuedOrders'], value['operatives']) &&
     isDistrictOverlays(value['districts']) &&
     isRivalOverlays(value['rivals']) &&
     isRecentActivity(value['recentActivity']) &&
     Array.isArray(value['eventLog']) &&
     isRecord(value['flags'])
+  );
+}
+
+function isOperatives(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const ids = new Set<string>();
+
+  return value.every((operative) => {
+    if (
+      !isRecord(operative) ||
+      typeof operative['id'] !== 'string' ||
+      !getOperativeDefinition(operative['id'] as OperativeId) ||
+      ids.has(operative['id']) ||
+      typeof operative['loyalty'] !== 'number' ||
+      typeof operative['stress'] !== 'number' ||
+      typeof operative['status'] !== 'string' ||
+      !isStringArray(operative['revealedTraits']) ||
+      !isRecord(operative['hiddenFlags']) ||
+      typeof operative['weeksAssigned'] !== 'number' ||
+      !Array.isArray(operative['recentAssignments'])
+    ) {
+      return false;
+    }
+
+    ids.add(operative['id']);
+    return true;
+  });
+}
+
+function isHirePool(value: unknown, operatives: unknown): boolean {
+  if (!Array.isArray(value) || !Array.isArray(operatives)) {
+    return false;
+  }
+
+  const activeIds = new Set(
+    operatives.flatMap((operative) =>
+      isRecord(operative) && typeof operative['id'] === 'string' ? [operative['id']] : [],
+    ),
+  );
+  const hireIds = value.filter((id): id is string => typeof id === 'string');
+
+  return (
+    hireIds.length === value.length &&
+    new Set(hireIds).size === hireIds.length &&
+    hireIds.every(
+      (id) => getOperativeDefinition(id as OperativeId) !== undefined && !activeIds.has(id),
+    )
   );
 }
 
@@ -205,6 +259,10 @@ function isRecentActivity(value: unknown): boolean {
         getRivalDefinition(activity['rivalId'] as RivalId) !== undefined)
     );
   });
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
 function parseActionTarget(value: unknown): ActionTarget | undefined {

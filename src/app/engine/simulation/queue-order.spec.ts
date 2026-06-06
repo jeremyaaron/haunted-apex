@@ -1,4 +1,5 @@
 import { getCommandPointsRemaining, getOrderAvailability, selectQueuedOrderViews } from '../selectors';
+import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
 import { queueOrder, removeQueuedOrder } from './queue-order';
 
@@ -384,24 +385,11 @@ function queueTwoOrders() {
 
 function queueOneRecruitmentWithFourOperatives() {
   const state = newGame({ seed: 'VIOLET-ASH-1047' });
+  const extraOperativeId = state.hirePool[0];
   const fourOperativeState = {
     ...state,
-    operatives: [
-      ...state.operatives,
-      {
-        id: 'op_test_extra',
-        name: 'Test Extra',
-        archetype: 'Analyst',
-        loyalty: 50,
-        stress: 0,
-        violence: 40,
-        charm: 40,
-        tech: 40,
-        subtlety: 40,
-        traitIds: [],
-        status: 'available' as const,
-      },
-    ],
+    operatives: [...state.operatives, materializeOperativeState(extraOperativeId)],
+    hirePool: state.hirePool.slice(1),
   };
   const first = queueOrder(fourOperativeState, {
     actionId: 'recruit_operative',

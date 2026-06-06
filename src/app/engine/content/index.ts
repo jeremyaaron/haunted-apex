@@ -7,10 +7,6 @@ export {
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
 } from './district-zero-tuning';
 export {
-  DISTRICT_ZERO_RECRUIT_POOL,
-  DISTRICT_ZERO_STARTING_OPERATIVES,
-} from './district-zero-operatives';
-export {
   DISTRICT_ZERO_ACTIONS,
   DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS,
   getActionDefinition,

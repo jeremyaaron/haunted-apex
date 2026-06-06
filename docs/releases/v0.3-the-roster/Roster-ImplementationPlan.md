@@ -313,6 +313,35 @@ Unit tests:
 - Invalid registry coverage throws a descriptive error.
 - Separate new games do not share mutable operative arrays, flags, or histories.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Added bounded deterministic roster generation using the existing seeded RNG, rarity
+  weights, weighted ordering without replacement, deterministic combination search, and
+  a sorted fallback search.
+- Every opening now contains three unique operatives, four disjoint hire candidates,
+  required strategic role coverage, Intel capability, Heat-control capability, and at
+  most one starting rare.
+- New games now use schema version `3`, preserve the roster-generation RNG cursor, store
+  mutable `OperativeState[]`, store hire candidates as `OperativeId[]`, and initialize
+  `seenSignatureEventIds`.
+- Starting and recruited operative state is materialized from the static registry with
+  independent trait, flag, and assignment-history collections.
+- Removed the fixed District Zero starting-roster and recruit-pool content module.
+- Existing previews, action resolution, logs, storage validation, and the temporary
+  roster UI now resolve identity and base stats from static definitions.
+- Recruitment temporarily consumes the first hire-pool ID until Phase 3 adds explicit
+  candidate targeting.
+- Updated root and development-document READMEs to identify `v0.2.0: Rival Territory` as
+  the latest release and `v0.3.0: The Roster` as the current development target.
+- Added `docs/releases/release-status.json`, `npm run check:readme`, and a Pages workflow
+  check. Phase 11 now requires updating and verifying release references before merging
+  to `main`.
+- Generator tests cover deterministic state, valid/disjoint pools, seed variation,
+  rarity distribution, rare hire candidates, invalid content, and mutable-state
+  isolation. The complete suite passes with `172` tests.
+
 ### Review Gate
 
 Inspect a representative seed set and confirm that generated openings are varied,
@@ -996,8 +1025,10 @@ Finalize The Roster as a polished, tested, deployed release.
 - Update:
   - `package.json` version to `0.3.0`
   - `package-lock.json` version to `0.3.0`
-  - README release references if needed
+  - `docs/releases/release-status.json`
+  - README release references
   - implementation-plan completion records
+- Run the README release-status check before merging to `main`.
 - Run the complete test suite.
 - Run TypeScript checks.
 - Run the Pages production build.
@@ -1038,6 +1069,7 @@ v0.3.0
 
 ```bash
 npm test -- --watch=false --browsers=ChromeHeadless
+npm run check:readme
 npx tsc --noEmit -p tsconfig.app.json
 npx tsc --noEmit -p tsconfig.spec.json
 npm run build -- --configuration production --base-href /haunted-apex/

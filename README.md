@@ -1,12 +1,13 @@
 # Haunted Apex
 
-Haunted Apex is a cyber-noir strategy/sim prototype. The completed first release is **v0.1.0: District Zero**. The current development target is **v0.2.0: Rival Territory**.
+Haunted Apex is a cyber-noir strategy/sim prototype. The latest release is **v0.2.0: Rival Territory**. The current development target is **v0.3.0: The Roster**.
 
 Development documentation is organized under [`docs/`](docs/README.md):
 
 - [`docs/foundation/`](docs/foundation/) contains the original product and simulation direction.
 - [`docs/releases/v0.1-district-zero/`](docs/releases/v0.1-district-zero/) preserves the District Zero specification, TDD, and implementation plan.
 - [`docs/releases/v0.2-rival-territory/`](docs/releases/v0.2-rival-territory/) contains the Rival Territory direction, clarifications, TDD, and implementation plan.
+- [`docs/releases/v0.3-the-roster/`](docs/releases/v0.3-the-roster/) contains The Roster direction, clarifications, TDD, and implementation plan.
 
 ## Runtime
 
@@ -58,4 +59,10 @@ Tests:
 
 ```bash
 npm test
+```
+
+Verify release references before merging to `main`:
+
+```bash
+npm run check:readme
 ```

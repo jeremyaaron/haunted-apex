@@ -1,6 +1,4 @@
 import {
-  DISTRICT_ZERO_RECRUIT_POOL,
-  DISTRICT_ZERO_STARTING_OPERATIVES,
   getOperativeDefinition,
   getTraitDefinition,
   ROSTER_OPERATIVES,
@@ -108,9 +106,13 @@ describe('Roster content', () => {
 
   it('preserves the existing six operative stats', () => {
     const existingOperatives = [
-      ...DISTRICT_ZERO_STARTING_OPERATIVES,
-      ...DISTRICT_ZERO_RECRUIT_POOL,
-    ];
+      { id: 'op_mara_voss', violence: 35, charm: 58, tech: 45, subtlety: 82 },
+      { id: 'op_juno_hex', violence: 20, charm: 35, tech: 90, subtlety: 55 },
+      { id: 'op_saint_calder', violence: 45, charm: 78, tech: 35, subtlety: 62 },
+      { id: 'op_iris_vale', violence: 15, charm: 88, tech: 30, subtlety: 68 },
+      { id: 'op_knox_riven', violence: 86, charm: 25, tech: 20, subtlety: 38 },
+      { id: 'op_orchid_seven', violence: 30, charm: 52, tech: 50, subtlety: 78 },
+    ] as const;
 
     for (const existing of existingOperatives) {
       const definition = operatives.find((operative) => operative.id === existing.id);

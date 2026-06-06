@@ -2,6 +2,7 @@ import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
   getDistrictDefinition,
+  getOperativeDefinition,
   getOperativeActionModifier,
   getRivalDefinition,
   getVenueDefinition,
@@ -13,7 +14,8 @@ import type {
   DistrictDefinition,
   DistrictId,
   GameState,
-  Operative,
+  OperativeDefinition,
+  OperativeState,
   OperativeSkill,
   PressureDelta,
   PressureId,
@@ -319,7 +321,9 @@ export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
       id: order.id,
       actionId: action.id,
       label: action.label,
-      assignedOperativeName: operative?.name,
+      assignedOperativeName: operative
+        ? getOperativeDefinition(operative.id)?.name
+        : undefined,
       targetLabel: preview.targetLabel,
       adjustedEffects: preview.adjustedEffects,
       adjustedResourceCost: preview.adjustedResourceCost,
@@ -430,14 +434,15 @@ export function getAdjustedResourceCost(
 
 export function calculateRiskChance(
   action: ActionDefinition,
-  operative?: Operative,
+  operative?: OperativeState,
   state?: GameState,
   target?: ActionTarget,
 ): number {
   let riskChance = action.baseRisk;
 
   if (operative && action.operativeSkill) {
-    const skill = getSkill(operative, action.operativeSkill);
+    const definition = getOperativeDefinition(operative.id);
+    const skill = definition ? getSkill(definition, action.operativeSkill) : 50;
     riskChance -= Math.floor((skill - 50) / 4);
     riskChance += Math.floor(operative.stress / 10);
     riskChance -= Math.floor(operative.loyalty / 20);
@@ -562,14 +567,14 @@ function getOperativeAvailability(state: GameState, operativeId: string): OrderA
 function getOperativeOptionView(
   state: GameState,
   actionId: ActionId,
-  operative: Operative,
+  operative: OperativeState,
 ): OperativeOptionView {
   const action = requireAction(actionId);
 
   if (action.assignment === 'none') {
     return {
       id: operative.id,
-      name: operative.name,
+      name: getOperativeDefinition(operative.id)?.name ?? operative.id,
       disabled: true,
       reason: 'operative_not_allowed',
     };
@@ -579,7 +584,7 @@ function getOperativeOptionView(
 
   return {
     id: operative.id,
-    name: operative.name,
+    name: getOperativeDefinition(operative.id)?.name ?? operative.id,
     disabled: !availability.available,
     reason: availability.reason,
   };
@@ -621,17 +626,8 @@ function normalizePressureDelta(delta: PressureDelta): PressureDelta {
   return normalized;
 }
 
-function getSkill(operative: Operative, skill: OperativeSkill): number {
-  switch (skill) {
-    case 'violence':
-      return operative.violence;
-    case 'charm':
-      return operative.charm;
-    case 'tech':
-      return operative.tech;
-    case 'subtlety':
-      return operative.subtlety;
-  }
+function getSkill(operative: OperativeDefinition, skill: OperativeSkill): number {
+  return operative.baseStats[skill];
 }
 
 function clampRisk(value: number): number {
