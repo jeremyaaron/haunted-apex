@@ -589,6 +589,22 @@ Unit tests:
 - Facade queues and persists a targeted order.
 - Reset clears saved v0.2 state and transient selections.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Changed the current-run storage key to `haunted-apex:v0.2:current-run`.
+- Expanded save validation to require complete district and rival overlays plus a valid recent-activity array.
+- Queued orders now validate action IDs, operative references, required targets, allowed target types, and target content IDs.
+- Recent activity validates action, target, rival, tag, and numeric delta fields against the current content registries.
+- v0.1-shaped, incomplete, malformed, and invalid-reference saves fail safely without migration.
+- Extended `GameFacade.queueOrder` to accept targets while preserving autosave behavior.
+- Added facade access to legal target options, target-aware previews, district views, and rival views.
+- District and rival view selectors combine mutable overlays with static names, archetypes, ownership, venue modifiers, and pressure tiers.
+- New Run and Reset continue clearing queued state and restore complete v0.2 territory/rival defaults.
+- Added 8 Phase 7 tests; all 145 tests pass.
+- TypeScript and the Pages-subpath production build pass.
+
 ### Review Gate
 
 Inspect serialized state once before wiring the full UI.

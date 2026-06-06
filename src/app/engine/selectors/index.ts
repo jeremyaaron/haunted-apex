@@ -35,6 +35,13 @@ export {
   calculateTargetLocalHeatGain,
   resolveTargetDistrictId,
   selectActionTargetOptions,
+  selectDistrictTerritoryViews,
+  selectRivalTerritoryViews,
 } from './territory';
-export type { ActionTargetOption } from './territory';
+export type {
+  ActionTargetOption,
+  DistrictTerritoryView,
+  RivalTerritoryView,
+  VenueTerritoryView,
+} from './territory';
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';

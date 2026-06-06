@@ -1,7 +1,22 @@
 import { Injectable } from '@angular/core';
-import type { GameState, Pressures, TurnPhase } from '../engine';
+import {
+  getActionDefinition,
+  getDistrictDefinition,
+  getRivalDefinition,
+  getVenueDefinition,
+  RIVAL_TERRITORY_DISTRICTS,
+  RIVAL_TERRITORY_RIVALS,
+  type ActionId,
+  type ActionTarget,
+  type DistrictId,
+  type GameState,
+  type Pressures,
+  type RivalId,
+  type TurnPhase,
+  type VenueId,
+} from '../engine';
 
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0:current-run';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
 
 export interface GameStorage {
   saveCurrentRun(state: GameState): void;
@@ -68,10 +83,162 @@ function isGameState(value: unknown): value is GameState {
     isPressures(value['pressures']) &&
     Array.isArray(value['operatives']) &&
     Array.isArray(value['recruitPool']) &&
-    Array.isArray(value['queuedOrders']) &&
+    isQueuedOrders(value['queuedOrders'], value['operatives']) &&
+    isDistrictOverlays(value['districts']) &&
+    isRivalOverlays(value['rivals']) &&
+    isRecentActivity(value['recentActivity']) &&
     Array.isArray(value['eventLog']) &&
     isRecord(value['flags'])
   );
+}
+
+function isQueuedOrders(value: unknown, operatives: unknown): boolean {
+  if (!Array.isArray(value) || !Array.isArray(operatives)) {
+    return false;
+  }
+
+  const operativeIds = new Set(
+    operatives.flatMap((operative) =>
+      isRecord(operative) && typeof operative['id'] === 'string' ? [operative['id']] : [],
+    ),
+  );
+
+  return value.every((order) => {
+    if (
+      !isRecord(order) ||
+      typeof order['id'] !== 'string' ||
+      typeof order['actionId'] !== 'string'
+    ) {
+      return false;
+    }
+
+    const action = getActionDefinition(order['actionId'] as ActionId);
+
+    if (!action) {
+      return false;
+    }
+
+    if (
+      order['assignedOperativeId'] !== undefined &&
+      (typeof order['assignedOperativeId'] !== 'string' ||
+        !operativeIds.has(order['assignedOperativeId']))
+    ) {
+      return false;
+    }
+
+    const target = parseActionTarget(order['target']);
+
+    if (order['target'] !== undefined && !target) {
+      return false;
+    }
+
+    if (action.requiresTarget && !target) {
+      return false;
+    }
+
+    return !target || action.allowedTargetTypes.includes(target.type);
+  });
+}
+
+function isDistrictOverlays(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).length !== RIVAL_TERRITORY_DISTRICTS.length) {
+    return false;
+  }
+
+  return RIVAL_TERRITORY_DISTRICTS.every((definition) => {
+    const district = value[definition.id];
+
+    return (
+      isRecord(district) &&
+      district['id'] === definition.id &&
+      typeof district['control'] === 'number' &&
+      typeof district['heat'] === 'number'
+    );
+  });
+}
+
+function isRivalOverlays(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).length !== RIVAL_TERRITORY_RIVALS.length) {
+    return false;
+  }
+
+  return RIVAL_TERRITORY_RIVALS.every((definition) => {
+    const rival = value[definition.id];
+
+    return (
+      isRecord(rival) &&
+      rival['id'] === definition.id &&
+      typeof rival['pressure'] === 'number' &&
+      typeof rival['disposition'] === 'number' &&
+      typeof rival['active'] === 'boolean'
+    );
+  });
+}
+
+function isRecentActivity(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every((activity) => {
+    if (
+      !isRecord(activity) ||
+      typeof activity['id'] !== 'string' ||
+      typeof activity['week'] !== 'number' ||
+      typeof activity['actionId'] !== 'string' ||
+      !getActionDefinition(activity['actionId'] as ActionId) ||
+      !Array.isArray(activity['targetTags']) ||
+      !activity['targetTags'].every((tag) => typeof tag === 'string') ||
+      typeof activity['heatDelta'] !== 'number' ||
+      typeof activity['dominionDelta'] !== 'number'
+    ) {
+      return false;
+    }
+
+    if (activity['target'] !== undefined && !parseActionTarget(activity['target'])) {
+      return false;
+    }
+
+    return (
+      activity['rivalId'] === undefined ||
+      (typeof activity['rivalId'] === 'string' &&
+        getRivalDefinition(activity['rivalId'] as RivalId) !== undefined)
+    );
+  });
+}
+
+function parseActionTarget(value: unknown): ActionTarget | undefined {
+  if (!isRecord(value) || typeof value['type'] !== 'string' || typeof value['id'] !== 'string') {
+    return undefined;
+  }
+
+  const id = value['id'];
+
+  switch (value['type']) {
+    case 'district':
+      return getDistrictDefinition(id as DistrictId)
+        ? {
+            type: 'district',
+            id: id as DistrictId,
+          }
+        : undefined;
+    case 'venue':
+      return getVenueDefinition(id as VenueId)
+        ? {
+            type: 'venue',
+            id: id as VenueId,
+          }
+        : undefined;
+    case 'rival':
+      return getRivalDefinition(id as RivalId)
+        ? {
+            type: 'rival',
+            id: id as RivalId,
+          }
+        : undefined;
+    default:
+      return undefined;
+  }
 }
 
 function isPressures(value: unknown): value is Pressures {
@@ -102,4 +269,3 @@ function isTurnPhase(value: unknown): value is TurnPhase {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
-

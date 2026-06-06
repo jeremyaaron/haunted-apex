@@ -5,6 +5,8 @@ import {
   getTargetTags,
   resolveTargetDistrictId,
   selectActionTargetOptions,
+  selectDistrictTerritoryViews,
+  selectRivalTerritoryViews,
 } from './territory';
 
 describe('territory selectors', () => {
@@ -112,6 +114,44 @@ describe('territory selectors', () => {
         id: 'rival_knox_marrow',
       }),
     ).toBe('rival_knox_marrow');
+  });
+
+  it('projects mutable district state with static venue and controller content', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    state.districts.district_violet_ward.control = 44;
+    state.districts.district_violet_ward.heat = 63;
+    const violetWard = selectDistrictTerritoryViews(state)[0];
+
+    expect(violetWard).toEqual(
+      jasmine.objectContaining({
+        name: 'Violet Ward',
+        control: 44,
+        heat: 63,
+        baseHeat: 20,
+        controllingRivalName: 'Nyx Ardent',
+      }),
+    );
+    expect(violetWard.venues.map((venue) => venue.name)).toEqual([
+      'The Pale Circuit',
+      'The Glass Saint',
+    ]);
+  });
+
+  it('projects rival pressure tiers and controlled territory names', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    state.rivals.rival_knox_marrow.pressure = 76;
+    const knox = selectRivalTerritoryViews(state)[1];
+
+    expect(knox).toEqual(
+      jasmine.objectContaining({
+        name: 'Knox Marrow',
+        pressure: 76,
+        pressureTier: 'retaliating',
+        preferredPressureAttack: 'heat',
+        controlledDistrictNames: ['Chrome Narrows'],
+        controlledVenueNames: ['Zero Mercy'],
+      }),
+    );
   });
 });
 

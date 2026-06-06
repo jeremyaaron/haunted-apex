@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   advanceWeek,
+  getActionPreview,
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
@@ -9,8 +10,14 @@ import {
   removeQueuedOrder,
   resolveEventChoice,
   selectActionCards,
+  selectActionTargetOptions,
+  selectDistrictTerritoryViews,
   selectQueuedOrderViews,
+  selectRivalTerritoryViews,
   type ActionId,
+  type ActionPreview,
+  type ActionTarget,
+  type ActionTargetOption,
   type EventChoiceAvailability,
   type GameState,
   type NewGameConfig,
@@ -30,6 +37,8 @@ export class GameFacade {
   readonly state = this.stateSignal.asReadonly();
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
+  readonly districts = computed(() => selectDistrictTerritoryViews(this.stateSignal()));
+  readonly rivals = computed(() => selectRivalTerritoryViews(this.stateSignal()));
   readonly commandPointsRemaining = computed(() => getCommandPointsRemaining(this.stateSignal()));
   readonly pendingEventDefinition = computed(() => {
     const pendingEvent = this.stateSignal().pendingEvent;
@@ -62,10 +71,27 @@ export class GameFacade {
     this.storage.clearCurrentRun();
   }
 
-  queueOrder(actionId: ActionId, assignedOperativeId?: string): QueueOrderResult {
+  getTargetOptions(actionId: ActionId): ActionTargetOption[] {
+    return selectActionTargetOptions(this.stateSignal(), actionId);
+  }
+
+  getActionPreview(
+    actionId: ActionId,
+    assignedOperativeId?: string,
+    target?: ActionTarget,
+  ): ActionPreview | undefined {
+    return getActionPreview(this.stateSignal(), actionId, assignedOperativeId, target);
+  }
+
+  queueOrder(
+    actionId: ActionId,
+    assignedOperativeId?: string,
+    target?: ActionTarget,
+  ): QueueOrderResult {
     const result = queueOrder(this.stateSignal(), {
       actionId,
       assignedOperativeId,
+      target,
     });
 
     if (result.ok) {
@@ -114,4 +140,3 @@ export class GameFacade {
     this.storage.saveCurrentRun(state);
   }
 }
-

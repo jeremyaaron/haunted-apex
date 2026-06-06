@@ -9,11 +9,18 @@ import {
 import type {
   ActionId,
   ActionTarget,
+  DistrictArchetype,
   DistrictId,
   GameState,
   PressureDelta,
+  PressureId,
+  RivalArchetype,
   RivalId,
+  RivalPressureTier,
+  VenueArchetype,
+  VenueId,
 } from '../model';
+import { getRivalPressureTier } from './rivals';
 
 export type ActionTargetOption = {
   target: ActionTarget;
@@ -23,6 +30,45 @@ export type ActionTargetOption = {
   rivalName?: string;
   controlledByRivalId?: RivalId;
   controlledByRivalName?: string;
+};
+
+export type VenueTerritoryView = {
+  id: VenueId;
+  name: string;
+  archetype: VenueArchetype;
+  districtId: DistrictId;
+  controllingRivalId?: RivalId;
+  controllingRivalName?: string;
+  wealthMod: number;
+  intelMod: number;
+  heatMod: number;
+  loyaltyMod: number;
+  ruinMod: number;
+};
+
+export type DistrictTerritoryView = {
+  id: DistrictId;
+  name: string;
+  archetype: DistrictArchetype;
+  control: number;
+  heat: number;
+  baseHeat: number;
+  controllingRivalId?: RivalId;
+  controllingRivalName?: string;
+  venues: VenueTerritoryView[];
+};
+
+export type RivalTerritoryView = {
+  id: RivalId;
+  name: string;
+  archetype: RivalArchetype;
+  pressure: number;
+  pressureTier: RivalPressureTier;
+  disposition: number;
+  active: boolean;
+  preferredPressureAttack: Exclude<PressureId, 'ruin'>;
+  controlledDistrictNames: string[];
+  controlledVenueNames: string[];
 };
 
 export function selectActionTargetOptions(
@@ -111,6 +157,89 @@ export function selectActionTargetOptions(
   }
 
   return options;
+}
+
+export function selectDistrictTerritoryViews(state: GameState): DistrictTerritoryView[] {
+  return RIVAL_TERRITORY_DISTRICTS.map((contentDistrict) => {
+    const district = getDistrictDefinition(contentDistrict.id);
+
+    if (!district) {
+      throw new Error(`Missing district definition for ${contentDistrict.id}`);
+    }
+
+    const districtState = state.districts[district.id];
+    const controller = district.rivalId ? getRivalDefinition(district.rivalId) : undefined;
+
+    return {
+      id: district.id,
+      name: district.name,
+      archetype: district.archetype,
+      control: districtState.control,
+      heat: districtState.heat,
+      baseHeat: district.baseHeat,
+      ...(controller
+        ? {
+            controllingRivalId: controller.id,
+            controllingRivalName: controller.name,
+          }
+        : {}),
+      venues: district.venueIds.flatMap((venueId) => {
+        const venue = getVenueDefinition(venueId);
+
+        if (!venue) {
+          return [];
+        }
+
+        const venueControllerId = venue.controllingRivalId ?? district.rivalId;
+        const venueController = venueControllerId
+          ? getRivalDefinition(venueControllerId)
+          : undefined;
+
+        return [
+          {
+            id: venue.id,
+            name: venue.name,
+            archetype: venue.archetype,
+            districtId: venue.districtId,
+            ...(venueController
+              ? {
+                  controllingRivalId: venueController.id,
+                  controllingRivalName: venueController.name,
+                }
+              : {}),
+            wealthMod: venue.wealthMod,
+            intelMod: venue.intelMod,
+            heatMod: venue.heatMod,
+            loyaltyMod: venue.loyaltyMod,
+            ruinMod: venue.ruinMod,
+          },
+        ];
+      }),
+    };
+  });
+}
+
+export function selectRivalTerritoryViews(state: GameState): RivalTerritoryView[] {
+  return RIVAL_TERRITORY_RIVALS.map((rival) => {
+    const rivalState = state.rivals[rival.id];
+
+    return {
+      id: rival.id,
+      name: rival.name,
+      archetype: rival.archetype,
+      pressure: rivalState.pressure,
+      pressureTier: getRivalPressureTier(rivalState.pressure),
+      disposition: rivalState.disposition,
+      active: rivalState.active,
+      preferredPressureAttack: rival.preferredPressureAttack,
+      controlledDistrictNames: rival.controlledDistrictIds.flatMap(
+        (districtId) => getDistrictDefinition(districtId)?.name ?? [],
+      ),
+      controlledVenueNames: rival.controlledVenueIds.flatMap(
+        (venueId) => getVenueDefinition(venueId)?.name ?? [],
+      ),
+    };
+  });
 }
 
 export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | undefined {

@@ -66,6 +66,54 @@ describe('GameFacade', () => {
     expect(facade.commandPointsRemaining()).toBe(2);
   });
 
+  it('queues and persists a targeted order', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startNewGame({ seed: 'VIOLET-ASH-1047' });
+
+    const queued = facade.queueOrder('run_small_job', 'op_mara_voss', {
+      type: 'venue',
+      id: 'venue_zero_mercy',
+    });
+
+    if (!queued.ok) {
+      fail(`Expected targeted order, got ${queued.error}`);
+      return;
+    }
+
+    expect(facade.state().queuedOrders[0].target).toEqual({
+      type: 'venue',
+      id: 'venue_zero_mercy',
+    });
+    expect(facade.queuedOrders()[0].targetLabel).toBe('Zero Mercy');
+    expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(
+      facade.state(),
+    );
+  });
+
+  it('exposes legal targets, target previews, districts, and rivals', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startNewGame({ seed: 'VIOLET-ASH-1047' });
+    const target = {
+      type: 'venue' as const,
+      id: 'venue_glass_saint' as const,
+    };
+
+    expect(facade.getTargetOptions('run_small_job').some((option) => option.target.id === target.id))
+      .toBeTrue();
+    expect(facade.getActionPreview('run_small_job', 'op_mara_voss', target)?.targetLabel).toBe(
+      'The Glass Saint',
+    );
+    expect(facade.districts().map((district) => district.name)).toEqual([
+      'Violet Ward',
+      'Chrome Narrows',
+      'Ghostline Market',
+    ]);
+    expect(facade.rivals().map((rival) => rival.name)).toEqual([
+      'Nyx Ardent',
+      'Knox Marrow',
+    ]);
+  });
+
   it('advances to event choice and persists the new state', () => {
     const facade = TestBed.inject(GameFacade);
     facade.startNewGame({ seed: 'VIOLET-ASH-1047' });
@@ -134,14 +182,19 @@ describe('GameFacade', () => {
   it('resets the current run and clears stale state', () => {
     const facade = TestBed.inject(GameFacade);
     facade.startNewGame({ seed: 'FIRST' });
-    facade.queueOrder('gather_intel', 'op_mara_voss');
+    facade.queueOrder('run_small_job', 'op_mara_voss', {
+      type: 'venue',
+      id: 'venue_zero_mercy',
+    });
 
     const reset = facade.resetCurrentRun({ seed: 'SECOND' });
 
     expect(facade.state()).toEqual(reset);
     expect(facade.state().seed).toBe('SECOND');
     expect(facade.state().queuedOrders).toEqual([]);
+    expect(facade.state().recentActivity).toEqual([]);
+    expect(facade.districts().every((district) => district.heat === district.baseHeat)).toBeTrue();
+    expect(facade.rivals().every((rival) => rival.pressure === 0)).toBeTrue();
     expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(reset);
   });
 });
-
