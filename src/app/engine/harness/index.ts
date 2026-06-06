@@ -23,9 +23,13 @@ export type {
 } from './agents';
 export type {
   AgentBatchSummary,
+  ContextualEventCounts,
+  DistrictAverage,
   HarnessBatchOptions,
   HarnessBatchReport,
   HarnessRunOptions,
   HarnessRunResult,
   HarnessTraceEntry,
+  TargetReport,
+  TargetRunStats,
 } from './simulation-harness';

@@ -161,6 +161,18 @@ describe('advanceWeek', () => {
       }),
     );
     expect(result.state.eventLog.some((entry) => entry.type === 'complication')).toBeTrue();
+    expect(result.orderResolutions).toEqual([
+      jasmine.objectContaining({
+        complication: true,
+        order: jasmine.objectContaining({
+          actionId: 'run_small_job',
+          target: {
+            type: 'district',
+            id: 'district_chrome_narrows',
+          },
+        }),
+      }),
+    ]);
   });
 
   it('recruits the first candidate from the recruit pool', () => {

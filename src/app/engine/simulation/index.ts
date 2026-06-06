@@ -22,7 +22,7 @@ export {
 export { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
 export type { QueueOrderResult, RemoveQueuedOrderResult } from './queue-order';
 export type { ActionResolution } from './resolve-action';
-export type { AdvanceWeekResult } from './resolve-week';
+export type { AdvanceWeekResult, OrderResolutionDiagnostic } from './resolve-week';
 export type {
   EventSelection,
   EventWeightContext,

@@ -54,14 +54,21 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
   id: 'aggressive',
   label: 'AggressiveBot',
   chooseOrder: (state, options, context) =>
-    chooseHighestScoringOrder(state, options, context, {
-      dominion: 4,
-      heat: -0.45,
-      loyalty: 0.4,
-      resources: 0.00045,
-      intel: 0.45,
-      ruin: -0.35,
-    }),
+    chooseHighestScoringOrder(
+      state,
+      options,
+      context,
+      {
+        dominion: 4,
+        heat: -0.45,
+        loyalty: 0.4,
+        resources: 0.00045,
+        intel: 0.45,
+        ruin: -0.35,
+      },
+      {},
+      scoreAggressiveTarget,
+    ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, {
       dominion: 4,
@@ -77,10 +84,17 @@ export const CAUTIOUS_BOT: StrategyAgent = {
   id: 'cautious',
   label: 'CautiousBot',
   chooseOrder: (state, options, context) =>
-    chooseHighestScoringOrder(state, options, context, cautiousWeights(state), {
-      risk: -0.85,
-      resourceCost: -0.0014,
-    }),
+    chooseHighestScoringOrder(
+      state,
+      options,
+      context,
+      cautiousWeights(state),
+      {
+        risk: -0.85,
+        resourceCost: -0.0014,
+      },
+      (option) => scoreCautiousTarget(state, option),
+    ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, cautiousWeights(state)),
 };
@@ -89,14 +103,21 @@ export const GREEDY_BOT: StrategyAgent = {
   id: 'greedy',
   label: 'GreedyBot',
   chooseOrder: (state, options, context) =>
-    chooseHighestScoringOrder(state, options, context, {
-      dominion: 0.9,
-      heat: -0.05,
-      loyalty: 0.1,
-      resources: 0.0035,
-      intel: 0.8,
-      ruin: -0.05,
-    }),
+    chooseHighestScoringOrder(
+      state,
+      options,
+      context,
+      {
+        dominion: 0.9,
+        heat: -0.05,
+        loyalty: 0.1,
+        resources: 0.0035,
+        intel: 0.8,
+        ruin: -0.05,
+      },
+      {},
+      scoreGreedyTarget,
+    ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, {
       dominion: 0.9,
@@ -110,10 +131,17 @@ export const GREEDY_BOT: StrategyAgent = {
 
 export const OPERATOR_BOT: StrategyAgent = {
   id: 'operator',
-  label: 'OperatorBot',
+  label: 'Operator / Sane',
   chooseOrder: (state, options, context) =>
-    chooseHighestScoring(options, context, (option) =>
-      scoreOperatorPressureMove(state.pressures, getOrderNetDelta(option), option.preview.riskChance),
+    chooseHighestScoring(
+      options,
+      context,
+      (option) =>
+        scoreOperatorPressureMove(
+          state.pressures,
+          getOrderNetDelta(option),
+          option.preview.riskChance,
+        ) + scoreOperatorTarget(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
@@ -155,6 +183,7 @@ function chooseHighestScoringOrder(
   context: AgentDecisionContext,
   weights: PressureWeights,
   penalties: { risk?: number; resourceCost?: number } = {},
+  scoreTarget: (option: LegalOrderOption) => number = () => 0,
 ): LegalOrderOption | undefined {
   return chooseHighestScoring(options, context, (option) => {
     const pressureScore = scoreDelta(option.preview.adjustedEffects, weights);
@@ -163,8 +192,56 @@ function chooseHighestScoringOrder(
     const pressureBias =
       state.pressures.resources < 2200 && option.actionId === 'run_small_job' ? 18 : 0;
 
-    return pressureScore + riskPenalty + costPenalty + pressureBias;
+    return pressureScore + riskPenalty + costPenalty + pressureBias + scoreTarget(option);
   });
+}
+
+function scoreAggressiveTarget(option: LegalOrderOption): number {
+  return (
+    (option.preview.localImpact?.controlGain ?? 0) * 1.5 +
+    (option.preview.rivalAttention ? 2 : 0)
+  );
+}
+
+function scoreCautiousTarget(state: GameState, option: LegalOrderOption): number {
+  const target = option.preview.selectedTarget;
+  const districtId = option.preview.localImpact?.districtId;
+  const localHeat = districtId ? state.districts[districtId].heat : 0;
+  const paleCircuitBias =
+    target?.type === 'venue' && target.id === 'venue_pale_circuit' ? 18 : 0;
+  const uncontrolledBias = target && !option.preview.rivalAttention ? 8 : 0;
+  const rivalPenalty = option.preview.rivalAttention ? -18 : 0;
+
+  return paleCircuitBias + uncontrolledBias + rivalPenalty - localHeat * 0.35;
+}
+
+function scoreGreedyTarget(option: LegalOrderOption): number {
+  const target = option.preview.selectedTarget;
+  const favoredVenueBias =
+    target?.type === 'venue' &&
+    (target.id === 'venue_zero_mercy' || target.id === 'venue_black_halo_exchange')
+      ? 12
+      : 0;
+  const economicYield =
+    (option.preview.adjustedEffects.resources ?? 0) * 0.0015 +
+    (option.preview.adjustedEffects.intel ?? 0) * 0.8;
+
+  return favoredVenueBias + economicYield;
+}
+
+function scoreOperatorTarget(state: GameState, option: LegalOrderOption): number {
+  const rivalAttention = option.preview.rivalAttention;
+  const winsImmediately =
+    state.pressures.dominion + (option.preview.adjustedEffects.dominion ?? 0) >=
+    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory;
+  const highPressurePenalty =
+    rivalAttention && rivalAttention.currentPressure >= 60 && !winsImmediately ? -120 : 0;
+  const districtId = option.preview.localImpact?.districtId;
+  const localHeat = districtId ? state.districts[districtId].heat : 0;
+  const heatAwarePenalty = state.pressures.heat >= 65 ? localHeat * -0.35 : 0;
+  const controlValue = (option.preview.localImpact?.controlGain ?? 0) * 0.6;
+
+  return highPressurePenalty + heatAwarePenalty + controlValue;
 }
 
 function chooseHighestScoringChoice(

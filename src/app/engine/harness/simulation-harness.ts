@@ -1,11 +1,23 @@
-import { DISTRICT_ZERO_ACTIONS, getEventDefinition } from '../content';
+import {
+  DISTRICT_ZERO_ACTIONS,
+  RIVAL_TERRITORY_DISTRICTS,
+  RIVAL_TERRITORY_RIVALS,
+  getDistrictDefinition,
+  getEventDefinition,
+  getRivalDefinition,
+  getVenueDefinition,
+} from '../content';
 import type {
   ActionId,
+  ActionTarget,
+  DistrictId,
   EventChoiceDefinition,
   GameOverReason,
   GameState,
   PressureId,
   Pressures,
+  RivalId,
+  VenueId,
 } from '../model';
 import { PRESSURE_IDS } from '../model';
 import { createRng, nextInt } from '../rng';
@@ -22,6 +34,8 @@ import {
   newGame,
   queueOrder,
   resolveEventChoice,
+  type EventSelection,
+  type OrderResolutionDiagnostic,
 } from '../simulation';
 import {
   createEmptyActionUsage,
@@ -52,7 +66,9 @@ export type HarnessRunResult = {
   reason?: GameOverReason | 'agent_stalled';
   weeksPlayed: number;
   actionUsage: Record<ActionId, number>;
+  targetUsage: Record<string, TargetRunStats>;
   eventChoiceUsage: Record<string, number>;
+  contextualEvents: ContextualEventCounts;
   trace: HarnessTraceEntry[];
 };
 
@@ -74,7 +90,13 @@ export type AgentBatchSummary = {
   averageFinalPressures: Pressures;
   lossReasons: Partial<Record<GameOverReason | 'agent_stalled', number>>;
   actionUsage: Record<ActionId, number>;
+  targetReports: TargetReport[];
+  mostSelectedTarget?: TargetReport;
+  mostDangerousTarget?: TargetReport;
   eventChoiceUsage: Record<string, number>;
+  averageFinalRivalPressures: Record<RivalId, number>;
+  averageFinalDistricts: Record<DistrictId, DistrictAverage>;
+  contextualEvents: ContextualEventCounts;
 };
 
 export type HarnessBatchReport = {
@@ -83,19 +105,62 @@ export type HarnessBatchReport = {
   summaries: AgentBatchSummary[];
 };
 
+export type TargetRunStats = {
+  targetType: ActionTarget['type'];
+  targetId: string;
+  selections: number;
+  complications: number;
+};
+
+export type TargetReport = TargetRunStats & {
+  targetLabel: string;
+  complicationRate: number;
+  wins: number;
+  losses: number;
+};
+
+export type DistrictAverage = {
+  control: number;
+  heat: number;
+};
+
+export type ContextualEventCounts = {
+  influencedSelections: number;
+  targetTagInfluenced: number;
+  rivalPressureInfluenced: number;
+  localHeatInfluenced: number;
+};
+
 const MAX_HARNESS_STEPS = 64;
+const DANGEROUS_TARGET_MINIMUM_SELECTIONS = 5;
+const TARGET_TAG_MODIFIERS = new Set([
+  'recent_nightlife',
+  'recent_violence',
+  'recent_memory',
+]);
+const RIVAL_PRESSURE_MODIFIERS = new Set(['nyx_pressure', 'knox_pressure']);
 
 export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   let state = newGame({ seed: options.seed });
   const actionUsage = createEmptyActionUsage();
+  const targetUsage: Record<string, TargetRunStats> = {};
   const eventChoiceUsage: Record<string, number> = {};
+  const contextualEvents = createEmptyContextualEventCounts();
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   let stalled = false;
 
   for (let step = 0; step < MAX_HARNESS_STEPS && !state.gameOver && !stalled; step += 1) {
     if (state.phase === 'COMMAND') {
-      state = queueAgentOrders(state, options.agent, context, actionUsage, trace, options.collectTrace);
+      state = queueAgentOrders(
+        state,
+        options.agent,
+        context,
+        actionUsage,
+        targetUsage,
+        trace,
+        options.collectTrace,
+      );
 
       if (state.queuedOrders.length === 0) {
         stalled = true;
@@ -111,6 +176,8 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         break;
       }
 
+      recordOrderComplications(targetUsage, advanced.orderResolutions);
+      recordContextualEvent(contextualEvents, advanced.eventSelection);
       state = advanced.state;
       appendTrace(trace, options.collectTrace, state, 'Advanced week and presented event.');
     }
@@ -148,7 +215,9 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     reason: state.gameOver?.reason ?? (stalled ? 'agent_stalled' : undefined),
     weeksPlayed: state.week,
     actionUsage,
+    targetUsage,
     eventChoiceUsage,
+    contextualEvents,
     trace,
   };
 }
@@ -201,6 +270,114 @@ export function formatBatchReport(report: HarnessBatchReport): string {
         summary.averageFinalPressures.resources.toFixed(2),
         summary.averageFinalPressures.intel.toFixed(2),
         summary.averageFinalPressures.ruin.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'target_highlights',
+    'agent,agentLabel,mostSelectedTarget,selections,mostDangerousTarget,complicationRate',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.agentLabel,
+        summary.mostSelectedTarget?.targetLabel ?? '',
+        summary.mostSelectedTarget?.selections ?? 0,
+        summary.mostDangerousTarget?.targetLabel ?? '',
+        summary.mostDangerousTarget?.complicationRate.toFixed(3) ?? '',
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'target_details',
+    'agent,targetType,targetId,targetLabel,selections,complications,complicationRate,wins,losses',
+  );
+
+  for (const summary of report.summaries) {
+    for (const target of summary.targetReports) {
+      lines.push(
+        [
+          summary.agentId,
+          target.targetType,
+          target.targetId,
+          target.targetLabel,
+          target.selections,
+          target.complications,
+          target.complicationRate.toFixed(3),
+          target.wins,
+          target.losses,
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push('', 'rival_pressure', 'agent,rivalId,rivalName,averageFinalPressure');
+
+  for (const summary of report.summaries) {
+    for (const rival of RIVAL_TERRITORY_RIVALS) {
+      lines.push(
+        [
+          summary.agentId,
+          rival.id,
+          rival.name,
+          summary.averageFinalRivalPressures[rival.id].toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push('', 'district_state', 'agent,districtId,districtName,averageControl,averageHeat');
+
+  for (const summary of report.summaries) {
+    for (const district of RIVAL_TERRITORY_DISTRICTS) {
+      const average = summary.averageFinalDistricts[district.id];
+      lines.push(
+        [
+          summary.agentId,
+          district.id,
+          district.name,
+          average.control.toFixed(2),
+          average.heat.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push('', 'loss_causes', 'agent,cause,count');
+
+  for (const summary of report.summaries) {
+    const entries = Object.entries(summary.lossReasons);
+
+    if (entries.length === 0) {
+      lines.push([summary.agentId, 'none', 0].join(','));
+      continue;
+    }
+
+    for (const [reason, count] of entries) {
+      lines.push([summary.agentId, reason, count].join(','));
+    }
+  }
+
+  lines.push(
+    '',
+    'contextual_events',
+    'agent,influencedSelections,targetTagInfluenced,rivalPressureInfluenced,localHeatInfluenced',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.contextualEvents.influencedSelections,
+        summary.contextualEvents.targetTagInfluenced,
+        summary.contextualEvents.rivalPressureInfluenced,
+        summary.contextualEvents.localHeatInfluenced,
       ].join(','),
     );
   }
@@ -274,6 +451,7 @@ function queueAgentOrders(
   agent: StrategyAgent,
   context: AgentDecisionContext,
   actionUsage: Record<ActionId, number>,
+  targetUsage: Record<string, TargetRunStats>,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
 ): GameState {
@@ -300,6 +478,7 @@ function queueAgentOrders(
 
     next = queued.state;
     actionUsage[decision.actionId] += 1;
+    recordTargetSelection(targetUsage, decision.target);
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
@@ -358,8 +537,12 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     {} as Pressures,
   );
   const actionUsage = createEmptyActionUsage();
+  const targetReportsByKey = new Map<string, TargetReport>();
   const eventChoiceUsage: Record<string, number> = {};
   const lossReasons: Partial<Record<GameOverReason | 'agent_stalled', number>> = {};
+  const rivalPressureTotals = createEmptyRivalPressureTotals();
+  const districtTotals = createEmptyDistrictTotals();
+  const contextualEvents = createEmptyContextualEventCounts();
   let weeksTotal = 0;
   let wins = 0;
   let losses = 0;
@@ -384,14 +567,56 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
       pressureTotals[pressure] += run.finalState.pressures[pressure];
     }
 
+    for (const rival of RIVAL_TERRITORY_RIVALS) {
+      rivalPressureTotals[rival.id] += run.finalState.rivals[rival.id].pressure;
+    }
+
+    for (const district of RIVAL_TERRITORY_DISTRICTS) {
+      districtTotals[district.id].control += run.finalState.districts[district.id].control;
+      districtTotals[district.id].heat += run.finalState.districts[district.id].heat;
+    }
+
     for (const action of DISTRICT_ZERO_ACTIONS) {
       actionUsage[action.id] += run.actionUsage[action.id];
+    }
+
+    for (const [key, target] of Object.entries(run.targetUsage)) {
+      const current = targetReportsByKey.get(key) ?? {
+        targetType: target.targetType,
+        targetId: target.targetId,
+        selections: 0,
+        complications: 0,
+        targetLabel: getTargetReportLabel(target),
+        complicationRate: 0,
+        wins: 0,
+        losses: 0,
+      };
+      current.selections += target.selections;
+      current.complications += target.complications;
+
+      if (run.outcome === 'victory') {
+        current.wins += 1;
+      } else if (run.outcome === 'loss') {
+        current.losses += 1;
+      }
+
+      targetReportsByKey.set(key, current);
     }
 
     for (const [choiceId, count] of Object.entries(run.eventChoiceUsage)) {
       eventChoiceUsage[choiceId] = (eventChoiceUsage[choiceId] ?? 0) + count;
     }
+
+    addContextualEventCounts(contextualEvents, run.contextualEvents);
   }
+
+  const targetReports = [...targetReportsByKey.values()]
+    .map((target) => ({
+      ...target,
+      complicationRate:
+        target.selections > 0 ? target.complications / target.selections : 0,
+    }))
+    .sort((left, right) => left.targetLabel.localeCompare(right.targetLabel));
 
   return {
     agentId: agent.id,
@@ -405,8 +630,181 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     averageFinalPressures: averagePressures(pressureTotals, runs.length),
     lossReasons,
     actionUsage,
+    targetReports,
+    mostSelectedTarget: selectMostSelectedTarget(targetReports),
+    mostDangerousTarget: selectMostDangerousTarget(targetReports),
     eventChoiceUsage,
+    averageFinalRivalPressures: averageRivalPressures(rivalPressureTotals, runs.length),
+    averageFinalDistricts: averageDistricts(districtTotals, runs.length),
+    contextualEvents,
   };
+}
+
+function recordTargetSelection(
+  targetUsage: Record<string, TargetRunStats>,
+  target: ActionTarget | undefined,
+): void {
+  if (!target) {
+    return;
+  }
+
+  const key = getTargetKey(target);
+  const current = targetUsage[key] ?? {
+    targetType: target.type,
+    targetId: target.id,
+    selections: 0,
+    complications: 0,
+  };
+  current.selections += 1;
+  targetUsage[key] = current;
+}
+
+function recordOrderComplications(
+  targetUsage: Record<string, TargetRunStats>,
+  resolutions: readonly OrderResolutionDiagnostic[],
+): void {
+  for (const resolution of resolutions) {
+    const target = resolution.order.target;
+
+    if (!target || !resolution.complication) {
+      continue;
+    }
+
+    const usage = targetUsage[getTargetKey(target)];
+
+    if (usage) {
+      usage.complications += 1;
+    }
+  }
+}
+
+function recordContextualEvent(
+  counts: ContextualEventCounts,
+  selection: EventSelection,
+): void {
+  const modifierIds = new Set(
+    selection.diagnostics.contextModifiers.map((modifier) => modifier.id),
+  );
+
+  if (modifierIds.size > 0) {
+    counts.influencedSelections += 1;
+  }
+
+  if ([...modifierIds].some((id) => TARGET_TAG_MODIFIERS.has(id))) {
+    counts.targetTagInfluenced += 1;
+  }
+
+  if ([...modifierIds].some((id) => RIVAL_PRESSURE_MODIFIERS.has(id))) {
+    counts.rivalPressureInfluenced += 1;
+  }
+
+  if (modifierIds.has('recent_high_local_heat')) {
+    counts.localHeatInfluenced += 1;
+  }
+}
+
+function getTargetKey(target: ActionTarget): string {
+  return `${target.type}:${target.id}`;
+}
+
+function getTargetReportLabel(target: TargetRunStats): string {
+  switch (target.targetType) {
+    case 'district':
+      return getDistrictDefinition(target.targetId as DistrictId)?.name ?? target.targetId;
+    case 'venue':
+      return getVenueDefinition(target.targetId as VenueId)?.name ?? target.targetId;
+    case 'rival':
+      return getRivalDefinition(target.targetId as RivalId)?.name ?? target.targetId;
+  }
+}
+
+function selectMostSelectedTarget(targets: readonly TargetReport[]): TargetReport | undefined {
+  return [...targets].sort(
+    (left, right) =>
+      right.selections - left.selections || left.targetLabel.localeCompare(right.targetLabel),
+  )[0];
+}
+
+function selectMostDangerousTarget(targets: readonly TargetReport[]): TargetReport | undefined {
+  return [...targets]
+    .filter((target) => target.selections >= DANGEROUS_TARGET_MINIMUM_SELECTIONS)
+    .sort(
+      (left, right) =>
+        right.complicationRate - left.complicationRate ||
+        right.selections - left.selections ||
+        left.targetLabel.localeCompare(right.targetLabel),
+    )[0];
+}
+
+function createEmptyRivalPressureTotals(): Record<RivalId, number> {
+  return RIVAL_TERRITORY_RIVALS.reduce(
+    (totals, rival) => ({
+      ...totals,
+      [rival.id]: 0,
+    }),
+    {} as Record<RivalId, number>,
+  );
+}
+
+function createEmptyDistrictTotals(): Record<DistrictId, DistrictAverage> {
+  return RIVAL_TERRITORY_DISTRICTS.reduce(
+    (totals, district) => ({
+      ...totals,
+      [district.id]: {
+        control: 0,
+        heat: 0,
+      },
+    }),
+    {} as Record<DistrictId, DistrictAverage>,
+  );
+}
+
+function createEmptyContextualEventCounts(): ContextualEventCounts {
+  return {
+    influencedSelections: 0,
+    targetTagInfluenced: 0,
+    rivalPressureInfluenced: 0,
+    localHeatInfluenced: 0,
+  };
+}
+
+function addContextualEventCounts(
+  totals: ContextualEventCounts,
+  counts: ContextualEventCounts,
+): void {
+  totals.influencedSelections += counts.influencedSelections;
+  totals.targetTagInfluenced += counts.targetTagInfluenced;
+  totals.rivalPressureInfluenced += counts.rivalPressureInfluenced;
+  totals.localHeatInfluenced += counts.localHeatInfluenced;
+}
+
+function averageRivalPressures(
+  totals: Record<RivalId, number>,
+  runs: number,
+): Record<RivalId, number> {
+  return RIVAL_TERRITORY_RIVALS.reduce(
+    (averages, rival) => ({
+      ...averages,
+      [rival.id]: runs > 0 ? totals[rival.id] / runs : 0,
+    }),
+    {} as Record<RivalId, number>,
+  );
+}
+
+function averageDistricts(
+  totals: Record<DistrictId, DistrictAverage>,
+  runs: number,
+): Record<DistrictId, DistrictAverage> {
+  return RIVAL_TERRITORY_DISTRICTS.reduce(
+    (averages, district) => ({
+      ...averages,
+      [district.id]: {
+        control: runs > 0 ? totals[district.id].control / runs : 0,
+        heat: runs > 0 ? totals[district.id].heat / runs : 0,
+      },
+    }),
+    {} as Record<DistrictId, DistrictAverage>,
+  );
 }
 
 function averagePressures(totals: Pressures, runs: number): Pressures {

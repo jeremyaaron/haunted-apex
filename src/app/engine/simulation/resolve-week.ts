@@ -1,4 +1,4 @@
-import type { GameState } from '../model';
+import type { GameState, QueuedOrder } from '../model';
 import { applyIdleStressRecovery } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
 import { applyLocalDistrictCooling } from './district-effects';
@@ -12,12 +12,18 @@ export type AdvanceWeekResult =
       ok: true;
       state: GameState;
       eventSelection: EventSelection;
+      orderResolutions: OrderResolutionDiagnostic[];
     }
   | {
       ok: false;
       state: GameState;
       error: 'no_queued_orders' | 'not_command_phase';
     };
+
+export type OrderResolutionDiagnostic = {
+  order: QueuedOrder;
+  complication: boolean;
+};
 
 export function advanceWeek(state: GameState): AdvanceWeekResult {
   if (state.phase !== 'COMMAND') {
@@ -40,9 +46,18 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
     ...state,
     phase: 'RESOLVING_ACTIONS',
   };
+  const orderResolutions: OrderResolutionDiagnostic[] = [];
 
   for (const order of state.queuedOrders) {
-    next = resolveQueuedOrder(next, order).state;
+    const resolution = resolveQueuedOrder(next, order);
+    next = resolution.state;
+    orderResolutions.push({
+      order: {
+        ...order,
+        ...(order.target ? { target: { ...order.target } } : {}),
+      },
+      complication: resolution.complication,
+    });
   }
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
@@ -75,5 +90,6 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
     ok: true,
     state: next,
     eventSelection: selectedEvent,
+    orderResolutions,
   };
 }

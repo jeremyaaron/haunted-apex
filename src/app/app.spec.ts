@@ -49,6 +49,24 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Run Harness to simulate 100 games per strategy.');
   });
 
+  it('should expose expanded target and territory harness reporting', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    clickButton(compiled, 'Run Harness');
+    fixture.detectChanges();
+
+    const output = compiled.querySelector('.harness-output pre')?.textContent ?? '';
+    expect(output).toContain('target_highlights');
+    expect(output).toContain('target_details');
+    expect(output).toContain('rival_pressure');
+    expect(output).toContain('district_state');
+    expect(output).toContain('loss_causes');
+    expect(output).toContain('contextual_events');
+    expect(output).toContain('Operator / Sane');
+  });
+
   it('should queue an action from the dashboard', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
