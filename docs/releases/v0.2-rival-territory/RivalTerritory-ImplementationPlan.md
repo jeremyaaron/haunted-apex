@@ -884,6 +884,32 @@ Deployment checks:
 - Browser console contains no asset-path or runtime errors.
 - The deployment artifact remains well below the documented 1 GB Pages limit.
 
+### Implementation Record
+
+Implemented locally June 6, 2026:
+
+- Confirmed GitHub Pages is enabled with GitHub Actions as the publishing source.
+- Added `.github/workflows/deploy-pages.yml`.
+- Configured automatic deployment from pushes to `main` and manual `workflow_dispatch` runs.
+- Configured Node from `.nvmrc`, npm dependency caching, and reproducible installation with `npm ci`.
+- Kept test/build and deployment as separate jobs so deployment cannot begin before verification succeeds.
+- Added the complete 154-test headless suite to the build job.
+- Added the production Angular build with base href `/haunted-apex/`.
+- Added explicit checks for the expected `dist/haunted-apex/browser/index.html` artifact and base href.
+- Added uncompressed artifact-size reporting before upload.
+- Configured official GitHub Pages actions and the protected `github-pages` deployment environment.
+- Scoped deployment permissions to `pages: write` and `id-token: write`.
+- Preserved deployment concurrency without canceling a deployment already in progress.
+- Documented the automated deployment behavior in the root README without claiming the site is live prematurely.
+- Verified locally that the production artifact is 304 KB and contains the correct project-subpath base href.
+- Verified all 154 tests, TypeScript compilation, and the production Pages build.
+
+Pending first workflow run:
+
+- Push the workflow to `main`.
+- Confirm the Actions build and deployment jobs succeed.
+- Smoke-test the public Pages origin and then replace the README's planned-live wording with a direct playable link.
+
 ### Review Gate
 
 Confirm the public build behaves like the validated local production build before advertising it from the README.
