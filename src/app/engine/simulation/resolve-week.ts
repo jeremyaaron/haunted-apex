@@ -1,6 +1,8 @@
 import type { GameState } from '../model';
 import { applyIdleStressRecovery } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
+import { applyLocalDistrictCooling } from './district-effects';
+import { pruneRecentActivity } from './recent-activity';
 import { resolveQueuedOrder } from './resolve-action';
 import { selectWeeklyEvent } from './select-weekly-event';
 import { applyWinLoss } from './win-loss';
@@ -44,6 +46,8 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
   next = applyWeeklyDrift(next);
+  next = applyLocalDistrictCooling(next);
+  next = pruneRecentActivity(next);
   next = applyWinLoss(next);
 
   if (next.gameOver) {

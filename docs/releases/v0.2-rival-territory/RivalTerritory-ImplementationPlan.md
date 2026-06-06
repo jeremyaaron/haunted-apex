@@ -379,6 +379,22 @@ Unit tests:
 - Recent activity captures tags and deltas.
 - Old activity is pruned.
 
+### Completion Record
+
+Completed June 6, 2026:
+
+- Targeted actions now mutate district control and local Heat using the shared Phase 3 projections.
+- Local Heat uses the final resolved Heat delta, including complications.
+- Controlled targets add the configured pressure to the correct rival and clamp at 100.
+- Direct rival targets add rival pressure without changing district overlays.
+- Uncontrolled territory adds no rival pressure.
+- Every resolved order records compact recent activity with target tags, rival context, and final Heat/Dominion deltas.
+- Recent activity is pruned to the current week plus the prior two weeks before event selection.
+- Weekly local cooling runs after global drift and does not fall below district base Heat.
+- Action logs now name targets, local effects, and rival attention.
+- Added 12 Phase 4 tests; all 122 tests pass.
+- TypeScript and the Pages-subpath production build pass.
+
 ### Review Gate
 
 Resolve one full targeted week headlessly and inspect state/log changes before adding passive rival consequences.

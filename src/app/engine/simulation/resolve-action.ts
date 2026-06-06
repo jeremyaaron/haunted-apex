@@ -1,4 +1,8 @@
-import { getActionDefinition, getOperativeActionModifier } from '../content';
+import {
+  getActionDefinition,
+  getOperativeActionModifier,
+  getRivalDefinition,
+} from '../content';
 import type {
   ActionDefinition,
   GameLogEntry,
@@ -8,10 +12,23 @@ import type {
   QueuedOrder,
   RecruitCandidate,
 } from '../model';
-import { calculateRiskChance, getAdjustedEffects, getAdjustedResourceCost } from '../selectors';
+import {
+  calculateRiskChance,
+  calculateRivalPressureGain,
+  calculateTargetControlGain,
+  calculateTargetLocalHeatGain,
+  getAdjustedEffects,
+  getAdjustedResourceCost,
+  getTargetControllerId,
+  getTargetLabel,
+  getTargetTags,
+  resolveTargetDistrictId,
+} from '../selectors';
 import { createRng, nextInt, type RngState } from '../rng';
 import { clampStress } from './clamps';
+import { applyTargetedActionConsequences } from './district-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
+import { recordRecentActivity } from './recent-activity';
 
 const NORMAL_ACTION_STRESS = 6;
 const DANGEROUS_ACTION_STRESS = 10;
@@ -64,13 +81,24 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     },
   };
 
+  next = applyTargetedActionConsequences(next, action.id, order.target, totalDelta);
+  next = recordRecentActivity(next, action.id, order.target, totalDelta);
   next = resolveRecruitment(next, action);
   next = applyAssignedOperativeStress(next, action, operative, order.assignedOperativeId);
   next = appendLog(next, {
     type: 'order_resolved',
     title: action.label,
-    body: createResolutionBody(action, operative, roll.value, riskChance, complication),
+    body: createResolutionBody(
+      action,
+      operative,
+      order,
+      totalDelta,
+      roll.value,
+      riskChance,
+      complication,
+    ),
     pressureDelta: totalDelta,
+    tags: getTargetTags(order.target),
   });
 
   if (complication) {
@@ -252,14 +280,26 @@ function applyComplicationSideEffects(
 function createResolutionBody(
   action: ActionDefinition,
   operative: Operative | undefined,
+  order: QueuedOrder,
+  resolvedDelta: PressureDelta,
   roll: number,
   riskChance: number,
   complication: boolean,
 ): string {
   const assignment = operative ? ` Assigned: ${operative.name}.` : '';
+  const targetLabel = getTargetLabel(order.target);
+  const target = targetLabel ? ` Target: ${targetLabel}.` : '';
+  const districtImpact = resolveTargetDistrictId(order.target)
+    ? ` Local impact: +${calculateTargetControlGain(action.id, order.target)} control, +${calculateTargetLocalHeatGain(resolvedDelta, order.target)} Heat.`
+    : '';
+  const rivalId = getTargetControllerId(order.target);
+  const rival = rivalId ? getRivalDefinition(rivalId) : undefined;
+  const rivalAttention = rival
+    ? ` Rival attention: ${rival.name} +${calculateRivalPressureGain(action.id)}.`
+    : '';
   const result = complication ? 'Complication triggered.' : 'Resolved cleanly.';
 
-  return `${result}${assignment} Risk ${riskChance}, roll ${roll}.`;
+  return `${result}${assignment}${target}${districtImpact}${rivalAttention} Risk ${riskChance}, roll ${roll}.`;
 }
 
 function createComplicationBody(action: ActionDefinition): string {

@@ -74,6 +74,26 @@ describe('advanceWeek', () => {
     expect(result.state.pressures.resources).toBe(6050);
     expect(result.state.pressures.dominion).toBe(16);
     expect(result.state.pressures.heat).toBe(28);
+    expect(result.state.districts.district_chrome_narrows).toEqual({
+      id: 'district_chrome_narrows',
+      control: 11,
+      heat: 31,
+    });
+    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(8);
+    expect(result.state.recentActivity).toEqual([
+      jasmine.objectContaining({
+        actionId: 'run_small_job',
+        target: {
+          type: 'venue',
+          id: 'venue_zero_mercy',
+        },
+        rivalId: 'rival_knox_marrow',
+        heatDelta: 12,
+        dominionDelta: 4,
+      }),
+    ]);
+    expect(result.state.eventLog[0].body).toContain('Target: Zero Mercy.');
+    expect(result.state.eventLog[0].body).toContain('Rival attention: Knox Marrow +8.');
   });
 
   it('applies Bribe Official failure behavior and sets bribe_exposed', () => {
@@ -127,6 +147,17 @@ describe('advanceWeek', () => {
       intel: 10,
       ruin: 0,
     });
+    expect(result.state.districts.district_chrome_narrows).toEqual({
+      id: 'district_chrome_narrows',
+      control: 11,
+      heat: 32,
+    });
+    expect(result.state.recentActivity[0]).toEqual(
+      jasmine.objectContaining({
+        heatDelta: 14,
+        dominionDelta: 4,
+      }),
+    );
     expect(result.state.eventLog.some((entry) => entry.type === 'complication')).toBeTrue();
   });
 
