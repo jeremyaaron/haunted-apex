@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   PRESSURE_IDS,
@@ -34,6 +34,7 @@ export class App {
   protected readonly selectedOperatives = signal<Partial<Record<ActionId, string>>>({});
   protected readonly selectedTargets = signal<Partial<Record<ActionId, ActionTarget>>>({});
   protected readonly harnessOutput = signal('');
+  protected readonly debugVisible = signal(false);
   protected seedInput = 'VIOLET-ASH-1047';
 
   protected readonly actionViews = computed(() =>
@@ -175,6 +176,14 @@ export class App {
     });
 
     this.harnessOutput.set(formatBatchReport(report));
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  protected toggleDebugPanel(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      this.debugVisible.update((visible) => !visible);
+    }
   }
 
   protected isAdvanceEnabled(): boolean {

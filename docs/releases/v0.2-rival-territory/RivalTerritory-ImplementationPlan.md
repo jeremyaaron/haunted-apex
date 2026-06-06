@@ -995,6 +995,62 @@ Approve and tag:
 v0.2.0 - Rival Territory
 ```
 
+### Balance Pass 1 Record
+
+Completed June 6, 2026:
+
+- Raised the Dominion victory target from 70 to 85 so competent play must survive at least one additional strategic exchange.
+- Added venue-specific Dominion modifiers:
+  - The Pale Circuit: `-2 Dominion`, preserving its low-Heat identity at reduced conquest yield.
+  - The Glass Saint: `+2 Dominion`.
+  - Zero Mercy: `+2 Dominion`.
+  - Black Halo Exchange: `+1 Dominion`.
+- Added Dominion modifiers to shared previews, resolution, territory views, and UI modifier labels.
+- Increased rival pressure from Run a Small Job from 8 to 10 and Expand Influence from 12 to 14.
+- Lowered rival passive and rival-context event thresholds from 60/50 to 40.
+- Increased Nyx Ardent's passive Loyalty loss from 3 to 5 and Knox Marrow's passive Heat gain from 3 to 5.
+- Added an Aggressive Heat brake at 85 while preserving its Dominion-first policy.
+- Added Cautious resource-recovery behavior so it usually loses from Dominion shortfall rather than bankruptcy.
+- Added Greedy Heat, cash-reserve, and Resource/Intel conversion behavior so it is risky but no longer deterministic.
+- Verified four independent 100-run-per-agent batches:
+
+```text
+Random:          0-4%
+Aggressive:     36-45%
+Cautious:        0%
+Greedy:         37-45%
+Operator / Sane: 67-76%
+```
+
+- Cautious losses are now predominantly `out_of_time`.
+- Rival-pressure-influenced events increased from near zero to meaningful samples in Random, Aggressive, and Operator runs.
+- Target choice now exposes a visible safety-versus-Dominion tradeoff instead of making The Pale Circuit universally optimal.
+- Random is below the original 5-12% guide, but this pass intentionally favors the stated goal that random play should almost never win.
+- Added venue-tradeoff and hidden-debug regression tests and updated affected contracts;
+  all 156 tests pass.
+- Confirmed the GitHub Pages prototype is live at `https://jeremyaaron.github.io/haunted-apex/`.
+
+Pending before final v0.2.0 approval:
+
+- Review the field guide and hidden debug access in a manual playthrough.
+- Complete at least one manual victory on the tuned build.
+- Deploy and smoke-test the final balance/UI commit.
+- Approve and tag `v0.2.0 - Rival Territory`.
+
+### Usability Review Record
+
+- Replaced the obsolete `District Zero Prototype` eyebrow with `Rival Territory`.
+- Relabeled action complication percentages as `Risk: <tier> <percent>%`.
+- Added a bounded, scrollable Field Guide beneath the Event Feed covering victory and
+  loss conditions, action skills, risk, district Control, Local Heat, venue modifiers,
+  rival Pressure tiers, reprisals, and weekly fallout.
+- Explicitly documents that Control is the player's foothold rather than territory
+  ownership, and that ownership cannot change in v0.2.
+- Explicitly identifies rival Disposition and profile ratings as non-mechanical in this
+  release.
+- Removed debug tooling from the default released interface. It can be toggled for
+  troubleshooting with `Ctrl+Shift+D` or `Cmd+Shift+D`.
+
 ---
 
 ## Recommended Execution Order

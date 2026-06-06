@@ -2,10 +2,10 @@ import type { ActionId, RivalPressureTier } from '../model';
 
 const RIVAL_PRESSURE_BY_ACTION: Record<ActionId, number> = {
   gather_intel: 4,
-  run_small_job: 8,
+  run_small_job: 10,
   bribe_official: 5,
   recruit_operative: 3,
-  expand_influence: 12,
+  expand_influence: 14,
   lay_low: 0,
 };
 

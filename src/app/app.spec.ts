@@ -37,22 +37,29 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Command Board');
     expect(compiled.textContent).toContain('Operative Roster');
     expect(compiled.textContent).toContain('Event Feed');
+    expect(compiled.textContent).toContain('Rival Territory');
+    expect(compiled.textContent).toContain('Field Guide');
+    expect(compiled.textContent).toContain('Risk: Low 10%');
     expect(compiled.textContent).toContain('Gather Intel');
     expect(compiled.textContent).toContain('Mara Voss');
-    expect(compiled.textContent).toContain('Dominion target 70');
-    expect(compiled.textContent).toContain('Win at 70');
+    expect(compiled.textContent).toContain('Dominion target 85');
+    expect(compiled.textContent).toContain('Win at 85');
     expect(compiled.textContent).toContain('Warning at 25');
-    expect(compiled.textContent).toContain('Debug Panel');
-    expect(compiled.textContent).toContain('RNG Cursor');
-    expect(compiled.textContent).toContain('Exact Risk');
-    expect(compiled.textContent).toContain('Run Harness');
-    expect(compiled.textContent).toContain('Run Harness to simulate 100 games per strategy.');
+    expect(compiled.textContent).not.toContain('Debug Panel');
+    expect(compiled.textContent).toContain('Control is your network foothold');
+    expect(compiled.textContent).toContain('Watching (0-24)');
+    expect(compiled.textContent).toContain('do not modify actions in this release');
   });
 
   it('should expose expanded target and territory harness reporting', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'd', ctrlKey: true, shiftKey: true }),
+    );
+    fixture.detectChanges();
 
     clickButton(compiled, 'Run Harness');
     fixture.detectChanges();
@@ -65,6 +72,27 @@ describe('App', () => {
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
     expect(output).toContain('Operator / Sane');
+  });
+
+  it('should keep debug tooling hidden behind the keyboard toggle', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).not.toContain('Debug Panel');
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'd', metaKey: true, shiftKey: true }),
+    );
+    fixture.detectChanges();
+    expect(compiled.textContent).toContain('Debug Panel');
+    expect(compiled.textContent).toContain('Run Harness');
+
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'd', metaKey: true, shiftKey: true }),
+    );
+    fixture.detectChanges();
+    expect(compiled.textContent).not.toContain('Debug Panel');
   });
 
   it('should queue an action from the dashboard', () => {
@@ -164,7 +192,7 @@ describe('App', () => {
     expect(jobCard.textContent).toContain('+1950 Resources');
     expect(jobCard.textContent).toContain('High 26%');
     expect(jobCard.querySelector('.rival-warning')?.textContent).toContain('Knox Marrow');
-    expect(jobCard.querySelector('.rival-warning')?.textContent).toContain('Pressure +8');
+    expect(jobCard.querySelector('.rival-warning')?.textContent).toContain('Pressure +10');
     expect(jobCard.querySelector('.local-impact')?.textContent).toContain('Chrome Narrows');
   });
 
@@ -191,6 +219,8 @@ describe('App', () => {
     expect(compiled.querySelectorAll('.venue-row').length).toBe(4);
     expect(compiled.querySelectorAll('.rival-row').length).toBe(2);
     expect(compiled.querySelector('.territory-panel')?.textContent).toContain('Ghostline Market');
+    expect(compiled.querySelector('.territory-panel')?.textContent).toContain('Dominion -2');
+    expect(compiled.querySelector('.territory-panel')?.textContent).toContain('Dominion +2');
     expect(compiled.querySelector('.rival-panel')?.textContent).toContain('Nyx Ardent');
     expect(compiled.querySelector('.rival-panel')?.textContent).toContain('Knox Marrow');
   });

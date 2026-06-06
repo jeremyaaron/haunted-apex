@@ -41,6 +41,7 @@ export type VenueTerritoryView = {
   controllingRivalName?: string;
   wealthMod: number;
   intelMod: number;
+  dominionMod: number;
   heatMod: number;
   loyaltyMod: number;
   ruinMod: number;
@@ -209,6 +210,7 @@ export function selectDistrictTerritoryViews(state: GameState): DistrictTerritor
               : {}),
             wealthMod: venue.wealthMod,
             intelMod: venue.intelMod,
+            dominionMod: venue.dominionMod,
             heatMod: venue.heatMod,
             loyaltyMod: venue.loyaltyMod,
             ruinMod: venue.ruinMod,

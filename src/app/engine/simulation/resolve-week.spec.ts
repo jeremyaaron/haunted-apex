@@ -74,14 +74,14 @@ describe('advanceWeek', () => {
       28,
     );
     expect(result.state.pressures.resources).toBe(6050);
-    expect(result.state.pressures.dominion).toBe(16);
+    expect(result.state.pressures.dominion).toBe(18);
     expect(result.state.pressures.heat).toBe(28);
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
       control: 11,
       heat: 31,
     });
-    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(8);
+    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(10);
     expect(result.state.recentActivity).toEqual([
       jasmine.objectContaining({
         actionId: 'run_small_job',
@@ -91,11 +91,11 @@ describe('advanceWeek', () => {
         },
         rivalId: 'rival_knox_marrow',
         heatDelta: 12,
-        dominionDelta: 4,
+        dominionDelta: 6,
       }),
     ]);
     expect(result.state.eventLog[0].body).toContain('Target: Zero Mercy.');
-    expect(result.state.eventLog[0].body).toContain('Rival attention: Knox Marrow +8.');
+    expect(result.state.eventLog[0].body).toContain('Rival attention: Knox Marrow +10.');
   });
 
   it('applies Bribe Official failure behavior and sets bribe_exposed', () => {
@@ -353,14 +353,14 @@ describe('clamps and win/loss', () => {
   });
 
   it('detects dominion victory', () => {
-    expect(getGameOverState(withPressures({ dominion: 75 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 85 }))).toEqual({
       result: 'victory',
       reason: 'dominion_victory',
     });
   });
 
   it('detects loss before victory when fail and win thresholds are both crossed', () => {
-    expect(getGameOverState(withPressures({ dominion: 75, heat: 100 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 85, heat: 100 }))).toEqual({
       result: 'loss',
       reason: 'heat_lockdown',
     });

@@ -401,6 +401,10 @@ export function applyVenueModifiers(
     next.intel = effects.intel + venue.intelMod;
   }
 
+  if (effects.dominion !== undefined) {
+    next.dominion = effects.dominion + venue.dominionMod;
+  }
+
   if (effects.heat !== undefined) {
     next.heat = effects.heat + venue.heatMod;
   }

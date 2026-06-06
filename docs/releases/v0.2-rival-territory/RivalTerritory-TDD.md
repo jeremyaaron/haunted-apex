@@ -191,6 +191,7 @@ type VenueDefinition = {
   districtId: DistrictId;
   wealthMod: number;
   intelMod: number;
+  dominionMod: number;
   heatMod: number;
   loyaltyMod: number;
   ruinMod: number;
@@ -449,6 +450,7 @@ Rules:
 
 - Apply `wealthMod * 150` only when the action already changes Resources.
 - Apply `intelMod` only when the action already changes Intel.
+- Apply `dominionMod` only when the action already changes Dominion.
 - Apply `heatMod` only when the action already changes Heat.
 - Apply `loyaltyMod` only when the action already changes Loyalty.
 - Apply `ruinMod` only when the action already changes Ruin.
@@ -497,10 +499,10 @@ Base pressure gain:
 ```ts
 const RIVAL_PRESSURE_BY_ACTION: Record<ActionId, number> = {
   gather_intel: 4,
-  run_small_job: 8,
+  run_small_job: 10,
   bribe_official: 5,
   recruit_operative: 3,
-  expand_influence: 12,
+  expand_influence: 14,
   lay_low: 0,
 };
 ```
@@ -602,16 +604,16 @@ Apply passive rival effects after global drift and local district cooling.
 Nyx Ardent:
 
 ```ts
-if (nyx.active && nyx.pressure >= 60 && state.pressures.intel < 20) {
-  loyalty -= 3;
+if (nyx.active && nyx.pressure >= 40 && state.pressures.intel < 20) {
+  loyalty -= 5;
 }
 ```
 
 Knox Marrow:
 
 ```ts
-if (knox.active && knox.pressure >= 60) {
-  heat += 3;
+if (knox.active && knox.pressure >= 40) {
+  heat += 5;
 }
 ```
 
@@ -658,6 +660,8 @@ The v0.2 order is:
 ```
 
 The existing rule remains: loss conditions take precedence if victory and loss thresholds are crossed simultaneously.
+
+Balance Pass 1 raises the Dominion victory threshold from 70 to 85.
 
 For v0.2, action, drift, and passive rival effects may put the run into a failing state, but the weekly event response still resolves before the final win/loss check. This follows the canonical order in `v0.2A.md`.
 
@@ -1068,8 +1072,8 @@ This detail may remain in debug/prototype copy and can be made more atmospheric 
 
 ### Rival tests
 
-- Nyx passive applies only at pressure >= 60 and Intel < 20.
-- Knox passive applies only at pressure >= 60.
+- Nyx passive applies only at pressure >= 40 and Intel < 20.
+- Knox passive applies only at pressure >= 40.
 - Passive effects apply once per week.
 - Pressure tiers resolve at exact boundaries.
 

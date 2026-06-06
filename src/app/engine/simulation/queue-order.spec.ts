@@ -350,7 +350,7 @@ describe('queueOrder', () => {
       jasmine.objectContaining({
         targetLabel: 'Zero Mercy',
         adjustedEffects: {
-          dominion: 4,
+          dominion: 6,
           heat: 12,
           loyalty: -1,
           resources: 1550,

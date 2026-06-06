@@ -13,20 +13,20 @@ type RivalPassiveEffect = {
 const RIVAL_PASSIVE_EFFECTS: Record<RivalId, RivalPassiveEffect> = {
   rival_nyx_ardent: {
     applies: (state) =>
-      state.rivals.rival_nyx_ardent.pressure >= 60 && state.pressures.intel < 20,
+      state.rivals.rival_nyx_ardent.pressure >= 40 && state.pressures.intel < 20,
     title: 'Nyx Ardent Exploits Uncertainty',
     body: 'Nyx Ardent turns scarce intelligence into whispers through the network.',
     pressureDelta: {
-      loyalty: -3,
+      loyalty: -5,
     },
     tags: ['RIVAL', 'LOYALTY'],
   },
   rival_knox_marrow: {
-    applies: (state) => state.rivals.rival_knox_marrow.pressure >= 60,
+    applies: (state) => state.rivals.rival_knox_marrow.pressure >= 40,
     title: 'Knox Marrow Escalates',
     body: 'Knox Marrow answers mounting pressure by making the streets louder.',
     pressureDelta: {
-      heat: 3,
+      heat: 5,
     },
     tags: ['RIVAL', 'HEAT'],
   },

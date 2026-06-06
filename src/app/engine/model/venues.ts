@@ -20,6 +20,7 @@ export type VenueDefinition = {
   districtId: DistrictId;
   wealthMod: number;
   intelMod: number;
+  dominionMod: number;
   heatMod: number;
   loyaltyMod: number;
   ruinMod: number;

@@ -39,15 +39,12 @@ http://localhost:4200/
 
 ## Playable Build
 
-GitHub Pages deployment is configured for v0.2.0 at:
+Play the current prototype:
 
-```text
 https://jeremyaaron.github.io/haunted-apex/
-```
 
 The deployment workflow runs after pushes to `main` and can also be started manually from the
-repository's Actions tab. This README will identify the build as live after the first successful
-deployment.
+repository's Actions tab.
 
 ## Verification
 

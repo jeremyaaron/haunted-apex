@@ -58,26 +58,12 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
       state,
       options,
       context,
-      {
-        dominion: 4,
-        heat: -0.45,
-        loyalty: 0.4,
-        resources: 0.00045,
-        intel: 0.45,
-        ruin: -0.35,
-      },
+      aggressiveWeights(state),
       {},
       scoreAggressiveTarget,
     ),
   chooseEventChoice: (state, options, context) =>
-    chooseHighestScoringChoice(state, options, context, {
-      dominion: 4,
-      heat: -0.45,
-      loyalty: 0.5,
-      resources: 0.00045,
-      intel: 0.4,
-      ruin: -0.35,
-    }),
+    chooseHighestScoringChoice(state, options, context, aggressiveWeights(state)),
 };
 
 export const CAUTIOUS_BOT: StrategyAgent = {
@@ -107,26 +93,12 @@ export const GREEDY_BOT: StrategyAgent = {
       state,
       options,
       context,
-      {
-        dominion: 0.9,
-        heat: -0.05,
-        loyalty: 0.1,
-        resources: 0.0035,
-        intel: 0.8,
-        ruin: -0.05,
-      },
+      greedyWeights(state),
       {},
-      scoreGreedyTarget,
+      (option) => scoreGreedyTarget(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
-    chooseHighestScoringChoice(state, options, context, {
-      dominion: 0.9,
-      heat: -0.05,
-      loyalty: 0.1,
-      resources: 0.0035,
-      intel: 0.8,
-      ruin: -0.05,
-    }, false),
+    chooseHighestScoringChoice(state, options, context, greedyWeights(state)),
 };
 
 export const OPERATOR_BOT: StrategyAgent = {
@@ -211,11 +183,28 @@ function scoreCautiousTarget(state: GameState, option: LegalOrderOption): number
     target?.type === 'venue' && target.id === 'venue_pale_circuit' ? 18 : 0;
   const uncontrolledBias = target && !option.preview.rivalAttention ? 8 : 0;
   const rivalPenalty = option.preview.rivalAttention ? -18 : 0;
+  const resourceRecoveryBias =
+    option.actionId === 'run_small_job'
+      ? state.pressures.resources <= 1200
+        ? 120
+        : state.pressures.resources <= 2400
+          ? 35
+          : 0
+      : 0;
+  const unaffordableUpkeepPenalty =
+    state.pressures.resources <= 1600 && option.preview.adjustedResourceCost > 0 ? -60 : 0;
 
-  return paleCircuitBias + uncontrolledBias + rivalPenalty - localHeat * 0.35;
+  return (
+    paleCircuitBias +
+    uncontrolledBias +
+    rivalPenalty +
+    resourceRecoveryBias +
+    unaffordableUpkeepPenalty -
+    localHeat * 0.35
+  );
 }
 
-function scoreGreedyTarget(option: LegalOrderOption): number {
+function scoreGreedyTarget(state: GameState, option: LegalOrderOption): number {
   const target = option.preview.selectedTarget;
   const favoredVenueBias =
     target?.type === 'venue' &&
@@ -225,8 +214,36 @@ function scoreGreedyTarget(option: LegalOrderOption): number {
   const economicYield =
     (option.preview.adjustedEffects.resources ?? 0) * 0.0015 +
     (option.preview.adjustedEffects.intel ?? 0) * 0.8;
+  const nextHeat = state.pressures.heat + (option.preview.adjustedEffects.heat ?? 0);
+  const heatLossPenalty = nextHeat >= 100 ? -10_000 : 0;
+  const dangerPenalty = nextHeat >= 85 ? (nextHeat - 84) * -10 : 0;
+  const recoveryBias =
+    state.pressures.heat >= 72 && (option.preview.adjustedEffects.heat ?? 0) < 0
+      ? Math.abs(option.preview.adjustedEffects.heat ?? 0) * 5
+      : 0;
+  const conversionBias =
+    option.actionId === 'expand_influence' &&
+    (state.pressures.resources >= 3000 || state.pressures.intel >= 35)
+      ? 22
+      : 0;
+  const nextResources =
+    state.pressures.resources +
+    (option.preview.adjustedEffects.resources ?? 0) -
+    option.preview.adjustedResourceCost;
+  const reservePenalty = nextResources < 800 ? (800 - nextResources) * -0.08 : 0;
+  const cashRecoveryBias =
+    option.actionId === 'run_small_job' && state.pressures.resources < 1800 ? 60 : 0;
 
-  return favoredVenueBias + economicYield;
+  return (
+    favoredVenueBias +
+    economicYield +
+    heatLossPenalty +
+    dangerPenalty +
+    recoveryBias +
+    conversionBias +
+    reservePenalty +
+    cashRecoveryBias
+  );
 }
 
 function scoreOperatorTarget(state: GameState, option: LegalOrderOption): number {
@@ -295,6 +312,30 @@ function cautiousWeights(state: GameState): PressureWeights {
     resources: state.pressures.resources <= 1600 ? 0.0025 : 0.0006,
     intel: 0.55,
     ruin: state.pressures.ruin >= 20 ? -5 : -2.4,
+  };
+}
+
+function aggressiveWeights(state: GameState): PressureWeights {
+  const heatBrake = state.pressures.heat >= 85;
+
+  return {
+    dominion: 4,
+    heat: heatBrake ? -3.5 : -0.45,
+    loyalty: 0.5,
+    resources: 0.00045,
+    intel: 0.4,
+    ruin: -0.35,
+  };
+}
+
+function greedyWeights(state: GameState): PressureWeights {
+  return {
+    dominion: 1.3,
+    heat: state.pressures.heat >= 72 ? -3.2 : -0.05,
+    loyalty: 0.1,
+    resources: state.pressures.resources < 1800 ? 0.007 : 0.0035,
+    intel: 0.8,
+    ruin: -0.05,
   };
 }
 

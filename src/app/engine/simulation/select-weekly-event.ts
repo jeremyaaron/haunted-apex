@@ -203,14 +203,14 @@ function getContextModifiers(
   }
 
   if (
-    context.rivalPressures.rival_nyx_ardent >= 50 &&
+    context.rivalPressures.rival_nyx_ardent >= 40 &&
     (event.id === 'liaison_favor' || event.id === 'operative_wants_more')
   ) {
     modifiers.push({ id: 'nyx_pressure', amount: 10 });
   }
 
   if (
-    context.rivalPressures.rival_knox_marrow >= 50 &&
+    context.rivalPressures.rival_knox_marrow >= 40 &&
     (event.id === 'rival_tests_border' || event.id === 'job_goes_loud')
   ) {
     modifiers.push({ id: 'knox_pressure', amount: 10 });

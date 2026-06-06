@@ -87,16 +87,16 @@ describe('weekly event selection', () => {
     expect(modifierIdsFor(state, 'blackmail_lead')).toContain('recent_memory');
   });
 
-  it('raises intended event weights when Nyx pressure reaches 50', () => {
-    const state = withRivalPressure('rival_nyx_ardent', 50);
+  it('raises intended event weights when Nyx pressure reaches 40', () => {
+    const state = withRivalPressure('rival_nyx_ardent', 40);
 
     expect(weightFor(state, 'liaison_favor')).toBe(15);
     expect(weightFor(state, 'operative_wants_more')).toBe(20);
     expect(modifierIdsFor(state, 'liaison_favor')).toContain('nyx_pressure');
   });
 
-  it('raises intended event weights when Knox pressure reaches 50', () => {
-    const state = withRivalPressure('rival_knox_marrow', 50);
+  it('raises intended event weights when Knox pressure reaches 40', () => {
+    const state = withRivalPressure('rival_knox_marrow', 40);
 
     expect(weightFor(state, 'rival_tests_border')).toBe(28);
     expect(weightFor(state, 'job_goes_loud')).toBe(14);

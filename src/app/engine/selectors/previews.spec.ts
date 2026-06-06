@@ -147,11 +147,28 @@ describe('action previews', () => {
     );
 
     expect(preview?.adjustedEffects).toEqual({
-      dominion: 3,
+      dominion: 1,
       loyalty: -3,
     });
     expect(preview?.adjustedEffects.intel).toBeUndefined();
     expect(preview?.adjustedEffects.heat).toBeUndefined();
+  });
+
+  it('makes safe and dangerous venues trade Dominion yield for pressure', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const paleCircuit = getActionPreview(state, 'expand_influence', undefined, {
+      type: 'venue',
+      id: 'venue_pale_circuit',
+    });
+    const glassSaint = getActionPreview(state, 'expand_influence', undefined, {
+      type: 'venue',
+      id: 'venue_glass_saint',
+    });
+
+    expect(paleCircuit?.adjustedEffects.dominion).toBe(7);
+    expect(paleCircuit?.adjustedEffects.heat).toBe(8);
+    expect(glassSaint?.adjustedEffects.dominion).toBe(11);
+    expect(glassSaint?.adjustedEffects.heat).toBe(11);
   });
 
   it('normalizes a venue modifier that cancels an existing effect', () => {
@@ -167,6 +184,7 @@ describe('action previews', () => {
           districtId: 'district_violet_ward',
           wealthMod: 0,
           intelMod: 0,
+          dominionMod: 0,
           heatMod: -1,
           loyaltyMod: 0,
           ruinMod: 0,
@@ -309,9 +327,9 @@ describe('action previews', () => {
     expect(preview?.rivalAttention).toEqual({
       rivalId: 'rival_nyx_ardent',
       rivalName: 'Nyx Ardent',
-      pressureGain: 12,
+      pressureGain: 14,
       currentPressure: 20,
-      projectedPressure: 32,
+      projectedPressure: 34,
       projectedTier: 'interested',
     });
     expect(preview?.localImpact).toEqual({

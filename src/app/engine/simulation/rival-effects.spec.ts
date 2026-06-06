@@ -3,8 +3,8 @@ import { newGame } from './new-game';
 import { applyRivalPassiveEffects } from './rival-effects';
 
 describe('rival passive effects', () => {
-  it('does not apply Nyx Ardent below pressure 60', () => {
-    const state = withRivalPressure('rival_nyx_ardent', 59);
+  it('does not apply Nyx Ardent below pressure 40', () => {
+    const state = withRivalPressure('rival_nyx_ardent', 39);
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty);
@@ -13,7 +13,7 @@ describe('rival passive effects', () => {
 
   it('does not apply Nyx Ardent when Intel is at least 20', () => {
     const state = {
-      ...withRivalPressure('rival_nyx_ardent', 60),
+      ...withRivalPressure('rival_nyx_ardent', 40),
       pressures: {
         ...newGame().pressures,
         intel: 20,
@@ -26,25 +26,25 @@ describe('rival passive effects', () => {
   });
 
   it('applies and logs Nyx Ardent Loyalty pressure under the full condition', () => {
-    const state = withRivalPressure('rival_nyx_ardent', 60);
+    const state = withRivalPressure('rival_nyx_ardent', 40);
     const resolved = applyRivalPassiveEffects(state);
 
-    expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty - 3);
+    expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty - 5);
     expect(resolved.eventLog).toEqual([
       jasmine.objectContaining({
         type: 'rival_effect',
         title: jasmine.stringContaining('Nyx Ardent'),
         pressureDelta: {
-          loyalty: -3,
+          loyalty: -5,
         },
         tags: jasmine.arrayContaining(['RIVAL', 'LOYALTY', 'rival_nyx_ardent']),
       }),
     ]);
   });
 
-  it('applies and clamps Knox Marrow Heat pressure at pressure 60', () => {
+  it('applies and clamps Knox Marrow Heat pressure at pressure 40', () => {
     const state = {
-      ...withRivalPressure('rival_knox_marrow', 60),
+      ...withRivalPressure('rival_knox_marrow', 40),
       pressures: {
         ...newGame().pressures,
         heat: 99,
@@ -58,7 +58,7 @@ describe('rival passive effects', () => {
         type: 'rival_effect',
         title: jasmine.stringContaining('Knox Marrow'),
         pressureDelta: {
-          heat: 3,
+          heat: 5,
         },
         tags: jasmine.arrayContaining(['RIVAL', 'HEAT', 'rival_knox_marrow']),
       }),
@@ -68,14 +68,14 @@ describe('rival passive effects', () => {
   it('applies each rival effect at most once per week', () => {
     const state = withRivalPressure(
       'rival_knox_marrow',
-      60,
-      withRivalPressure('rival_nyx_ardent', 60),
+      40,
+      withRivalPressure('rival_nyx_ardent', 40),
     );
     const firstResolution = applyRivalPassiveEffects(state);
     const secondResolution = applyRivalPassiveEffects(firstResolution);
 
-    expect(secondResolution.pressures.loyalty).toBe(state.pressures.loyalty - 3);
-    expect(secondResolution.pressures.heat).toBe(state.pressures.heat + 3);
+    expect(secondResolution.pressures.loyalty).toBe(state.pressures.loyalty - 5);
+    expect(secondResolution.pressures.heat).toBe(state.pressures.heat + 5);
     expect(
       secondResolution.eventLog.filter((entry) => entry.type === 'rival_effect').length,
     ).toBe(2);
@@ -84,8 +84,8 @@ describe('rival passive effects', () => {
   it('does not apply effects from inactive rivals', () => {
     const pressured = withRivalPressure(
       'rival_knox_marrow',
-      60,
-      withRivalPressure('rival_nyx_ardent', 60),
+      40,
+      withRivalPressure('rival_nyx_ardent', 40),
     );
     const state: GameState = {
       ...pressured,

@@ -221,6 +221,7 @@ p {
 .territory-panel,
 .rival-panel,
 .fallout-panel,
+.guide-panel,
 .debug-panel {
   padding: 16px;
 }
@@ -644,6 +645,51 @@ dd {
 
 .fallout-panel {
   min-height: 180px;
+}
+
+.guide-panel {
+  margin-bottom: 14px;
+}
+
+.guide-scroll {
+  max-height: 430px;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-color: rgba(129, 216, 208, 0.42) rgba(4, 7, 11, 0.5);
+}
+
+.guide-intro {
+  padding: 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid #81d8d0;
+  background: rgba(129, 216, 208, 0.055);
+}
+
+.guide-intro strong {
+  color: #d7fffb;
+}
+
+.guide-intro p,
+.guide-panel details p {
+  margin: 6px 0 0;
+  font-size: 0.84rem;
+}
+
+.guide-panel details {
+  border-top: 1px solid rgba(232, 237, 242, 0.1);
+}
+
+.guide-panel summary {
+  padding: 11px 4px;
+  color: #e8edf2;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.guide-panel details p {
+  max-width: 110ch;
+  padding: 0 4px 10px 20px;
 }
 
 .territory-rival-grid {

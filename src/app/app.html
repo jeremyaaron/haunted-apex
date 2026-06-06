@@ -1,7 +1,7 @@
 <main class="black-ledger-shell">
   <header class="ledger-header">
     <div>
-      <p class="eyebrow">District Zero Prototype</p>
+      <p class="eyebrow">Rival Territory</p>
       <h1>The Black Ledger</h1>
       <p class="header-deck">Haunted Apex command channel // District Zero uplink</p>
     </div>
@@ -77,7 +77,7 @@
               <div class="card-topline">
                 <h3>{{ action.label }}</h3>
                 <span class="risk" [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'">
-                  {{ action.riskLabel }} {{ action.riskChance }}%
+                  Risk: {{ action.riskLabel }} {{ action.riskChance }}%
                 </span>
               </div>
 
@@ -347,6 +347,7 @@
                   <div class="venue-modifiers">
                     @if (venue.wealthMod) { <span>Wealth {{ signed(venue.wealthMod) }}</span> }
                     @if (venue.intelMod) { <span>Intel {{ signed(venue.intelMod) }}</span> }
+                    @if (venue.dominionMod) { <span>Dominion {{ signed(venue.dominionMod) }}</span> }
                     @if (venue.heatMod) { <span>Heat {{ signed(venue.heatMod) }}</span> }
                     @if (venue.loyaltyMod) { <span>Loyalty {{ signed(venue.loyaltyMod) }}</span> }
                     @if (venue.ruinMod) { <span>Ruin {{ signed(venue.ruinMod) }}</span> }
@@ -449,91 +450,171 @@
     }
   </section>
 
-  <section class="panel debug-panel">
+  <section class="panel guide-panel" aria-labelledby="field-guide-title">
     <div class="panel-heading">
-      <p class="panel-label">Debug Panel</p>
-      <h2>Tuning State</h2>
-      <button type="button" class="secondary" (click)="runHarnessBatch()">Run Harness</button>
+      <div>
+        <p class="panel-label">Network Reference</p>
+        <h2 id="field-guide-title">Field Guide</h2>
+      </div>
+      <span class="panel-count">Rival Territory</span>
     </div>
 
-    <div class="debug-grid">
-      <div class="debug-block">
-        <dl>
-          <div>
-            <dt>Seed</dt>
-            <dd>{{ debugView().seed }}</dd>
-          </div>
-          <div>
-            <dt>RNG Cursor</dt>
-            <dd>{{ debugView().rngCursor }}</dd>
-          </div>
-          <div>
-            <dt>Phase</dt>
-            <dd>{{ debugView().phase }}</dd>
-          </div>
-          <div>
-            <dt>Pending Event</dt>
-            <dd>{{ debugView().pendingEventId }}</dd>
-          </div>
-          <div>
-            <dt>Recent Tags</dt>
-            <dd>{{ debugView().recentEventTags }}</dd>
-          </div>
-        </dl>
+    <div class="guide-scroll">
+      <div class="guide-intro">
+        <strong>Build Dominion to 85 before week 8 closes.</strong>
+        <p>
+          Heat at 100, Loyalty at 0, or Resources below 0 ends the run. Action cards
+          recalculate their displayed outcome and complication risk as targets and
+          operatives change.
+        </p>
       </div>
 
-      <div class="debug-block">
-        <h3>Exact Risk</h3>
-        <div class="debug-risk-list">
-          @for (risk of debugView().riskRows; track risk.id) {
-            <div>
-              <span>{{ risk.label }}</span>
-              <strong>{{ risk.riskChance }}%</strong>
-              <small>{{ risk.riskLabel }}</small>
-            </div>
-          }
-        </div>
-      </div>
+      <details open>
+        <summary>Actions and risk</summary>
+        <p>
+          Risk is the percentage chance that an order suffers a complication. A
+          complication worsens the resolved outcome; it is not the chance that the order
+          produces nothing.
+        </p>
+        <p>
+          Gather Intel tests Subtlety, Small Jobs test Violence, and Bribe Official plus
+          Expand Influence test Charm. Higher relevant skill and Loyalty reduce risk.
+          Stress raises it, especially at 60 or higher. Some operatives also have
+          action-specific advantages already included in the preview.
+        </p>
+      </details>
 
-      <div class="debug-block">
-        <h3>Pressures JSON</h3>
-        <pre>{{ debugView().pressuresJson }}</pre>
-      </div>
+      <details>
+        <summary>Districts, venues, and control</summary>
+        <p>
+          Control is your network foothold in a district, not its ownership rating.
+          Higher Control reduces action risk at 40 and again at 70. Gather Intel, Small
+          Jobs, and Expand Influence can raise it. Rival ownership is fixed in this
+          release, so even high Control does not transfer a district or venue to you.
+        </p>
+        <p>
+          Local Heat makes future work in that district riskier when it rises above the
+          district's base. It cools toward base each week. Venues modify only outcomes an
+          action already affects: Wealth modifies Resources, while the other labels match
+          their pressure meters.
+        </p>
+      </details>
 
-      <div class="debug-block">
-        <h3>Flags JSON</h3>
-        <pre>{{ debugView().flagsJson }}</pre>
-      </div>
+      <details>
+        <summary>Rivals and pressure</summary>
+        <p>
+          Targeting a rival or property they control raises that kingpin's Pressure.
+          Pressure status advances through Watching (0-24), Interested (25-49), Provoked
+          (50-74), and Retaliating (75-100). Higher Pressure also changes which city
+          events are likely to surface.
+        </p>
+        <p>
+          At 40 Pressure, Knox can add Heat each week. Nyx can erode Loyalty each week
+          when your Intel is below 20. Attack names the pressure meter each rival prefers
+          to damage. Disposition and the remaining profile ratings are intelligence for
+          future systems; they do not modify actions in this release.
+        </p>
+      </details>
 
-      <div class="debug-block wide">
-        <h3>Queued Orders JSON</h3>
-        <pre>{{ debugView().queuedOrdersJson }}</pre>
-      </div>
-
-      <div class="debug-block wide">
-        <h3>Districts JSON</h3>
-        <pre>{{ debugView().districtsJson }}</pre>
-      </div>
-
-      <div class="debug-block wide">
-        <h3>Rivals JSON</h3>
-        <pre>{{ debugView().rivalsJson }}</pre>
-      </div>
-
-      <div class="debug-block wide">
-        <h3>Recent Activity JSON</h3>
-        <pre>{{ debugView().recentActivityJson }}</pre>
-      </div>
-
-      <div class="debug-block wide">
-        <h3>Target Preview JSON</h3>
-        <pre>{{ debugView().targetPreviewsJson }}</pre>
-      </div>
-
-      <div class="debug-block harness-output">
-        <h3>Harness CSV</h3>
-        <pre>{{ harnessOutput() || 'Run Harness to simulate 100 games per strategy.' }}</pre>
-      </div>
+      <details>
+        <summary>Weekly fallout</summary>
+        <p>
+          Every advance resolves queued orders, operative stress, network upkeep, local
+          cooling, rival reprisals, and one city event. The Event Feed records these
+          changes. Leave room for upkeep and retaliation instead of budgeting only around
+          the values printed on queued orders.
+        </p>
+      </details>
     </div>
   </section>
+
+  @if (debugVisible()) {
+    <section class="panel debug-panel">
+      <div class="panel-heading">
+        <p class="panel-label">Debug Panel</p>
+        <h2>Tuning State</h2>
+        <button type="button" class="secondary" (click)="runHarnessBatch()">Run Harness</button>
+      </div>
+
+      <div class="debug-grid">
+        <div class="debug-block">
+          <dl>
+            <div>
+              <dt>Seed</dt>
+              <dd>{{ debugView().seed }}</dd>
+            </div>
+            <div>
+              <dt>RNG Cursor</dt>
+              <dd>{{ debugView().rngCursor }}</dd>
+            </div>
+            <div>
+              <dt>Phase</dt>
+              <dd>{{ debugView().phase }}</dd>
+            </div>
+            <div>
+              <dt>Pending Event</dt>
+              <dd>{{ debugView().pendingEventId }}</dd>
+            </div>
+            <div>
+              <dt>Recent Tags</dt>
+              <dd>{{ debugView().recentEventTags }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="debug-block">
+          <h3>Exact Risk</h3>
+          <div class="debug-risk-list">
+            @for (risk of debugView().riskRows; track risk.id) {
+              <div>
+                <span>{{ risk.label }}</span>
+                <strong>{{ risk.riskChance }}%</strong>
+                <small>{{ risk.riskLabel }}</small>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="debug-block">
+          <h3>Pressures JSON</h3>
+          <pre>{{ debugView().pressuresJson }}</pre>
+        </div>
+
+        <div class="debug-block">
+          <h3>Flags JSON</h3>
+          <pre>{{ debugView().flagsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Queued Orders JSON</h3>
+          <pre>{{ debugView().queuedOrdersJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Districts JSON</h3>
+          <pre>{{ debugView().districtsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Rivals JSON</h3>
+          <pre>{{ debugView().rivalsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Recent Activity JSON</h3>
+          <pre>{{ debugView().recentActivityJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Target Preview JSON</h3>
+          <pre>{{ debugView().targetPreviewsJson }}</pre>
+        </div>
+
+        <div class="debug-block harness-output">
+          <h3>Harness CSV</h3>
+          <pre>{{ harnessOutput() || 'Run Harness to simulate 100 games per strategy.' }}</pre>
+        </div>
+      </div>
+    </section>
+  }
 </main>
