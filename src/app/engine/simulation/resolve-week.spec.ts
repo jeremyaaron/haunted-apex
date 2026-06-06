@@ -32,7 +32,7 @@ describe('advanceWeek', () => {
       dominion: 12,
       heat: 17,
       loyalty: 67,
-      resources: 3950,
+      resources: 4100,
       intel: 20,
       ruin: 0,
     });
@@ -67,9 +67,9 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       28,
     );
-    expect(result.state.pressures.resources).toBe(5350);
-    expect(result.state.pressures.dominion).toBe(17);
-    expect(result.state.pressures.heat).toBe(22);
+    expect(result.state.pressures.resources).toBe(5600);
+    expect(result.state.pressures.dominion).toBe(16);
+    expect(result.state.pressures.heat).toBe(23);
   });
 
   it('applies Bribe Official failure behavior and sets bribe_exposed', () => {
@@ -88,9 +88,9 @@ describe('advanceWeek', () => {
       dominion: 12,
       heat: 22,
       loyalty: 67,
-      resources: 3150,
+      resources: 3300,
       intel: 12,
-      ruin: 1,
+      ruin: 2,
     });
     expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
       'order_resolved',
@@ -112,10 +112,10 @@ describe('advanceWeek', () => {
     }
 
     expect(result.state.pressures).toEqual({
-      dominion: 17,
-      heat: 28,
-      loyalty: 64,
-      resources: 5750,
+      dominion: 16,
+      heat: 29,
+      loyalty: 63,
+      resources: 6000,
       intel: 10,
       ruin: 0,
     });
@@ -200,7 +200,7 @@ describe('weekly drift', () => {
       dominion: 12,
       heat: 16,
       loyalty: 67,
-      resources: 4350,
+      resources: 4500,
       intel: 10,
       ruin: 0,
     });
@@ -222,9 +222,9 @@ describe('weekly drift', () => {
 
     expect(drifted.pressures).toEqual({
       dominion: 40,
-      heat: 70,
+      heat: 72,
       loyalty: 43,
-      resources: 550,
+      resources: 700,
       intel: 10,
       ruin: 0,
     });
@@ -253,9 +253,16 @@ describe('clamps and win/loss', () => {
   });
 
   it('detects dominion victory', () => {
-    expect(getGameOverState(withPressures({ dominion: 60 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 75 }))).toEqual({
       result: 'victory',
       reason: 'dominion_victory',
+    });
+  });
+
+  it('detects loss before victory when fail and win thresholds are both crossed', () => {
+    expect(getGameOverState(withPressures({ dominion: 75, heat: 100 }))).toEqual({
+      result: 'loss',
+      reason: 'heat_lockdown',
     });
   });
 

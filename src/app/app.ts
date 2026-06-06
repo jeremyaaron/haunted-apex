@@ -5,6 +5,7 @@ import {
   getOrderAvailability,
   PRESSURE_IDS,
   STRATEGY_AGENTS,
+  DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   formatBatchReport,
   pressureDeltaToView,
   simulateBatch,
@@ -56,6 +57,7 @@ export class App {
       seed: state.seed,
       rngCursor: state.rngCursor,
       phase: state.phase,
+      dominionTarget: DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory,
       pendingEventId: state.pendingEvent?.definitionId ?? 'None',
       pressuresJson: JSON.stringify(state.pressures, null, 2),
       flagsJson: JSON.stringify(state.flags, null, 2),
@@ -221,7 +223,10 @@ export class App {
 
   private getPressureMeterValue(id: PressureId, value: number): number {
     if (id === 'dominion') {
-      return Math.max(0, Math.min(100, Math.round((value / 60) * 100)));
+      return Math.max(
+        0,
+        Math.min(100, Math.round((value / DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) * 100)),
+      );
     }
 
     if (id === 'resources') {
@@ -237,7 +242,11 @@ export class App {
 
   private getPressureStatus(id: PressureId, value: number): 'stable' | 'warning' | 'critical' {
     if (id === 'dominion') {
-      return value >= 60 ? 'critical' : value >= 45 ? 'warning' : 'stable';
+      return value >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
+        ? 'critical'
+        : value >= 60
+          ? 'warning'
+          : 'stable';
     }
 
     if (id === 'heat') {
@@ -262,7 +271,7 @@ export class App {
   private getPressureTargetLabel(id: PressureId): string {
     switch (id) {
       case 'dominion':
-        return 'Win at 60';
+        return `Win at ${DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory}`;
       case 'heat':
         return 'Lose at 100';
       case 'loyalty':

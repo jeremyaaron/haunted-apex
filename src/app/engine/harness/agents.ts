@@ -1,9 +1,10 @@
-import { DISTRICT_ZERO_ACTIONS } from '../content';
+import { DISTRICT_ZERO_ACTIONS, DISTRICT_ZERO_WIN_LOSS_THRESHOLDS } from '../content';
 import type {
   ActionId,
   EventChoiceDefinition,
   GameState,
   PressureDelta,
+  Pressures,
   QueuedOrder,
 } from '../model';
 import type { ActionPreview, QueueOrderRequest } from '../selectors';
@@ -89,22 +90,35 @@ export const GREEDY_BOT: StrategyAgent = {
   label: 'GreedyBot',
   chooseOrder: (state, options, context) =>
     chooseHighestScoringOrder(state, options, context, {
-      dominion: 1,
-      heat: -0.5,
-      loyalty: 0.25,
-      resources: 0.004,
-      intel: 0.9,
-      ruin: -0.25,
+      dominion: 0.9,
+      heat: -0.05,
+      loyalty: 0.1,
+      resources: 0.0035,
+      intel: 0.8,
+      ruin: -0.05,
     }),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, {
-      dominion: 1,
-      heat: -0.5,
-      loyalty: 0.25,
-      resources: 0.004,
-      intel: 0.9,
-      ruin: -0.25,
-    }),
+      dominion: 0.9,
+      heat: -0.05,
+      loyalty: 0.1,
+      resources: 0.0035,
+      intel: 0.8,
+      ruin: -0.05,
+    }, false),
+};
+
+export const OPERATOR_BOT: StrategyAgent = {
+  id: 'operator',
+  label: 'OperatorBot',
+  chooseOrder: (state, options, context) =>
+    chooseHighestScoring(options, context, (option) =>
+      scoreOperatorPressureMove(state.pressures, getOrderNetDelta(option), option.preview.riskChance),
+    ),
+  chooseEventChoice: (state, options, context) =>
+    chooseHighestScoring(options, context, (option) =>
+      scoreOperatorPressureMove(state.pressures, mergeChoiceDelta(option.choice), 0),
+    ),
 };
 
 export const STRATEGY_AGENTS = [
@@ -112,6 +126,7 @@ export const STRATEGY_AGENTS = [
   AGGRESSIVE_BOT,
   CAUTIOUS_BOT,
   GREEDY_BOT,
+  OPERATOR_BOT,
 ] as const;
 
 export function getQueuedActionUsage(queuedOrders: readonly QueuedOrder[]): Record<ActionId, number> {
@@ -145,7 +160,8 @@ function chooseHighestScoringOrder(
     const pressureScore = scoreDelta(option.preview.adjustedEffects, weights);
     const riskPenalty = option.preview.riskChance * (penalties.risk ?? -0.25);
     const costPenalty = option.preview.adjustedResourceCost * (penalties.resourceCost ?? -0.0007);
-    const pressureBias = state.pressures.resources < 1200 && option.actionId === 'run_small_job' ? 8 : 0;
+    const pressureBias =
+      state.pressures.resources < 2200 && option.actionId === 'run_small_job' ? 18 : 0;
 
     return pressureScore + riskPenalty + costPenalty + pressureBias;
   });
@@ -156,11 +172,12 @@ function chooseHighestScoringChoice(
   options: readonly LegalEventChoiceOption[],
   context: AgentDecisionContext,
   weights: PressureWeights,
+  includeSurvivalBias = true,
 ): LegalEventChoiceOption | undefined {
   return chooseHighestScoring(options, context, (option) => {
     const delta = mergeChoiceDelta(option.choice);
     const pressureScore = scoreDelta(delta, weights);
-    const survivalBias = getSurvivalBias(state, delta);
+    const survivalBias = includeSurvivalBias ? getSurvivalBias(state, delta) : 0;
 
     return pressureScore + survivalBias;
   });
@@ -209,6 +226,99 @@ function scoreDelta(delta: PressureDelta, weights: PressureWeights): number {
     const weight = weights[pressure as keyof PressureDelta] ?? 0;
     return score + value * weight;
   }, 0);
+}
+
+function getOrderNetDelta(option: LegalOrderOption): PressureDelta {
+  return {
+    ...option.preview.adjustedEffects,
+    resources: (option.preview.adjustedEffects.resources ?? 0) - option.preview.adjustedResourceCost,
+  };
+}
+
+function scoreOperatorPressureMove(
+  pressures: Pressures,
+  delta: PressureDelta,
+  riskChance: number,
+): number {
+  const next = applyDeltaForScoring(pressures, delta);
+
+  if (isLosingProjection(next)) {
+    return -10_000 + scoreDelta(delta, operatorWeights(pressures));
+  }
+
+  const currentWorstMargin = getWorstNormalizedSurvivalMargin(pressures);
+  const nextWorstMargin = getWorstNormalizedSurvivalMargin(next);
+  const stabilityGain = (nextWorstMargin - currentWorstMargin) * 45;
+  const stableEnough = currentWorstMargin >= 0.25;
+  const weights = operatorWeights(pressures);
+  const dominionFinishBias =
+    next.dominion >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory ? 100 : 0;
+  const dominanceBias = stableEnough ? (delta.dominion ?? 0) * 3.5 : (delta.dominion ?? 0) * 1.4;
+  const riskPenalty = riskChance * (stableEnough ? -0.12 : -0.3);
+  const ruinBrake = next.ruin >= 25 ? (next.ruin - 24) * -2.5 : 0;
+
+  return (
+    scoreDelta(delta, weights) +
+    stabilityGain +
+    dominanceBias +
+    dominionFinishBias +
+    riskPenalty +
+    ruinBrake
+  );
+}
+
+function operatorWeights(pressures: Pressures): PressureWeights {
+  const heatDanger = highBandDanger(pressures.heat, 60, DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss);
+  const loyaltyDanger = lowBandDanger(pressures.loyalty, 45);
+  const resourceDanger = lowBandDanger(pressures.resources, 1800);
+
+  return {
+    dominion: Math.max(1.4, 4.7 - (heatDanger + loyaltyDanger + resourceDanger) * 1.7),
+    heat: -0.45 - heatDanger * 6,
+    loyalty: 0.35 + loyaltyDanger * 7,
+    resources: 0.0002 + resourceDanger * 0.008,
+    intel: 0.35,
+    ruin: pressures.ruin >= 20 ? -5 : -1.6,
+  };
+}
+
+function highBandDanger(value: number, warningValue: number, failValue: number): number {
+  return Math.max(0, Math.min(1, (value - warningValue) / (failValue - warningValue)));
+}
+
+function lowBandDanger(value: number, warningValue: number): number {
+  return Math.max(0, Math.min(1, (warningValue - value) / warningValue));
+}
+
+function getWorstNormalizedSurvivalMargin(pressures: Pressures): number {
+  const heatMargin =
+    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss - pressures.heat) /
+    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss;
+  const loyaltyMargin =
+    (pressures.loyalty - DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.loyaltyLoss) / 60;
+  const resourceMargin =
+    (pressures.resources - DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.resourceLoss) / 5000;
+
+  return Math.min(heatMargin, loyaltyMargin, resourceMargin);
+}
+
+function applyDeltaForScoring(pressures: Pressures, delta: PressureDelta): Pressures {
+  return {
+    dominion: pressures.dominion + (delta.dominion ?? 0),
+    heat: pressures.heat + (delta.heat ?? 0),
+    loyalty: pressures.loyalty + (delta.loyalty ?? 0),
+    resources: pressures.resources + (delta.resources ?? 0),
+    intel: pressures.intel + (delta.intel ?? 0),
+    ruin: pressures.ruin + (delta.ruin ?? 0),
+  };
+}
+
+function isLosingProjection(pressures: Pressures): boolean {
+  return (
+    pressures.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss ||
+    pressures.loyalty <= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.loyaltyLoss ||
+    pressures.resources < DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.resourceLoss
+  );
 }
 
 function mergeChoiceDelta(choice: EventChoiceDefinition): PressureDelta {

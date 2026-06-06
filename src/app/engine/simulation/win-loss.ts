@@ -2,13 +2,6 @@ import { DISTRICT_ZERO_WIN_LOSS_THRESHOLDS } from '../content';
 import type { GameOverState, GameState } from '../model';
 
 export function getGameOverState(state: GameState): GameOverState | undefined {
-  if (state.pressures.dominion >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) {
-    return {
-      result: 'victory',
-      reason: 'dominion_victory',
-    };
-  }
-
   if (state.pressures.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss) {
     return {
       result: 'loss',
@@ -27,6 +20,13 @@ export function getGameOverState(state: GameState): GameOverState | undefined {
     return {
       result: 'loss',
       reason: 'bankrupt',
+    };
+  }
+
+  if (state.pressures.dominion >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) {
+    return {
+      result: 'victory',
+      reason: 'dominion_victory',
     };
   }
 
@@ -53,4 +53,3 @@ export function applyWinLoss(state: GameState): GameState {
     gameOver,
   };
 }
-

@@ -63,7 +63,7 @@ describe('action previews', () => {
     expect(preview?.adjustedEffects).toEqual({
       heat: -12,
       intel: 2,
-      ruin: 1,
+      ruin: 2,
     });
   });
 

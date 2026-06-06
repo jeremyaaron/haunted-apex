@@ -37,7 +37,7 @@ describe('resolveEventChoice', () => {
     }
 
     expect(result.state.pressures.resources).toBe(4000);
-    expect(result.state.pressures.heat).toBe(10);
+    expect(result.state.pressures.heat).toBe(8);
   });
 
   it('subtracts tech_or_intel costs from Intel in v0', () => {
@@ -79,7 +79,7 @@ describe('resolveEventChoice', () => {
       week: 8,
       pressures: {
         ...withPendingEvent('rival_tests_border').pressures,
-        dominion: 54,
+        dominion: 70,
       },
     };
     const result = resolveEventChoice(state, 'event_1_1', 'answer_publicly');
@@ -138,4 +138,3 @@ function withPendingEvent(definitionId: string): GameState {
     },
   };
 }
-

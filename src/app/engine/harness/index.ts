@@ -2,6 +2,7 @@ export {
   AGGRESSIVE_BOT,
   CAUTIOUS_BOT,
   GREEDY_BOT,
+  OPERATOR_BOT,
   RANDOM_BOT,
   STRATEGY_AGENTS,
   createEmptyActionUsage,

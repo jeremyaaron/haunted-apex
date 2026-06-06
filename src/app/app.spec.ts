@@ -37,8 +37,8 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Event Feed');
     expect(compiled.textContent).toContain('Gather Intel');
     expect(compiled.textContent).toContain('Mara Voss');
-    expect(compiled.textContent).toContain('Dominion target 60');
-    expect(compiled.textContent).toContain('Win at 60');
+    expect(compiled.textContent).toContain('Dominion target 70');
+    expect(compiled.textContent).toContain('Win at 70');
     expect(compiled.textContent).toContain('Warning at 25');
     expect(compiled.textContent).toContain('Debug Panel');
     expect(compiled.textContent).toContain('RNG Cursor');

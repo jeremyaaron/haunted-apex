@@ -9,14 +9,14 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     baseWeight: 6,
     weightRules: [
       { pressure: 'heat', min: 40, addWeight: 8 },
-      { pressure: 'heat', min: 70, addWeight: 12 },
+      { pressure: 'heat', min: 65, addWeight: 14 },
     ],
     choices: [
       {
         id: 'pay_for_clean_passage',
         label: 'Pay for clean passage',
         cost: { resources: 1000 },
-        effects: { heat: -8 },
+        effects: { heat: -10 },
       },
       {
         id: 'feed_them_a_rival_name',
@@ -27,7 +27,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
       {
         id: 'let_the_sweep_pass',
         label: 'Let the sweep pass',
-        effects: { heat: 4, loyalty: -2 },
+        effects: { heat: 7, loyalty: -3 },
       },
     ],
   },
@@ -42,7 +42,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
       {
         id: 'answer_publicly',
         label: 'Answer publicly',
-        effects: { dominion: 6, heat: 8, loyalty: 3 },
+        effects: { dominion: 5, heat: 11, loyalty: 2, ruin: 1 },
       },
       {
         id: 'handle_it_quietly',
@@ -125,7 +125,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
       {
         id: 'exploit_immediately',
         label: 'Exploit immediately',
-        effects: { dominion: 7, resources: 800, heat: 6, ruin: 2 },
+        effects: { dominion: 6, resources: 700, heat: 8, ruin: 3 },
       },
       {
         id: 'save_it_for_later',
@@ -147,24 +147,24 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     tags: ['VIOLENCE', 'HEAT', 'LOYALTY'],
     baseWeight: 4,
     weightRules: [
-      { pressure: 'heat', min: 50, addWeight: 8 },
-      { flag: 'ran_small_job_this_week', addWeight: 12 },
+      { pressure: 'heat', min: 50, addWeight: 10 },
+      { flag: 'ran_small_job_this_week', addWeight: 16 },
     ],
     choices: [
       {
         id: 'extract_your_people_first',
         label: 'Extract your people first',
-        effects: { loyalty: 5, heat: 10, resources: -500 },
+        effects: { loyalty: 5, heat: 12, resources: -700 },
       },
       {
         id: 'erase_the_witnesses',
         label: 'Erase the witnesses',
-        effects: { heat: -2, loyalty: -4, ruin: 6 },
+        effects: { heat: -3, loyalty: -5, ruin: 8 },
       },
       {
         id: 'abandon_the_exposed_asset',
         label: 'Abandon the exposed asset',
-        effects: { heat: -8, loyalty: -10, ruin: 4 },
+        effects: { heat: -9, loyalty: -12, ruin: 6 },
       },
     ],
   },
@@ -203,7 +203,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     tags: ['SAFEHOUSE', 'HEAT'],
     baseWeight: 2,
     weightRules: [
-      { pressure: 'heat', min: 65, addWeight: 12 },
+      { pressure: 'heat', min: 60, addWeight: 14 },
       { flag: 'bribe_exposed', addWeight: 10 },
     ],
     choices: [
@@ -211,18 +211,18 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         id: 'move_immediately',
         label: 'Move immediately',
         cost: { resources: 1500 },
-        effects: { heat: -10, loyalty: 2 },
+        effects: { heat: -12, loyalty: 2 },
       },
       {
         id: 'set_a_trap',
         label: 'Set a trap',
         cost: { intel: 6 },
-        effects: { dominion: 5, heat: 4 },
+        effects: { dominion: 4, heat: 6 },
       },
       {
         id: 'stay_and_project_strength',
         label: 'Stay and project strength',
-        effects: { dominion: 4, loyalty: -6, heat: 6 },
+        effects: { dominion: 3, loyalty: -8, heat: 8 },
       },
     ],
   },
@@ -266,7 +266,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
       {
         id: 'send_them_back_burning',
         label: 'Send them back burning',
-        effects: { dominion: 5, heat: 5 },
+        effects: { dominion: 4, heat: 7, ruin: 1 },
       },
       {
         id: 'keep_the_device_and_reverse_it',
@@ -287,4 +287,3 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
 export function getEventDefinition(eventDefinitionId: string): EventDefinition | undefined {
   return DISTRICT_ZERO_EVENTS.find((event) => event.id === eventDefinitionId);
 }
-

@@ -29,7 +29,7 @@
     <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
     <span>{{ game.commandPointsRemaining() }} Command</span>
     <span>{{ game.state().phase }}</span>
-    <span>Dominion target 60</span>
+    <span>Dominion target {{ debugView().dominionTarget }}</span>
     <span>Seed {{ game.state().seed }}</span>
     @if (game.state().gameOver; as gameOver) {
       <span class="danger">{{ gameOver.result }}: {{ gameOver.reason }}</span>

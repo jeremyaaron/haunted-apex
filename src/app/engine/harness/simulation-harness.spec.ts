@@ -33,9 +33,10 @@ describe('simulation harness', () => {
     });
     const output = formatBatchReport(report);
 
-    expect(report.totalRuns).toBe(400);
-    expect(report.summaries.length).toBe(4);
+    expect(report.totalRuns).toBe(500);
+    expect(report.summaries.length).toBe(5);
     expect(output).toContain('agent,runs,wins,losses,incomplete,winRate');
+    expect(output).toContain('operator,100');
 
     for (const summary of report.summaries) {
       const actionCount = Object.values(summary.actionUsage).reduce((total, count) => total + count, 0);

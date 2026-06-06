@@ -20,9 +20,8 @@ export const DISTRICT_ZERO_SOFT_WARNINGS = {
 } as const;
 
 export const DISTRICT_ZERO_WIN_LOSS_THRESHOLDS = {
-  dominionVictory: 60,
+  dominionVictory: 70,
   heatLoss: 100,
   loyaltyLoss: 0,
   resourceLoss: 0,
 } as const;
-

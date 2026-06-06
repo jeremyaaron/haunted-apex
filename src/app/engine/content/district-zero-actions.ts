@@ -30,10 +30,10 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     commandCost: 1,
     resourceCost: 0,
     effects: {
-      resources: 1400,
-      dominion: 5,
-      heat: 8,
-      loyalty: -2,
+      resources: 1500,
+      dominion: 4,
+      heat: 9,
+      loyalty: -3,
     },
     operativeSkill: 'violence',
     baseRisk: 22,
@@ -48,7 +48,7 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     effects: {
       heat: -12,
       intel: 2,
-      ruin: 1,
+      ruin: 2,
     },
     operativeSkill: 'charm',
     baseRisk: 14,
@@ -72,11 +72,12 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     id: 'expand_influence',
     label: 'Expand Influence',
     commandCost: 1,
-    resourceCost: 900,
+    resourceCost: 850,
     effects: {
-      dominion: 10,
-      heat: 7,
+      dominion: 9,
+      heat: 8,
       loyalty: -3,
+      ruin: 1,
     },
     operativeSkill: 'charm',
     baseRisk: 18,
@@ -87,11 +88,11 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     id: 'lay_low',
     label: 'Lay Low',
     commandCost: 1,
-    resourceCost: 300,
+    resourceCost: 100,
     effects: {
-      heat: -10,
-      loyalty: 4,
-      dominion: -2,
+      heat: -12,
+      loyalty: 5,
+      dominion: -1,
     },
     baseRisk: 4,
     stressType: 'recovery',
@@ -168,4 +169,3 @@ export function getOperativeActionModifier(
 
   return DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS[operativeId]?.[actionId];
 }
-

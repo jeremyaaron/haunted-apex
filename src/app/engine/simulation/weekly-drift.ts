@@ -2,7 +2,7 @@ import type { GameLogEntry, GameState, PressureDelta } from '../model';
 import { applyPressureDelta } from './pressure-delta';
 
 export function applyWeeklyDrift(state: GameState): GameState {
-  const baseResourceDrift = -650;
+  const baseResourceDrift = -500;
   const baseHeatDrift = -2;
   const baseLoyaltyDrift = -1;
   const drift: PressureDelta = {
@@ -21,7 +21,14 @@ export function applyWeeklyDrift(state: GameState): GameState {
     projected.heat += 2;
   }
 
+  if (state.pressures.dominion >= 60) {
+    drift.loyalty = (drift.loyalty ?? 0) - 1;
+    projected.loyalty -= 1;
+  }
+
   if (projected.heat >= 70) {
+    drift.heat = (drift.heat ?? 0) + 2;
+    projected.heat += 2;
     drift.loyalty = (drift.loyalty ?? 0) - 3;
     projected.loyalty -= 3;
   }
