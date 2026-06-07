@@ -206,4 +206,61 @@ describe('GameStorageService', () => {
 
     expect(service.loadCurrentRun()).toBeUndefined();
   });
+
+  it('round-trips operative assignment history', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const withHistory = {
+      ...state,
+      operatives: state.operatives.map((operative, index) =>
+        index === 0
+          ? {
+              ...operative,
+              weeksAssigned: 1,
+              recentAssignments: [
+                {
+                  id: 'assignment_1_1',
+                  week: 1,
+                  actionId: 'gather_intel' as const,
+                  target: {
+                    type: 'venue' as const,
+                    id: 'venue_glass_saint' as const,
+                  },
+                  targetTags: ['nightlife', 'memory'],
+                  complication: true,
+                  stressDelta: 10,
+                },
+              ],
+            }
+          : operative,
+      ),
+    };
+
+    service.saveCurrentRun(withHistory);
+
+    expect(service.loadCurrentRun()).toEqual(withHistory);
+  });
+
+  it('rejects malformed assignment history and obsolete operative statuses', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const malformedHistory = structuredClone(state);
+    const obsoleteStatus = structuredClone(state);
+
+    malformedHistory.operatives[0].recentAssignments = [
+      {
+        id: 'assignment_1_1',
+        week: 1,
+        actionId: 'gather_intel',
+        targetTags: [],
+        complication: false,
+        stressDelta: Number.NaN,
+      },
+    ];
+    (obsoleteStatus.operatives[0] as { status: string }).status = 'compromised';
+
+    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(malformedHistory));
+    expect(service.loadCurrentRun()).toBeUndefined();
+
+    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(obsoleteStatus));
+    expect(service.loadCurrentRun()).toBeUndefined();
+  });
 });

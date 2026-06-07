@@ -677,11 +677,7 @@ function getOperativeAvailability(state: GameState, operativeId: string): OrderA
     return unavailable('operative_already_assigned');
   }
 
-  if (
-    operative.status !== 'available' &&
-    operative.status !== 'idle' &&
-    operative.status !== 'compromised'
-  ) {
+  if (operative.status !== 'available' && operative.status !== 'idle') {
     return unavailable('operative_unavailable');
   }
 

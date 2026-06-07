@@ -252,7 +252,7 @@
 
       <div class="operative-list">
         @for (operative of game.operatives(); track operative.id) {
-          <article class="operative-card" [class.compromised]="operative.status === 'compromised'">
+          <article class="operative-card">
             <div class="operative-topline">
               <div class="portrait-slot">
                 <span>{{ initials(operative.name) }}</span>

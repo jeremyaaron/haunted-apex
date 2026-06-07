@@ -2,7 +2,7 @@ export { newGame } from './new-game';
 export { queueOrder, removeQueuedOrder } from './queue-order';
 export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
-export { applyIdleStressRecovery } from './stress';
+export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyDrift } from './weekly-drift';
 export {
   applyLocalDistrictCooling,

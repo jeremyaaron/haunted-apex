@@ -7,7 +7,7 @@ import type { TraitId } from './traits';
 
 export type OperativeSkill = 'violence' | 'charm' | 'tech' | 'subtlety';
 
-export type OperativeStatus = 'available' | 'assigned' | 'idle' | 'injured' | 'compromised';
+export type OperativeStatus = 'available' | 'assigned' | 'idle' | 'injured';
 
 export type OperativeId =
   | 'op_mara_voss'

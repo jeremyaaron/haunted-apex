@@ -53,6 +53,18 @@ describe('advanceWeek', () => {
       'drift',
       'event_presented',
     ]);
+    expect(result.orderResolutions[0]).toEqual(
+      jasmine.objectContaining({
+        complication: false,
+        riskChance: 3,
+        resolvedDelta: {
+          heat: 1,
+          intel: 10,
+          resources: -400,
+        },
+        stressDelta: 6,
+      }),
+    );
   });
 
   it('applies dangerous action stress for Run a Small Job', () => {
@@ -242,6 +254,45 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       16,
     );
+  });
+
+  it('prunes operative assignment history after resolving the current week', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const historicalState: GameState = {
+      ...base,
+      week: 5,
+      operatives: base.operatives.map((operative) =>
+        operative.id === 'op_mara_voss'
+          ? {
+              ...operative,
+              recentAssignments: [1, 2, 3, 4].map((week) => ({
+                id: `assignment_${week}_1`,
+                week,
+                actionId: 'gather_intel' as const,
+                targetTags: [],
+                complication: false,
+                stressDelta: 6,
+              })),
+            }
+          : operative,
+      ),
+    };
+    const queued = mustQueue(historicalState, {
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const result = advanceWeek(queued);
+
+    if (!result.ok) {
+      fail(`Expected week resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(
+      result.state.operatives
+        .find((operative) => operative.id === 'op_mara_voss')
+        ?.recentAssignments.map((assignment) => assignment.week),
+    ).toEqual([3, 4, 5]);
   });
 
   it('cools districts, applies rival effects, then presents an event before win/loss', () => {

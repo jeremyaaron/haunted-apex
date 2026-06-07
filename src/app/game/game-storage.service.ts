@@ -111,16 +111,51 @@ function isOperatives(value: unknown): boolean {
       ids.has(operative['id']) ||
       typeof operative['loyalty'] !== 'number' ||
       typeof operative['stress'] !== 'number' ||
-      typeof operative['status'] !== 'string' ||
+      !isOperativeStatus(operative['status']) ||
       !isStringArray(operative['revealedTraits']) ||
       !isRecord(operative['hiddenFlags']) ||
       typeof operative['weeksAssigned'] !== 'number' ||
-      !Array.isArray(operative['recentAssignments'])
+      !isRecentAssignments(operative['recentAssignments'])
     ) {
       return false;
     }
 
     ids.add(operative['id']);
+    return true;
+  });
+}
+
+function isOperativeStatus(value: unknown): boolean {
+  return value === 'available' || value === 'assigned' || value === 'idle' || value === 'injured';
+}
+
+function isRecentAssignments(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const ids = new Set<string>();
+
+  return value.every((assignment) => {
+    if (
+      !isRecord(assignment) ||
+      typeof assignment['id'] !== 'string' ||
+      ids.has(assignment['id']) ||
+      typeof assignment['week'] !== 'number' ||
+      typeof assignment['actionId'] !== 'string' ||
+      !getActionDefinition(assignment['actionId'] as ActionId) ||
+      !isStringArray(assignment['targetTags']) ||
+      typeof assignment['complication'] !== 'boolean' ||
+      typeof assignment['stressDelta'] !== 'number'
+    ) {
+      return false;
+    }
+
+    if (assignment['target'] !== undefined && !parseActionTarget(assignment['target'])) {
+      return false;
+    }
+
+    ids.add(assignment['id']);
     return true;
   });
 }

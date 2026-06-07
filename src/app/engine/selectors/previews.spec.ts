@@ -345,7 +345,7 @@ describe('action previews', () => {
       ...state,
       operatives: state.operatives.map((operative) =>
         operative.id === mara.id
-          ? { ...operative, stress: 85, status: 'compromised' as const }
+          ? { ...operative, stress: 85, status: 'available' as const }
           : operative,
       ),
     };

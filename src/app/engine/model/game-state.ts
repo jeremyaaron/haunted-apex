@@ -35,6 +35,7 @@ export type GameOverState = {
 export type GameLogEntryType =
   | 'order_queued'
   | 'order_resolved'
+  | 'operative_condition'
   | 'complication'
   | 'drift'
   | 'rival_effect'

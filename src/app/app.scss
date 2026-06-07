@@ -581,10 +581,6 @@ dt {
   font-weight: 700;
 }
 
-.operative-card.compromised {
-  border-color: rgba(255, 113, 113, 0.5);
-}
-
 .operative-topline {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto;

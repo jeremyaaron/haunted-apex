@@ -1,6 +1,7 @@
+import { getActionPreview } from '../selectors';
+import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
 import { resolveQueuedOrder } from './resolve-action';
-import { materializeOperativeState } from '../roster';
 
 describe('resolveQueuedOrder recruitment', () => {
   it('fails closed when a queued candidate is no longer in the hire pool', () => {
@@ -85,5 +86,215 @@ describe('resolveQueuedOrder operative territory modifiers', () => {
 
     expect(rookResult.state.districts.district_violet_ward.control).toBe(26);
     expect(irisResult.state.rivals.rival_nyx_ardent.pressure).toBe(16);
+  });
+});
+
+describe('resolveQueuedOrder assignment history and Stress', () => {
+  it('keeps clean resolution aligned with the action preview', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const state = {
+      ...base,
+      operatives: [materializeOperativeState('op_juno_hex')],
+    };
+    const target = {
+      type: 'venue',
+      id: 'venue_glass_saint',
+    } as const;
+    const preview = getActionPreview(state, 'gather_intel', 'op_juno_hex', target);
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_juno_hex',
+      target,
+    });
+
+    if (!preview?.selectedOperative) {
+      fail('Expected an operative action preview');
+      return;
+    }
+
+    expect(result.complication).toBeFalse();
+    expect(result.riskChance).toBe(preview.riskChance);
+    expect(result.resolvedDelta).toEqual({
+      ...preview.adjustedEffects,
+      resources: -preview.adjustedResourceCost,
+    });
+    expect(result.stressDelta).toBe(
+      preview.selectedOperative.projectedStress - preview.selectedOperative.stress,
+    );
+  });
+
+  it('records final target context and complication-inclusive Stress', () => {
+    const base = newGame({ seed: 'E' });
+    const state = {
+      ...base,
+      operatives: [materializeOperativeState('op_juno_hex')],
+    };
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_juno_hex',
+      target: {
+        type: 'venue',
+        id: 'venue_glass_saint',
+      },
+    });
+    const juno = result.state.operatives[0];
+
+    expect(result.complication).toBeTrue();
+    expect(result.stressDelta).toBe(14);
+    expect(juno.stress).toBe(46);
+    expect(juno.status).toBe('available');
+    expect(juno.weeksAssigned).toBe(1);
+    expect(juno.recentAssignments).toEqual([
+      {
+        id: 'assignment_1_1',
+        week: 1,
+        actionId: 'gather_intel',
+        target: {
+          type: 'venue',
+          id: 'venue_glass_saint',
+        },
+        targetTags: [
+          'nightlife',
+          'liaison',
+          'social',
+          'elite',
+          'memory',
+          'seduction',
+        ],
+        complication: true,
+        stressDelta: 14,
+      },
+    ]);
+  });
+
+  it('increments weeksAssigned once for multiple assignments in one week', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const state = {
+      ...base,
+      operatives: [materializeOperativeState('op_mara_voss')],
+    };
+    const first = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const second = resolveQueuedOrder(first.state, {
+      id: 'order_1_2',
+      actionId: 'lay_low',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const mara = second.state.operatives[0];
+
+    expect(mara.weeksAssigned).toBe(1);
+    expect(mara.recentAssignments.map((assignment) => assignment.id)).toEqual([
+      'assignment_1_1',
+      'assignment_1_2',
+    ]);
+  });
+
+  it('clamps final Stress at both bounds and records the applied delta', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const highState = {
+      ...base,
+      operatives: [
+        {
+          ...materializeOperativeState('op_mara_voss'),
+          stress: 98,
+        },
+      ],
+    };
+    const lowState = {
+      ...base,
+      operatives: [
+        {
+          ...materializeOperativeState('op_echo_saint'),
+          stress: 2,
+        },
+      ],
+    };
+    const high = resolveQueuedOrder(highState, {
+      id: 'order_1_1',
+      actionId: 'run_small_job',
+      assignedOperativeId: 'op_mara_voss',
+      target: {
+        type: 'district',
+        id: 'district_chrome_narrows',
+      },
+    });
+    const low = resolveQueuedOrder(lowState, {
+      id: 'order_1_1',
+      actionId: 'lay_low',
+      assignedOperativeId: 'op_echo_saint',
+    });
+
+    expect(high.state.operatives[0].stress).toBe(100);
+    expect(high.stressDelta).toBe(2);
+    expect(high.state.operatives[0].recentAssignments[0].stressDelta).toBe(2);
+    expect(low.state.operatives[0].stress).toBe(0);
+    expect(low.stressDelta).toBe(-2);
+    expect(low.state.operatives[0].recentAssignments[0].stressDelta).toBe(-2);
+  });
+
+  it('keeps Breaking operatives available and logs only actual tier changes', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const breakingState = {
+      ...base,
+      operatives: [
+        {
+          ...materializeOperativeState('op_mara_voss'),
+          stress: 85,
+        },
+      ],
+    };
+    const transitionState = {
+      ...base,
+      operatives: [
+        {
+          ...materializeOperativeState('op_mara_voss'),
+          stress: 38,
+        },
+      ],
+    };
+    const breaking = resolveQueuedOrder(breakingState, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const transition = resolveQueuedOrder(transitionState, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+
+    expect(breaking.state.operatives[0].status).toBe('available');
+    expect(
+      breaking.state.eventLog.filter((entry) => entry.type === 'operative_condition'),
+    ).toEqual([]);
+    expect(
+      transition.state.eventLog.filter((entry) => entry.type === 'operative_condition'),
+    ).toEqual([
+      jasmine.objectContaining({
+        title: 'Mara Voss Escalates',
+        tags: ['OPERATIVE', 'op_mara_voss', 'stable', 'strained'],
+      }),
+    ]);
+  });
+
+  it('does not create assignment history for unassigned orders', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+    });
+
+    expect(result.stressDelta).toBe(0);
+    expect(
+      result.state.operatives.every(
+        (operative) =>
+          operative.weeksAssigned === 0 && operative.recentAssignments.length === 0,
+      ),
+    ).toBeTrue();
   });
 });

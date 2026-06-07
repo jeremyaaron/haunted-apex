@@ -527,7 +527,8 @@ Completed June 7, 2026:
   Control, and rival Pressure consistently in previews and clean resolution.
 - Stress risk now uses only the documented Stable, Strained, Unstable, and Breaking
   tier modifiers of `0/2/5/10`; continuous Stress risk was removed.
-- Breaking and compromised operatives remain legal assignment options.
+- Breaking operatives remain legal assignment options without a separate compromised
+  status.
 - Action previews expose relevant skill, current and projected Stress tiers, and only
   matched player-safe modifier sources.
 - Assignment option views expose target-specific skill, Stress, and fit context.
@@ -613,6 +614,33 @@ Unit tests:
 - Old assignments prune at the correct boundary.
 - Tier-change logs are emitted only when the tier changes.
 - Existing district, venue, and rival outcomes still resolve correctly.
+
+### Completion Record
+
+Completed June 7, 2026:
+
+- Real order resolution now uses one shared operative modifier result for final effects,
+  Resource costs, risk, Stress, district Control, and rival Pressure.
+- Assignment Stress combines action type, authored Stress profile, matching traits and
+  affinities, and the complication penalty before one final clamp.
+- Complications now contribute to the recorded final Stress delta instead of mutating
+  operative state through a separate follow-up path.
+- Removed `compromised` from operative status; Breaking operatives resolve normally and
+  return to `available`.
+- Every assigned order appends a structured assignment record containing action,
+  target, target tags, complication state, and the actual clamped Stress delta.
+- `weeksAssigned` increments by unique assigned week rather than raw assignment count.
+- Assignment histories retain only the current and prior two weeks after weekly
+  resolution.
+- Idle recovery remains limited to unused operatives and can log a downward tier
+  transition.
+- Assignment resolution logs upward and downward Stress-tier changes only when a
+  boundary is crossed.
+- Action and weekly-resolution diagnostics now expose final risk, pressure delta, and
+  Stress delta for preview/resolution inspection.
+- Save validation now checks operative statuses and the full assignment-history
+  structure.
+- The complete suite passes with `214` tests.
 
 ### Review Gate
 

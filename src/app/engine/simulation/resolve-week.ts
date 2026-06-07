@@ -1,10 +1,10 @@
 import type { GameState, QueuedOrder } from '../model';
-import { applyIdleStressRecovery } from './stress';
+import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
 import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
 import { applyRivalPassiveEffects } from './rival-effects';
-import { resolveQueuedOrder } from './resolve-action';
+import { resolveQueuedOrder, type ActionResolution } from './resolve-action';
 import { selectWeeklyEvent, type EventSelection } from './select-weekly-event';
 
 export type AdvanceWeekResult =
@@ -23,6 +23,9 @@ export type AdvanceWeekResult =
 export type OrderResolutionDiagnostic = {
   order: QueuedOrder;
   complication: boolean;
+  riskChance: number;
+  resolvedDelta: ActionResolution['resolvedDelta'];
+  stressDelta: number;
 };
 
 export function advanceWeek(state: GameState): AdvanceWeekResult {
@@ -57,10 +60,14 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
         ...(order.target ? { target: { ...order.target } } : {}),
       },
       complication: resolution.complication,
+      riskChance: resolution.riskChance,
+      resolvedDelta: resolution.resolvedDelta,
+      stressDelta: resolution.stressDelta,
     });
   }
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
+  next = pruneRecentAssignments(next);
   next = applyWeeklyDrift(next);
   next = applyLocalDistrictCooling(next);
   next = applyRivalPassiveEffects(next);

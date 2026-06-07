@@ -27,6 +27,7 @@ import { createRng, nextInt, type RngState } from '../rng';
 import {
   calculateActionStressDelta,
   calculateOperativeModifiers,
+  getStressTier,
   materializeOperativeState,
   type OperativeModifierResult,
 } from '../roster';
@@ -39,6 +40,9 @@ export type ActionResolution = {
   state: GameState;
   rng: RngState;
   complication: boolean;
+  riskChance: number;
+  resolvedDelta: PressureDelta;
+  stressDelta: number;
 };
 
 export function resolveQueuedOrder(state: GameState, order: QueuedOrder): ActionResolution {
@@ -53,6 +57,9 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
       }),
       rng: createRng(state.seed, state.rngCursor),
       complication: true,
+      riskChance: 0,
+      resolvedDelta: {},
+      stressDelta: 0,
     };
   }
 
@@ -68,6 +75,9 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
       }),
       rng: createRng(state.seed, state.rngCursor),
       complication: true,
+      riskChance: 0,
+      resolvedDelta: {},
+      stressDelta: 0,
     };
   }
 
@@ -124,14 +134,17 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
   );
   next = recordRecentActivity(next, action.id, order.target, totalDelta);
   next = resolveRecruitment(next, action, order.target);
-  next = applyAssignedOperativeStress(
+  next = applyComplicationFlags(next, action, complication);
+  const assignmentOutcome = applyAssignedOperativeOutcome(
     next,
     action,
     operative,
     order.assignedOperativeId,
     order.target,
     operativeModifiers,
+    complication,
   );
+  next = assignmentOutcome.state;
   next = appendLog(next, {
     type: 'order_resolved',
     title: action.label,
@@ -149,8 +162,11 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     tags: getTargetTags(order.target),
   });
 
+  if (assignmentOutcome.tierChange) {
+    next = appendStressTierChangeLog(next, assignmentOutcome.tierChange);
+  }
+
   if (complication) {
-    next = applyComplicationSideEffects(next, action, order.assignedOperativeId);
     next = appendLog(next, {
       type: 'complication',
       title: `${action.label} Complication`,
@@ -163,6 +179,9 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     state: next,
     rng: roll.rng,
     complication,
+    riskChance,
+    resolvedDelta: totalDelta,
+    stressDelta: assignmentOutcome.stressDelta,
   };
 }
 
@@ -274,77 +293,158 @@ function resolveRecruitment(
   };
 }
 
-function applyAssignedOperativeStress(
+type StressTierChange = {
+  operativeId: OperativeState['id'];
+  operativeName: string;
+  previousTier: ReturnType<typeof getStressTier>;
+  nextTier: ReturnType<typeof getStressTier>;
+  stress: number;
+};
+
+type AssignmentOutcome = {
+  state: GameState;
+  stressDelta: number;
+  tierChange?: StressTierChange;
+};
+
+function applyAssignedOperativeOutcome(
   state: GameState,
   action: ActionDefinition,
   operative: OperativeState | undefined,
   assignedOperativeId: string | undefined,
   target: QueuedOrder['target'],
   operativeModifiers: OperativeModifierResult,
-): GameState {
+  complication: boolean,
+): AssignmentOutcome {
   if (!operative || !assignedOperativeId) {
-    return state;
-  }
-
-  const stressDelta = getActionStressDelta(
-    action,
-    assignedOperativeId,
-    state,
-    target,
-    operativeModifiers,
-  );
-
-  return {
-    ...state,
-    operatives: state.operatives.map((candidate) => {
-      if (candidate.id !== assignedOperativeId) {
-        return candidate;
-      }
-
-      const stress = clampStress(candidate.stress + stressDelta);
-
-      return {
-        ...candidate,
-        stress,
-        status: stress >= 80 ? 'compromised' : 'available',
-      };
-    }),
-  };
-}
-
-function applyComplicationSideEffects(
-  state: GameState,
-  action: ActionDefinition,
-  assignedOperativeId: string | undefined,
-): GameState {
-  const flags =
-    action.id === 'bribe_official'
-      ? {
-          ...state.flags,
-          bribe_exposed: true,
-        }
-      : state.flags;
-
-  if (!assignedOperativeId) {
     return {
-      ...state,
-      flags,
+      state,
+      stressDelta: 0,
     };
   }
 
+  const requestedStressDelta =
+    getActionStressDelta(
+      action,
+      assignedOperativeId,
+      state,
+      target,
+      operativeModifiers,
+    ) + (complication ? 4 : 0);
+  const stress = clampStress(operative.stress + requestedStressDelta);
+  const stressDelta = stress - operative.stress;
+  const previousTier = getStressTier(operative.stress);
+  const nextTier = getStressTier(stress);
+  const alreadyAssignedThisWeek = operative.recentAssignments.some(
+    (assignment) => assignment.week === state.week,
+  );
+  const assignment = {
+    id: nextAssignmentId(operative, state.week),
+    week: state.week,
+    actionId: action.id,
+    ...(target ? { target: { ...target } } : {}),
+    targetTags: getTargetTags(target),
+    complication,
+    stressDelta,
+  };
+
+  return {
+    state: {
+      ...state,
+      operatives: state.operatives.map((candidate) =>
+        candidate.id === assignedOperativeId
+          ? {
+              ...candidate,
+              stress,
+              status: 'available',
+              weeksAssigned:
+                candidate.weeksAssigned + (alreadyAssignedThisWeek ? 0 : 1),
+              recentAssignments: [...candidate.recentAssignments, assignment],
+            }
+          : candidate,
+      ),
+    },
+    stressDelta,
+    ...(previousTier !== nextTier
+      ? {
+          tierChange: {
+            operativeId: operative.id,
+            operativeName:
+              getOperativeDefinition(operative.id)?.name ?? operative.id,
+            previousTier,
+            nextTier,
+            stress,
+          },
+        }
+      : {}),
+  };
+}
+
+function applyComplicationFlags(
+  state: GameState,
+  action: ActionDefinition,
+  complication: boolean,
+): GameState {
+  if (!complication || action.id !== 'bribe_official') {
+    return state;
+  }
+
   return {
     ...state,
-    flags,
-    operatives: state.operatives.map((operative) =>
-      operative.id === assignedOperativeId
-        ? {
-            ...operative,
-            stress: clampStress(operative.stress + 4),
-            status: clampStress(operative.stress + 4) >= 80 ? 'compromised' : operative.status,
-          }
-        : operative,
-    ),
+    flags: {
+      ...state.flags,
+      bribe_exposed: true,
+    },
   };
+}
+
+function appendStressTierChangeLog(
+  state: GameState,
+  tierChange: StressTierChange,
+): GameState {
+  const direction =
+    stressTierRank(tierChange.nextTier) > stressTierRank(tierChange.previousTier)
+      ? 'Escalates'
+      : 'Stabilizes';
+
+  return appendLog(state, {
+    type: 'operative_condition',
+    title: `${tierChange.operativeName} ${direction}`,
+    body: `${tierChange.operativeName} moved from ${tierChange.previousTier} to ${tierChange.nextTier} at ${tierChange.stress} Stress.`,
+    tags: [
+      'OPERATIVE',
+      tierChange.operativeId,
+      tierChange.previousTier,
+      tierChange.nextTier,
+    ],
+  });
+}
+
+function stressTierRank(tier: ReturnType<typeof getStressTier>): number {
+  switch (tier) {
+    case 'stable':
+      return 0;
+    case 'strained':
+      return 1;
+    case 'unstable':
+      return 2;
+    case 'breaking':
+      return 3;
+  }
+}
+
+function nextAssignmentId(operative: OperativeState, week: number): string {
+  const prefix = `assignment_${week}_`;
+  const maxExistingId = operative.recentAssignments.reduce((max, assignment) => {
+    if (!assignment.id.startsWith(prefix)) {
+      return max;
+    }
+
+    const suffix = Number.parseInt(assignment.id.slice(prefix.length), 10);
+    return Number.isNaN(suffix) ? max : Math.max(max, suffix);
+  }, 0);
+
+  return `${prefix}${maxExistingId + 1}`;
 }
 
 function createResolutionBody(
