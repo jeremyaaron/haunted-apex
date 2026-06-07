@@ -13,13 +13,14 @@ export function recordRecentActivity(
   target: ActionTarget | undefined,
   resolvedDelta: PressureDelta,
 ): GameState {
-  const rivalId = getTargetControllerId(target);
+  const contextualTarget = target?.type === 'recruit' ? undefined : target;
+  const rivalId = getTargetControllerId(contextualTarget);
   const entry: RecentActivityEntry = {
     id: nextActivityId(state),
     week: state.week,
     actionId,
-    ...(target ? { target: { ...target } } : {}),
-    targetTags: getTargetTags(target),
+    ...(contextualTarget ? { target: { ...contextualTarget } } : {}),
+    targetTags: getTargetTags(contextualTarget),
     ...(rivalId ? { rivalId } : {}),
     heatDelta: resolvedDelta.heat ?? 0,
     dominionDelta: resolvedDelta.dominion ?? 0,

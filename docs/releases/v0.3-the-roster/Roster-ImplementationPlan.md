@@ -408,6 +408,32 @@ Unit tests:
 - Full roster disables recruitment.
 - Recruitment creates no district, Local Heat, rival-pressure, or recent-target context.
 
+### Completion Record
+
+Completed June 7, 2026:
+
+- Added `recruit` to the shared `ActionTarget` union and changed Recruit Operative to
+  require only that target type.
+- Recruit target options now come from the current hire pool in stable order and expose
+  authored name, archetype, rarity, and role-tag metadata.
+- Added recruit-specific validation for absent candidates, duplicate queued candidates,
+  projected roster capacity, and full active rosters.
+- Two distinct candidates can be queued in the same week when Command, Resources, and
+  the five-operative cap permit it.
+- Recruitment now materializes the selected candidate, removes only that ID, preserves
+  remaining hire-pool order, and never implicitly substitutes the first candidate.
+- Invalid stale recruit orders fail closed with a diagnostic and do not consume RNG,
+  apply action effects, or recruit another candidate.
+- Recruit targets resolve to no district, rival controller, Local Heat, territory tags,
+  or recent target context.
+- Storage validation parses recruit targets and rejects absent candidates, duplicate
+  queued recruits, illegal target types, and projected roster-cap violations.
+- The harness and queued-order views resolve recruit labels through the operative
+  registry.
+- Queue serialization now omits an undefined operative assignment, preserving exact
+  JSON round trips for unassigned targeted orders.
+- The complete suite passes with `183` tests.
+
 ### Review Gate
 
 Review the queue and target contracts before candidate-specific modifiers and UI depend

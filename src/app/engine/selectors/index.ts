@@ -41,7 +41,9 @@ export {
 export type {
   ActionTargetOption,
   DistrictTerritoryView,
+  RecruitTargetOption,
   RivalTerritoryView,
+  TerritoryTargetOption,
   VenueTerritoryView,
 } from './territory';
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';

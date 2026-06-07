@@ -165,4 +165,45 @@ describe('GameStorageService', () => {
     localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(illegalTarget));
     expect(service.loadCurrentRun()).toBeUndefined();
   });
+
+  it('round-trips a queued recruit target from the hire pool', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const queued = queueOrder(state, {
+      actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: state.hirePool[1],
+      },
+    });
+
+    if (!queued.ok) {
+      fail(`Expected recruit order, got ${queued.error}`);
+      return;
+    }
+
+    service.saveCurrentRun(queued.state);
+
+    expect(service.loadCurrentRun()).toEqual(queued.state);
+  });
+
+  it('rejects queued recruit targets outside the hire pool', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const invalidState = {
+      ...state,
+      queuedOrders: [
+        {
+          id: 'order_1_1',
+          actionId: 'recruit_operative' as const,
+          target: {
+            type: 'recruit' as const,
+            id: state.operatives[0].id,
+          },
+        },
+      ],
+    };
+
+    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(invalidState));
+
+    expect(service.loadCurrentRun()).toBeUndefined();
+  });
 });

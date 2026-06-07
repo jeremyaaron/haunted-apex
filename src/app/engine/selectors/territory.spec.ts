@@ -38,6 +38,27 @@ describe('territory selectors', () => {
     expect(
       selectActionTargetOptions(state, 'run_small_job').map((option) => option.targetType),
     ).toEqual(['district', 'district', 'district', 'venue', 'venue', 'venue', 'venue']);
+    expect(
+      selectActionTargetOptions(state, 'recruit_operative').map(
+        (option) => `${option.targetType}:${option.target.id}`,
+      ),
+    ).toEqual(state.hirePool.map((operativeId) => `recruit:${operativeId}`));
+  });
+
+  it('exposes authored recruit candidate metadata in hire-pool order', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const options = selectActionTargetOptions(state, 'recruit_operative');
+
+    expect(options[0]).toEqual(
+      jasmine.objectContaining({
+        label: 'Iris Vale',
+        targetType: 'recruit',
+        operativeId: 'op_iris_vale',
+        archetype: 'Socialite',
+        rarity: 'uncommon',
+        roleTags: ['social', 'recruitment', 'rival_pressure'],
+      }),
+    );
   });
 
   it('omits inactive rivals from rival target options', () => {
@@ -84,6 +105,22 @@ describe('territory selectors', () => {
         id: 'rival_knox_marrow',
       }),
     ).toBeUndefined();
+    expect(
+      resolveTargetDistrictId({
+        type: 'recruit',
+        id: 'op_iris_vale',
+      }),
+    ).toBeUndefined();
+  });
+
+  it('keeps recruit targets outside territory, rival, and event-tag context', () => {
+    const target = {
+      type: 'recruit',
+      id: 'op_iris_vale',
+    } as const;
+
+    expect(getTargetControllerId(target)).toBeUndefined();
+    expect(getTargetTags(target)).toEqual([]);
   });
 
   it('combines venue and district tags without duplicates', () => {

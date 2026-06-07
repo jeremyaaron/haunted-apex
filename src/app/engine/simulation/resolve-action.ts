@@ -56,6 +56,21 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     };
   }
 
+  if (
+    action.id === 'recruit_operative' &&
+    (order.target?.type !== 'recruit' || !state.hirePool.includes(order.target.id))
+  ) {
+    return {
+      state: appendLog(state, {
+        type: 'complication',
+        title: 'Invalid Recruitment Order',
+        body: `Order ${order.id} referenced a candidate who is no longer in the hire pool and was skipped.`,
+      }),
+      rng: createRng(state.seed, state.rngCursor),
+      complication: true,
+    };
+  }
+
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
     : undefined;
@@ -84,7 +99,7 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
 
   next = applyTargetedActionConsequences(next, action.id, order.target, totalDelta);
   next = recordRecentActivity(next, action.id, order.target, totalDelta);
-  next = resolveRecruitment(next, action);
+  next = resolveRecruitment(next, action, order.target);
   next = applyAssignedOperativeStress(next, action, operative, order.assignedOperativeId);
   next = appendLog(next, {
     type: 'order_resolved',
@@ -189,17 +204,23 @@ function getComplicationDelta(action: ActionDefinition, complication: boolean): 
   };
 }
 
-function resolveRecruitment(state: GameState, action: ActionDefinition): GameState {
-  if (action.id !== 'recruit_operative' || state.hirePool.length === 0) {
+function resolveRecruitment(
+  state: GameState,
+  action: ActionDefinition,
+  target: QueuedOrder['target'],
+): GameState {
+  if (
+    action.id !== 'recruit_operative' ||
+    target?.type !== 'recruit' ||
+    !state.hirePool.includes(target.id)
+  ) {
     return state;
   }
 
-  const [operativeId, ...remainingHirePool] = state.hirePool;
-
   return {
     ...state,
-    operatives: [...state.operatives, materializeOperativeState(operativeId)],
-    hirePool: remainingHirePool,
+    operatives: [...state.operatives, materializeOperativeState(target.id)],
+    hirePool: state.hirePool.filter((operativeId) => operativeId !== target.id),
   };
 }
 

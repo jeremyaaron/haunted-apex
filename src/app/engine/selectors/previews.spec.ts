@@ -390,7 +390,8 @@ describe('action previews', () => {
     const recruitCard = cards.find((card) => card.actionId === 'recruit_operative');
 
     expect(cards.length).toBe(6);
-    expect(recruitCard?.state).toBe('available');
+    expect(recruitCard?.state).toBe('unavailable');
+    expect(recruitCard?.unavailableReason).toBe('target_required');
     expect(recruitCard?.availableOperatives.every((operative) => operative.disabled)).toBeTrue();
     expect(recruitCard?.availableOperatives[0].reason).toBe('operative_not_allowed');
   });

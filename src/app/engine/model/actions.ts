@@ -1,4 +1,4 @@
-import type { OperativeSkill } from './operatives';
+import type { OperativeId, OperativeSkill } from './operatives';
 import type { PressureDelta } from './pressures';
 import type { DistrictId } from './districts';
 import type { RivalId } from './rivals';
@@ -19,7 +19,8 @@ export type ActionAssignmentRule = 'optional' | 'required' | 'none';
 export type ActionTarget =
   | { type: 'district'; id: DistrictId }
   | { type: 'venue'; id: VenueId }
-  | { type: 'rival'; id: RivalId };
+  | { type: 'rival'; id: RivalId }
+  | { type: 'recruit'; id: OperativeId };
 
 export type ActionDefinition = {
   id: ActionId;

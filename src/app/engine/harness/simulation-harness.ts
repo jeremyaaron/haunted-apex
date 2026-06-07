@@ -4,6 +4,7 @@ import {
   RIVAL_TERRITORY_RIVALS,
   getDistrictDefinition,
   getEventDefinition,
+  getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
@@ -14,6 +15,7 @@ import type {
   EventChoiceDefinition,
   GameOverReason,
   GameState,
+  OperativeId,
   PressureId,
   Pressures,
   RivalId,
@@ -715,6 +717,8 @@ function getTargetReportLabel(target: TargetRunStats): string {
       return getVenueDefinition(target.targetId as VenueId)?.name ?? target.targetId;
     case 'rival':
       return getRivalDefinition(target.targetId as RivalId)?.name ?? target.targetId;
+    case 'recruit':
+      return getOperativeDefinition(target.targetId as OperativeId)?.name ?? target.targetId;
   }
 }
 

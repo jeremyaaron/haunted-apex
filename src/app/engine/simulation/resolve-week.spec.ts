@@ -176,9 +176,17 @@ describe('advanceWeek', () => {
     ]);
   });
 
-  it('recruits the first candidate from the hire pool', () => {
-    const queued = mustQueue(newGame({ seed: 'VIOLET-ASH-1047' }), {
+  it('recruits the selected candidate and preserves remaining hire order', () => {
+    const initial = newGame({ seed: 'VIOLET-ASH-1047' });
+    const selectedCandidate = initial.hirePool[1];
+    const untouchedDistricts = structuredClone(initial.districts);
+    const untouchedRivals = structuredClone(initial.rivals);
+    const queued = mustQueue(initial, {
       actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: selectedCandidate,
+      },
     });
     const result = advanceWeek(queued);
 
@@ -187,17 +195,33 @@ describe('advanceWeek', () => {
       return;
     }
 
-    expect(result.state.operatives.map((operative) => operative.id)).toContain('op_iris_vale');
-    expect(result.state.hirePool).not.toContain('op_iris_vale');
+    expect(result.state.operatives.map((operative) => operative.id)).toContain(selectedCandidate);
+    expect(result.state.operatives.map((operative) => operative.id)).not.toContain(
+      initial.hirePool[0],
+    );
+    expect(result.state.hirePool).toEqual([
+      initial.hirePool[0],
+      initial.hirePool[2],
+      initial.hirePool[3],
+    ]);
     expect(result.state.hirePool.length).toBe(3);
-    expect(getOperativeDefinition(result.state.hirePool[0])?.name).toBe('Rook Vale');
-    expect(result.state.operatives.find((operative) => operative.id === 'op_iris_vale')).toEqual(
+    expect(result.state.operatives.find((operative) => operative.id === selectedCandidate)).toEqual(
       jasmine.objectContaining({
-        loyalty: 58,
+        loyalty: getOperativeDefinition(selectedCandidate)?.startingLoyalty,
         stress: 12,
         status: 'available',
       }),
     );
+    expect(result.state.districts).toEqual(untouchedDistricts);
+    expect(result.state.rivals).toEqual(untouchedRivals);
+    expect(result.state.recentActivity[0]).toEqual(
+      jasmine.objectContaining({
+        actionId: 'recruit_operative',
+        targetTags: [],
+      }),
+    );
+    expect(result.state.recentActivity[0].target).toBeUndefined();
+    expect(result.state.recentActivity[0].rivalId).toBeUndefined();
   });
 
   it('recovers assigned stress for Lay Low', () => {

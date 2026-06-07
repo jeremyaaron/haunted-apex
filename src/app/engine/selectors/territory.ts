@@ -1,6 +1,7 @@
 import {
   getActionDefinition,
   getDistrictDefinition,
+  getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
   RIVAL_TERRITORY_DISTRICTS,
@@ -12,6 +13,9 @@ import type {
   DistrictArchetype,
   DistrictId,
   GameState,
+  OperativeId,
+  OperativeRarity,
+  OperativeRoleTag,
   PressureDelta,
   PressureId,
   RivalArchetype,
@@ -22,15 +26,27 @@ import type {
 } from '../model';
 import { getRivalPressureTier } from './rivals';
 
-export type ActionTargetOption = {
-  target: ActionTarget;
+export type TerritoryTargetOption = {
+  target: Exclude<ActionTarget, { type: 'recruit' }>;
   label: string;
-  targetType: ActionTarget['type'];
+  targetType: 'district' | 'venue' | 'rival';
   districtName?: string;
   rivalName?: string;
   controlledByRivalId?: RivalId;
   controlledByRivalName?: string;
 };
+
+export type RecruitTargetOption = {
+  target: { type: 'recruit'; id: OperativeId };
+  label: string;
+  targetType: 'recruit';
+  operativeId: OperativeId;
+  archetype: string;
+  rarity: OperativeRarity;
+  roleTags: readonly OperativeRoleTag[];
+};
+
+export type ActionTargetOption = TerritoryTargetOption | RecruitTargetOption;
 
 export type VenueTerritoryView = {
   id: VenueId;
@@ -157,6 +173,29 @@ export function selectActionTargetOptions(
     }
   }
 
+  if (allowedTypes.has('recruit')) {
+    for (const operativeId of state.hirePool) {
+      const operative = getOperativeDefinition(operativeId);
+
+      if (!operative) {
+        continue;
+      }
+
+      options.push({
+        target: {
+          type: 'recruit',
+          id: operative.id,
+        },
+        label: operative.name,
+        targetType: 'recruit',
+        operativeId: operative.id,
+        archetype: operative.archetype,
+        rarity: operative.rarity,
+        roleTags: operative.roleTags,
+      });
+    }
+  }
+
   return options;
 }
 
@@ -255,6 +294,7 @@ export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | und
     case 'venue':
       return getVenueDefinition(target.id)?.districtId;
     case 'rival':
+    case 'recruit':
       return undefined;
   }
 }
@@ -274,6 +314,8 @@ export function getTargetTags(target?: ActionTarget): string[] {
     }
     case 'rival':
       return [...(getRivalDefinition(target.id)?.traits ?? [])];
+    case 'recruit':
+      return [];
   }
 }
 
@@ -298,6 +340,8 @@ export function getTargetControllerId(target?: ActionTarget): RivalId | undefine
     }
     case 'rival':
       return getRivalDefinition(target.id)?.id;
+    case 'recruit':
+      return undefined;
   }
 }
 
@@ -313,6 +357,8 @@ export function getTargetLabel(target?: ActionTarget): string | undefined {
       return getVenueDefinition(target.id)?.name;
     case 'rival':
       return getRivalDefinition(target.id)?.name;
+    case 'recruit':
+      return getOperativeDefinition(target.id)?.name;
   }
 }
 
@@ -320,7 +366,7 @@ export function calculateTargetControlGain(
   actionId: ActionId,
   target?: ActionTarget,
 ): number {
-  if (!target || target.type === 'rival') {
+  if (!target || target.type === 'rival' || target.type === 'recruit') {
     return 0;
   }
 

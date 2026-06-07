@@ -87,7 +87,7 @@ function isGameState(value: unknown): value is GameState {
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
     isStringArray(value['seenSignatureEventIds']) &&
-    isQueuedOrders(value['queuedOrders'], value['operatives']) &&
+    isQueuedOrders(value['queuedOrders'], value['operatives'], value['hirePool']) &&
     isDistrictOverlays(value['districts']) &&
     isRivalOverlays(value['rivals']) &&
     isRecentActivity(value['recentActivity']) &&
@@ -146,8 +146,8 @@ function isHirePool(value: unknown, operatives: unknown): boolean {
   );
 }
 
-function isQueuedOrders(value: unknown, operatives: unknown): boolean {
-  if (!Array.isArray(value) || !Array.isArray(operatives)) {
+function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown): boolean {
+  if (!Array.isArray(value) || !Array.isArray(operatives) || !Array.isArray(hirePool)) {
     return false;
   }
 
@@ -157,7 +157,11 @@ function isQueuedOrders(value: unknown, operatives: unknown): boolean {
     ),
   );
 
-  return value.every((order) => {
+  const hireIds = new Set(hirePool.filter((id): id is string => typeof id === 'string'));
+  const queuedRecruitIds = new Set<string>();
+  let queuedRecruitCount = 0;
+
+  const validOrders = value.every((order) => {
     if (
       !isRecord(order) ||
       typeof order['id'] !== 'string' ||
@@ -190,8 +194,23 @@ function isQueuedOrders(value: unknown, operatives: unknown): boolean {
       return false;
     }
 
+    if (action.id === 'recruit_operative') {
+      if (
+        target?.type !== 'recruit' ||
+        !hireIds.has(target.id) ||
+        queuedRecruitIds.has(target.id)
+      ) {
+        return false;
+      }
+
+      queuedRecruitIds.add(target.id);
+      queuedRecruitCount += 1;
+    }
+
     return !target || action.allowedTargetTypes.includes(target.type);
   });
+
+  return validOrders && operativeIds.size + queuedRecruitCount <= 5;
 }
 
 function isDistrictOverlays(value: unknown): boolean {
@@ -292,6 +311,13 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
         ? {
             type: 'rival',
             id: id as RivalId,
+          }
+        : undefined;
+    case 'recruit':
+      return getOperativeDefinition(id as OperativeId)
+        ? {
+            type: 'recruit',
+            id: id as OperativeId,
           }
         : undefined;
     default:

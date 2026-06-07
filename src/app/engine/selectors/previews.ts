@@ -53,6 +53,8 @@ export type QueueOrderUnavailableReason =
   | 'operative_unavailable'
   | 'operative_already_assigned'
   | 'roster_full'
+  | 'recruit_not_in_hire_pool'
+  | 'recruit_already_queued'
   | 'target_required'
   | 'target_not_allowed'
   | 'target_not_found'
@@ -234,6 +236,19 @@ function getTargetAvailability(
       return state.rivals[target.id].active
         ? { available: true }
         : unavailable('target_inactive');
+    case 'recruit':
+      if (!state.hirePool.includes(target.id)) {
+        return unavailable('recruit_not_in_hire_pool');
+      }
+
+      return state.queuedOrders.some(
+        (order) =>
+          order.actionId === 'recruit_operative' &&
+          order.target?.type === 'recruit' &&
+          order.target.id === target.id,
+      )
+        ? unavailable('recruit_already_queued')
+        : { available: true };
   }
 }
 

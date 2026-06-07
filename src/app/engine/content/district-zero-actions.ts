@@ -73,8 +73,8 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     baseRisk: 12,
     stressType: 'none',
     assignment: 'none',
-    requiresTarget: false,
-    allowedTargetTypes: ['district', 'venue'],
+    requiresTarget: true,
+    allowedTargetTypes: ['recruit'],
   },
   {
     id: 'expand_influence',
