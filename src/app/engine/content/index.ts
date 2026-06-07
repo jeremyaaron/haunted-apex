@@ -8,11 +8,8 @@ export {
 } from './district-zero-tuning';
 export {
   DISTRICT_ZERO_ACTIONS,
-  DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS,
   getActionDefinition,
-  getOperativeActionModifier,
 } from './district-zero-actions';
-export type { OperativeActionModifier, OperativeActionModifierMap } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './district-zero-events';
 export {
   getDistrictDefinition,

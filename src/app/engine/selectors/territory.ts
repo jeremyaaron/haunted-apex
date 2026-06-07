@@ -365,6 +365,7 @@ export function getTargetLabel(target?: ActionTarget): string | undefined {
 export function calculateTargetControlGain(
   actionId: ActionId,
   target?: ActionTarget,
+  operativeModifier = 0,
 ): number {
   if (!target || target.type === 'rival' || target.type === 'recruit') {
     return 0;
@@ -372,11 +373,11 @@ export function calculateTargetControlGain(
 
   switch (actionId) {
     case 'expand_influence':
-      return target.type === 'district' ? 12 : 8;
+      return (target.type === 'district' ? 12 : 8) + operativeModifier;
     case 'run_small_job':
-      return 3;
+      return 3 + operativeModifier;
     case 'gather_intel':
-      return 1;
+      return 1 + operativeModifier;
     case 'bribe_official':
     case 'recruit_operative':
     case 'lay_low':

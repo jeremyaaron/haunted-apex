@@ -74,13 +74,13 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       28,
     );
-    expect(result.state.pressures.resources).toBe(6050);
+    expect(result.state.pressures.resources).toBe(6450);
     expect(result.state.pressures.dominion).toBe(18);
-    expect(result.state.pressures.heat).toBe(28);
+    expect(result.state.pressures.heat).toBe(30);
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
       control: 11,
-      heat: 31,
+      heat: 32,
     });
     expect(result.state.rivals.rival_knox_marrow.pressure).toBe(10);
     expect(result.state.recentActivity).toEqual([
@@ -91,7 +91,7 @@ describe('advanceWeek', () => {
           id: 'venue_zero_mercy',
         },
         rivalId: 'rival_knox_marrow',
-        heatDelta: 12,
+        heatDelta: 14,
         dominionDelta: 6,
       }),
     ]);

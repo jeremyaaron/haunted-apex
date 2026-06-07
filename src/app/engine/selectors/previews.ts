@@ -3,7 +3,6 @@ import {
   getActionDefinition,
   getDistrictDefinition,
   getOperativeDefinition,
-  getOperativeActionModifier,
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
@@ -15,6 +14,7 @@ import type {
   DistrictId,
   GameState,
   OperativeDefinition,
+  OperativeId,
   OperativeState,
   OperativeSkill,
   PressureDelta,
@@ -25,6 +25,14 @@ import type {
   VenueDefinition,
 } from '../model';
 import { PRESSURE_IDS } from '../model';
+import {
+  calculateActionStressDelta,
+  calculateOperativeModifiers,
+  getStressRiskModifier,
+  getStressTier,
+  type AppliedModifierSource,
+  type OperativeModifierResult,
+} from '../roster';
 import {
   calculateTargetControlGain,
   calculateTargetLocalHeatGain,
@@ -71,10 +79,28 @@ export type PressureDeltaView = {
 };
 
 export type OperativeOptionView = {
-  id: string;
+  id: OperativeId;
   name: string;
+  stress: number;
+  stressTier: ReturnType<typeof getStressTier>;
+  relevantSkill?: OperativeSkill;
+  relevantSkillValue?: number;
+  appliedSources: AppliedModifierSource[];
   disabled: boolean;
   reason?: QueueOrderUnavailableReason;
+};
+
+export type OperativeAssignmentPreview = {
+  operativeId: OperativeId;
+  name: string;
+  recruitCandidate: boolean;
+  relevantSkill?: OperativeSkill;
+  relevantSkillValue?: number;
+  stress: number;
+  stressTier: ReturnType<typeof getStressTier>;
+  projectedStress: number;
+  projectedStressTier: ReturnType<typeof getStressTier>;
+  appliedSources: AppliedModifierSource[];
 };
 
 export type ActionPreview = {
@@ -87,6 +113,7 @@ export type ActionPreview = {
   baseEffects: PressureDelta;
   adjustedEffects: PressureDelta;
   selectedOperativeId?: string;
+  selectedOperative?: OperativeAssignmentPreview;
   selectedTarget?: ActionTarget;
   targetLabel?: string;
   riskChance: number;
@@ -147,7 +174,7 @@ export function getQueuedResourceCost(state: GameState): number {
       return cost;
     }
 
-    return cost + getAdjustedResourceCost(action, order.assignedOperativeId);
+    return cost + getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target);
   }, 0);
 }
 
@@ -195,7 +222,12 @@ export function getOrderAvailability(
     return unavailable('roster_full');
   }
 
-  const adjustedResourceCost = getAdjustedResourceCost(action, request.assignedOperativeId);
+  const adjustedResourceCost = getAdjustedResourceCost(
+    action,
+    request.assignedOperativeId,
+    state,
+    request.target,
+  );
 
   if (state.pressures.resources - getQueuedResourceCost(state) < adjustedResourceCost) {
     return unavailable('not_enough_resources');
@@ -267,8 +299,15 @@ export function getActionPreview(
   const operative = assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === assignedOperativeId)
     : undefined;
-  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId, state, target);
-  const riskChance = calculateRiskChance(action, operative, state, target);
+  const modifiers = getOperativeModifiers(state, action, operative, target);
+  const adjustedEffects = getAdjustedEffects(
+    action,
+    assignedOperativeId,
+    state,
+    target,
+    modifiers,
+  );
+  const riskChance = calculateRiskChance(action, operative, state, target, modifiers);
 
   return {
     actionId: action.id,
@@ -276,16 +315,40 @@ export function getActionPreview(
     requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
-    adjustedResourceCost: getAdjustedResourceCost(action, assignedOperativeId),
+    adjustedResourceCost: getAdjustedResourceCost(
+      action,
+      assignedOperativeId,
+      state,
+      target,
+      modifiers,
+    ),
     baseEffects: { ...action.effects },
     adjustedEffects,
     selectedOperativeId: assignedOperativeId,
+    selectedOperative: getOperativeAssignmentPreview(
+      state,
+      action,
+      operative,
+      target,
+      modifiers,
+    ),
     selectedTarget: target,
     targetLabel: getTargetLabel(target),
     riskChance,
     riskLabel: riskLabel(riskChance),
-    rivalAttention: getRivalAttentionPreview(state, action.id, target),
-    localImpact: getLocalImpactPreview(state, action.id, adjustedEffects, target),
+    rivalAttention: getRivalAttentionPreview(
+      state,
+      action.id,
+      target,
+      modifiers.rivalPressureModifier,
+    ),
+    localImpact: getLocalImpactPreview(
+      state,
+      action.id,
+      adjustedEffects,
+      target,
+      modifiers.districtControlModifier,
+    ),
   };
 }
 
@@ -313,11 +376,19 @@ export function selectActionCards(state: GameState): ActionCardView[] {
       ...preview,
       state: isQueued ? 'queued' : availability.available ? 'available' : 'unavailable',
       unavailableReason: availability.reason,
-      availableOperatives: state.operatives.map((operative) =>
-        getOperativeOptionView(state, actionId, operative),
-      ),
+      availableOperatives: selectAssignmentOptions(state, actionId),
     };
   });
+}
+
+export function selectAssignmentOptions(
+  state: GameState,
+  actionId: ActionId,
+  target?: ActionTarget,
+): OperativeOptionView[] {
+  return state.operatives.map((operative) =>
+    getOperativeOptionView(state, actionId, operative, target),
+  );
 }
 
 export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
@@ -359,9 +430,21 @@ export function getAdjustedEffects(
   assignedOperativeId?: string,
   state?: GameState,
   target?: ActionTarget,
+  operativeModifiers?: OperativeModifierResult,
 ): PressureDelta {
-  const modifier = getOperativeActionModifier(assignedOperativeId, action.id);
-  let effects = mergePressureDeltas(action.effects, modifier?.effects);
+  const modifiers =
+    operativeModifiers ??
+    (state
+      ? getOperativeModifiers(
+          state,
+          action,
+          assignedOperativeId
+            ? state.operatives.find((operative) => operative.id === assignedOperativeId)
+            : undefined,
+          target,
+        )
+      : emptyOperativeModifiers());
+  let effects = mergePressureDeltas(action.effects, modifiers.effects);
   const districtId = resolveTargetDistrictId(target);
 
   if (state && districtId) {
@@ -442,9 +525,24 @@ export function applyVenueModifiers(
 export function getAdjustedResourceCost(
   action: ActionDefinition,
   assignedOperativeId?: string,
+  state?: GameState,
+  target?: ActionTarget,
+  operativeModifiers?: OperativeModifierResult,
 ): number {
-  const modifier = getOperativeActionModifier(assignedOperativeId, action.id);
-  return Math.max(0, action.resourceCost + (modifier?.resourceCost ?? 0));
+  const modifiers =
+    operativeModifiers ??
+    (state
+      ? getOperativeModifiers(
+          state,
+          action,
+          assignedOperativeId
+            ? state.operatives.find((operative) => operative.id === assignedOperativeId)
+            : undefined,
+          target,
+        )
+      : emptyOperativeModifiers());
+
+  return Math.max(0, action.resourceCost + modifiers.resourceCostModifier);
 }
 
 export function calculateRiskChance(
@@ -452,19 +550,26 @@ export function calculateRiskChance(
   operative?: OperativeState,
   state?: GameState,
   target?: ActionTarget,
+  operativeModifiers?: OperativeModifierResult,
 ): number {
   let riskChance = action.baseRisk;
 
-  if (operative && action.operativeSkill) {
+  if (operative) {
     const definition = getOperativeDefinition(operative.id);
-    const skill = definition ? getSkill(definition, action.operativeSkill) : 50;
-    riskChance -= Math.floor((skill - 50) / 4);
-    riskChance += Math.floor(operative.stress / 10);
-    riskChance -= Math.floor(operative.loyalty / 20);
 
-    if (operative.stress >= 60) {
-      riskChance += 10;
+    if (action.operativeSkill) {
+      const skill = definition ? getSkill(definition, action.operativeSkill) : 50;
+      riskChance -= Math.floor((skill - 50) / 4);
     }
+
+    riskChance -= Math.floor(operative.loyalty / 20);
+    riskChance += getStressRiskModifier(operative.stress);
+  }
+
+  if (state) {
+    const modifiers =
+      operativeModifiers ?? getOperativeModifiers(state, action, operative, target);
+    riskChance += modifiers.riskModifier;
   }
 
   const districtId = resolveTargetDistrictId(target);
@@ -486,6 +591,7 @@ function getRivalAttentionPreview(
   state: GameState,
   actionId: ActionId,
   target?: ActionTarget,
+  operativeModifier = 0,
 ): RivalAttentionPreview | undefined {
   const rivalId = getTargetControllerId(target);
 
@@ -500,7 +606,7 @@ function getRivalAttentionPreview(
     return undefined;
   }
 
-  const pressureGain = calculateRivalPressureGain(actionId);
+  const pressureGain = calculateRivalPressureGain(actionId, operativeModifier);
   const projectedPressure = Math.min(100, Math.max(0, rivalState.pressure + pressureGain));
 
   return {
@@ -518,6 +624,7 @@ function getLocalImpactPreview(
   actionId: ActionId,
   effects: PressureDelta,
   target?: ActionTarget,
+  operativeModifier = 0,
 ): LocalImpactPreview | undefined {
   const districtId = resolveTargetDistrictId(target);
 
@@ -534,7 +641,7 @@ function getLocalImpactPreview(
   return {
     districtId,
     districtName: district.name,
-    controlGain: calculateTargetControlGain(actionId, target),
+    controlGain: calculateTargetControlGain(actionId, target, operativeModifier),
     localHeatGain: calculateTargetLocalHeatGain(effects, target),
   };
 }
@@ -570,7 +677,11 @@ function getOperativeAvailability(state: GameState, operativeId: string): OrderA
     return unavailable('operative_already_assigned');
   }
 
-  if (operative.status !== 'available' && operative.status !== 'idle') {
+  if (
+    operative.status !== 'available' &&
+    operative.status !== 'idle' &&
+    operative.status !== 'compromised'
+  ) {
     return unavailable('operative_unavailable');
   }
 
@@ -583,6 +694,7 @@ function getOperativeOptionView(
   state: GameState,
   actionId: ActionId,
   operative: OperativeState,
+  target?: ActionTarget,
 ): OperativeOptionView {
   const action = requireAction(actionId);
 
@@ -590,6 +702,7 @@ function getOperativeOptionView(
     return {
       id: operative.id,
       name: getOperativeDefinition(operative.id)?.name ?? operative.id,
+      ...getOperativeFit(state, action, operative, target),
       disabled: true,
       reason: 'operative_not_allowed',
     };
@@ -600,8 +713,113 @@ function getOperativeOptionView(
   return {
     id: operative.id,
     name: getOperativeDefinition(operative.id)?.name ?? operative.id,
+    ...getOperativeFit(state, action, operative, target),
     disabled: !availability.available,
     reason: availability.reason,
+  };
+}
+
+function getOperativeFit(
+  state: GameState,
+  action: ActionDefinition,
+  operative: OperativeState,
+  target?: ActionTarget,
+) {
+  const definition = getOperativeDefinition(operative.id);
+  const modifiers = getOperativeModifiers(state, action, operative, target);
+
+  return {
+    stress: operative.stress,
+    stressTier: getStressTier(operative.stress),
+    relevantSkill: action.operativeSkill,
+    relevantSkillValue:
+      definition && action.operativeSkill
+        ? definition.baseStats[action.operativeSkill]
+        : undefined,
+    appliedSources: modifiers.appliedSources,
+  };
+}
+
+function getOperativeAssignmentPreview(
+  state: GameState,
+  action: ActionDefinition,
+  operative: OperativeState | undefined,
+  target: ActionTarget | undefined,
+  modifiers: OperativeModifierResult,
+): OperativeAssignmentPreview | undefined {
+  const recruitDefinition =
+    target?.type === 'recruit' ? getOperativeDefinition(target.id) : undefined;
+  const definition = operative ? getOperativeDefinition(operative.id) : recruitDefinition;
+
+  if (!definition) {
+    return undefined;
+  }
+
+  const stress = operative?.stress ?? definition.startingStress;
+  const projectedStress = operative
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          stress +
+            calculateActionStressDelta(
+              action,
+              {
+                state,
+                action,
+                operative,
+                target,
+              },
+              modifiers,
+            ),
+        ),
+      )
+    : stress;
+
+  return {
+    operativeId: definition.id,
+    name: definition.name,
+    recruitCandidate: !operative,
+    relevantSkill: operative ? action.operativeSkill : undefined,
+    relevantSkillValue:
+      operative && action.operativeSkill
+        ? definition.baseStats[action.operativeSkill]
+        : undefined,
+    stress,
+    stressTier: getStressTier(stress),
+    projectedStress,
+    projectedStressTier: getStressTier(projectedStress),
+    appliedSources: modifiers.appliedSources,
+  };
+}
+
+function getOperativeModifiers(
+  state: GameState,
+  action: ActionDefinition,
+  operative: OperativeState | undefined,
+  target?: ActionTarget,
+): OperativeModifierResult {
+  const recruitTargetDefinition =
+    target?.type === 'recruit' ? getOperativeDefinition(target.id) : undefined;
+
+  return calculateOperativeModifiers({
+    state,
+    action,
+    operative,
+    recruitTargetDefinition,
+    target,
+  });
+}
+
+function emptyOperativeModifiers(): OperativeModifierResult {
+  return {
+    effects: {},
+    resourceCostModifier: 0,
+    riskModifier: 0,
+    stressModifier: 0,
+    rivalPressureModifier: 0,
+    districtControlModifier: 0,
+    appliedSources: [],
   };
 }
 

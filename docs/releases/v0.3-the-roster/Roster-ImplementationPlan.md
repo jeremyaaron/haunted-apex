@@ -511,6 +511,32 @@ Unit tests:
 - Risk remains clamped.
 - Applied sources contain only visible, matched information.
 
+### Completion Record
+
+Completed June 7, 2026:
+
+- Added a pure, data-driven `calculateOperativeModifiers` pipeline for visible traits,
+  affinities, recruitment candidates, and combined action/target conditions.
+- Retired the identity-specific operative action modifier map and removed all runtime
+  operative-ID branches from action modifiers.
+- All matching trait and affinity effects now stack before district and venue
+  modifiers, including modifiers that introduce new pressure keys.
+- Candidate-conditioned recruitment applies Mother Neon's authored cost, Loyalty, and
+  Ruin changes through the same preview and resolution pipeline.
+- Operative modifiers now affect final effects, Resource cost, risk, Stress, district
+  Control, and rival Pressure consistently in previews and clean resolution.
+- Stress risk now uses only the documented Stable, Strained, Unstable, and Breaking
+  tier modifiers of `0/2/5/10`; continuous Stress risk was removed.
+- Breaking and compromised operatives remain legal assignment options.
+- Action previews expose relevant skill, current and projected Stress tiers, and only
+  matched player-safe modifier sources.
+- Assignment option views expose target-specific skill, Stress, and fit context.
+- The hidden debug preview payload includes selected-operative diagnostics for
+  inspection before the Phase 8 presentation layer.
+- Direct rival targets, rival-controlled targets, venue district inheritance, pressure
+  bounds, and all ten authored operative anchors have focused coverage.
+- The complete suite passes with `202` tests.
+
 ### Review Gate
 
 Inspect representative previews for all ten operatives. The player should be able to

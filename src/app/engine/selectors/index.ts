@@ -12,12 +12,14 @@ export {
   pressureDeltaToView,
   riskLabel,
   selectActionCards,
+  selectAssignmentOptions,
   selectQueuedOrderViews,
 } from './previews';
 export type {
   ActionCardView,
   ActionPreview,
   LocalImpactPreview,
+  OperativeAssignmentPreview,
   OperativeOptionView,
   OrderAvailability,
   PressureDeltaView,

@@ -1,13 +1,4 @@
-import type { ActionDefinition, ActionId, PressureDelta } from '../model';
-
-export type OperativeActionModifier = {
-  effects?: PressureDelta;
-  resourceCost?: number;
-  stress?: number;
-  chanceRelationshipLead?: number;
-};
-
-export type OperativeActionModifierMap = Partial<Record<ActionId, OperativeActionModifier>>;
+import type { ActionDefinition, ActionId } from '../model';
 
 export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
   {
@@ -112,72 +103,6 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
   },
 ] as const;
 
-export const DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS: Record<string, OperativeActionModifierMap> = {
-  op_mara_voss: {
-    gather_intel: {
-      effects: {
-        heat: -1,
-      },
-    },
-    expand_influence: {
-      effects: {
-        heat: -2,
-      },
-    },
-    run_small_job: {
-      effects: {
-        resources: -400,
-        heat: -2,
-      },
-    },
-  },
-  op_juno_hex: {
-    gather_intel: {
-      effects: {
-        intel: 3,
-        ruin: 1,
-      },
-      stress: 5,
-    },
-    run_small_job: {
-      effects: {
-        intel: 2,
-        ruin: 1,
-      },
-    },
-    expand_influence: {
-      effects: {
-        intel: 2,
-        ruin: 1,
-      },
-    },
-  },
-  op_saint_calder: {
-    bribe_official: {
-      resourceCost: -300,
-    },
-    expand_influence: {
-      effects: {
-        dominion: 3,
-      },
-    },
-    gather_intel: {
-      chanceRelationshipLead: 0.1,
-    },
-  },
-};
-
 export function getActionDefinition(actionId: ActionId): ActionDefinition | undefined {
   return DISTRICT_ZERO_ACTIONS.find((action) => action.id === actionId);
-}
-
-export function getOperativeActionModifier(
-  operativeId: string | undefined,
-  actionId: ActionId,
-): OperativeActionModifier | undefined {
-  if (!operativeId) {
-    return undefined;
-  }
-
-  return DISTRICT_ZERO_OPERATIVE_ACTION_MODIFIERS[operativeId]?.[actionId];
 }

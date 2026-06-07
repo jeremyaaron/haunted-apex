@@ -1,5 +1,6 @@
 import { getActionDefinition } from '../content';
 import { getResolvedActionDelta, newGame } from '../simulation';
+import { materializeOperativeState } from '../roster';
 import {
   applyVenueModifiers,
   calculateRiskChance,
@@ -8,6 +9,7 @@ import {
   pressureDeltaToView,
   riskLabel,
   selectActionCards,
+  selectAssignmentOptions,
 } from './previews';
 import { getRivalPressureTier } from './rivals';
 
@@ -130,8 +132,8 @@ describe('action previews', () => {
 
     expect(preview?.adjustedEffects).toEqual({
       heat: 5,
-      intel: 18,
-      ruin: 3,
+      intel: 22,
+      ruin: 5,
     });
   });
 
@@ -216,7 +218,30 @@ describe('action previews', () => {
       return;
     }
 
-    expect(calculateRiskChance(action, saint)).toBe(10);
+    expect(calculateRiskChance(action, saint)).toBe(8);
+  });
+
+  it('uses discrete Stress tiers without a continuous Stress term', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const action = getActionDefinition('expand_influence');
+    const saint = state.operatives.find((operative) => operative.id === 'op_saint_calder');
+
+    if (!action || !saint) {
+      fail('Expected action and operative to exist');
+      return;
+    }
+
+    const riskAt = (stress: number) =>
+      calculateRiskChance(action, {
+        ...saint,
+        stress,
+      });
+
+    expect(riskAt(0)).toBe(8);
+    expect(riskAt(39)).toBe(8);
+    expect(riskAt(40)).toBe(10);
+    expect(riskAt(60)).toBe(13);
+    expect(riskAt(80)).toBe(18);
   });
 
   it('adds local heat risk and applies control reductions', () => {
@@ -273,10 +298,8 @@ describe('action previews', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const lowRiskAction = getActionDefinition('lay_low');
     const highRiskAction = getActionDefinition('run_small_job');
-    const mara = state.operatives.find((operative) => operative.id === 'op_mara_voss');
-
-    if (!lowRiskAction || !highRiskAction || !mara) {
-      fail('Expected actions and operative to exist');
+    if (!lowRiskAction || !highRiskAction) {
+      fail('Expected actions to exist');
       return;
     }
 
@@ -295,15 +318,109 @@ describe('action previews', () => {
         },
       },
     };
-    const compromisedMara = {
-      ...mara,
-      violence: 0,
-      stress: 100,
-      loyalty: 0,
-    };
-
     expect(calculateRiskChance(lowRiskAction, undefined, extremeState, target)).toBe(8);
-    expect(calculateRiskChance(highRiskAction, compromisedMara, extremeState, target)).toBe(45);
+    expect(
+      calculateRiskChance(
+        {
+          ...highRiskAction,
+          baseRisk: 45,
+        },
+        undefined,
+        extremeState,
+        target,
+      ),
+    ).toBe(45);
+  });
+
+  it('keeps Breaking operatives assignable and previews discrete Stress risk', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const mara = state.operatives.find((operative) => operative.id === 'op_mara_voss');
+
+    if (!mara) {
+      fail('Expected Mara Voss in the test roster');
+      return;
+    }
+
+    const breakingState = {
+      ...state,
+      operatives: state.operatives.map((operative) =>
+        operative.id === mara.id
+          ? { ...operative, stress: 85, status: 'compromised' as const }
+          : operative,
+      ),
+    };
+    const preview = getActionPreview(
+      breakingState,
+      'gather_intel',
+      mara.id,
+    );
+
+    expect(
+      getOrderAvailability(breakingState, {
+        actionId: 'gather_intel',
+        assignedOperativeId: mara.id,
+      }).available,
+    ).toBeTrue();
+    expect(preview?.selectedOperative).toEqual(
+      jasmine.objectContaining({
+        relevantSkill: 'subtlety',
+        relevantSkillValue: 82,
+        stress: 85,
+        stressTier: 'breaking',
+        projectedStress: 91,
+        projectedStressTier: 'breaking',
+      }),
+    );
+  });
+
+  it('includes target-specific fit context in assignment options', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const mara = selectAssignmentOptions(state, 'gather_intel', {
+      type: 'venue',
+      id: 'venue_pale_circuit',
+    }).find((operative) => operative.id === 'op_mara_voss');
+
+    expect(mara).toEqual(
+      jasmine.objectContaining({
+        stress: 18,
+        stressTier: 'stable',
+        relevantSkill: 'subtlety',
+        relevantSkillValue: 82,
+        disabled: false,
+      }),
+    );
+    expect(mara?.appliedSources.map((source) => source.sourceId)).toEqual([
+      'clean_entry_gather_intel',
+      'mara_nightlife',
+    ]);
+  });
+
+  it('projects operative Control and rival Pressure modifiers', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const rook = materializeOperativeState('op_rook_vale');
+    const rookState = { ...state, operatives: [rook] };
+    const rookPreview = getActionPreview(
+      rookState,
+      'expand_influence',
+      rook.id,
+      {
+        type: 'district',
+        id: 'district_violet_ward',
+      },
+    );
+    const irisState = { ...state, operatives: [materializeOperativeState('op_iris_vale')] };
+    const irisPreview = getActionPreview(
+      irisState,
+      'expand_influence',
+      'op_iris_vale',
+      {
+        type: 'district',
+        id: 'district_violet_ward',
+      },
+    );
+
+    expect(rookPreview?.localImpact?.controlGain).toBe(14);
+    expect(irisPreview?.rivalAttention?.pressureGain).toBe(16);
   });
 
   it('projects controlled-target rival attention and local impact', () => {

@@ -9,8 +9,11 @@ const RIVAL_PRESSURE_BY_ACTION: Record<ActionId, number> = {
   lay_low: 0,
 };
 
-export function calculateRivalPressureGain(actionId: ActionId): number {
-  return RIVAL_PRESSURE_BY_ACTION[actionId];
+export function calculateRivalPressureGain(
+  actionId: ActionId,
+  operativeModifier = 0,
+): number {
+  return Math.max(0, RIVAL_PRESSURE_BY_ACTION[actionId] + operativeModifier);
 }
 
 export function getRivalPressureTier(pressure: number): RivalPressureTier {

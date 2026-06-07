@@ -77,6 +77,7 @@ export class App {
           target: action.selectedTarget,
           adjustedEffects: action.adjustedEffects,
           riskChance: action.riskChance,
+          selectedOperative: action.selectedOperative,
           rivalAttention: action.rivalAttention,
           localImpact: action.localImpact,
         })),
@@ -272,6 +273,7 @@ export class App {
       ...card,
       ...preview,
       targetOptions: this.game.getTargetOptions(card.actionId),
+      availableOperatives: this.game.getAssignmentOptions(card.actionId, target),
       state: queued ? 'queued' : availability.available ? 'available' : 'unavailable',
       unavailableReason: availability.reason,
     };

@@ -13,6 +13,7 @@ import {
   removeQueuedOrder,
   resolveEventChoice,
   selectActionCards,
+  selectAssignmentOptions,
   selectActionTargetOptions,
   selectDistrictTerritoryViews,
   selectQueuedOrderViews,
@@ -25,6 +26,7 @@ import {
   type GameState,
   type NewGameConfig,
   type OrderAvailability,
+  type OperativeOptionView,
   type QueueOrderResult,
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
@@ -98,6 +100,10 @@ export class GameFacade {
 
   getTargetOptions(actionId: ActionId): ActionTargetOption[] {
     return selectActionTargetOptions(this.stateSignal(), actionId);
+  }
+
+  getAssignmentOptions(actionId: ActionId, target?: ActionTarget): OperativeOptionView[] {
+    return selectAssignmentOptions(this.stateSignal(), actionId, target);
   }
 
   getActionPreview(

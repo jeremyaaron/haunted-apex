@@ -1,7 +1,6 @@
 import {
   getActionDefinition,
   getOperativeDefinition,
-  getOperativeActionModifier,
   getRivalDefinition,
 } from '../content';
 import type {
@@ -25,15 +24,16 @@ import {
   resolveTargetDistrictId,
 } from '../selectors';
 import { createRng, nextInt, type RngState } from '../rng';
-import { materializeOperativeState } from '../roster';
+import {
+  calculateActionStressDelta,
+  calculateOperativeModifiers,
+  materializeOperativeState,
+  type OperativeModifierResult,
+} from '../roster';
 import { clampStress } from './clamps';
 import { applyTargetedActionConsequences } from './district-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { recordRecentActivity } from './recent-activity';
-
-const NORMAL_ACTION_STRESS = 6;
-const DANGEROUS_ACTION_STRESS = 10;
-const LAY_LOW_STRESS_RECOVERY = -8;
 
 export type ActionResolution = {
   state: GameState;
@@ -74,7 +74,23 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
     : undefined;
-  const riskChance = calculateRiskChance(action, operative, state, order.target);
+  const operativeModifiers = calculateOperativeModifiers({
+    state,
+    action,
+    operative,
+    recruitTargetDefinition:
+      order.target?.type === 'recruit'
+        ? getOperativeDefinition(order.target.id)
+        : undefined,
+    target: order.target,
+  });
+  const riskChance = calculateRiskChance(
+    action,
+    operative,
+    state,
+    order.target,
+    operativeModifiers,
+  );
   const roll = nextInt(createRng(state.seed, state.rngCursor), 1, 100);
   const complication = roll.value <= riskChance;
   const actionDelta = getResolvedActionDelta(
@@ -83,6 +99,7 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     complication,
     state,
     order.target,
+    operativeModifiers,
   );
   const complicationDelta = getComplicationDelta(action, complication);
   const totalDelta = mergePressureDeltas(actionDelta, complicationDelta);
@@ -97,10 +114,24 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     },
   };
 
-  next = applyTargetedActionConsequences(next, action.id, order.target, totalDelta);
+  next = applyTargetedActionConsequences(
+    next,
+    action.id,
+    order.target,
+    totalDelta,
+    operativeModifiers.districtControlModifier,
+    operativeModifiers.rivalPressureModifier,
+  );
   next = recordRecentActivity(next, action.id, order.target, totalDelta);
   next = resolveRecruitment(next, action, order.target);
-  next = applyAssignedOperativeStress(next, action, operative, order.assignedOperativeId);
+  next = applyAssignedOperativeStress(
+    next,
+    action,
+    operative,
+    order.assignedOperativeId,
+    order.target,
+    operativeModifiers,
+  );
   next = appendLog(next, {
     type: 'order_resolved',
     title: action.label,
@@ -112,6 +143,7 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
       roll.value,
       riskChance,
       complication,
+      operativeModifiers,
     ),
     pressureDelta: totalDelta,
     tags: getTargetTags(order.target),
@@ -140,9 +172,22 @@ export function getResolvedActionDelta(
   complication: boolean,
   state?: GameState,
   target?: QueuedOrder['target'],
+  operativeModifiers?: OperativeModifierResult,
 ): PressureDelta {
-  const adjustedEffects = getAdjustedEffects(action, assignedOperativeId, state, target);
-  const adjustedResourceCost = getAdjustedResourceCost(action, assignedOperativeId);
+  const adjustedEffects = getAdjustedEffects(
+    action,
+    assignedOperativeId,
+    state,
+    target,
+    operativeModifiers,
+  );
+  const adjustedResourceCost = getAdjustedResourceCost(
+    action,
+    assignedOperativeId,
+    state,
+    target,
+    operativeModifiers,
+  );
   const effects =
     action.id === 'bribe_official' && complication
       ? {
@@ -159,25 +204,30 @@ export function getResolvedActionDelta(
 export function getActionStressDelta(
   action: ActionDefinition,
   assignedOperativeId?: string,
+  state?: GameState,
+  target?: QueuedOrder['target'],
+  operativeModifiers?: OperativeModifierResult,
 ): number {
-  const modifier = getOperativeActionModifier(assignedOperativeId, action.id);
-  let stress = modifier?.stress ?? 0;
+  const operative = state && assignedOperativeId
+    ? state.operatives.find((candidate) => candidate.id === assignedOperativeId)
+    : undefined;
 
-  switch (action.stressType) {
-    case 'normal':
-      stress += NORMAL_ACTION_STRESS;
-      break;
-    case 'dangerous':
-      stress += DANGEROUS_ACTION_STRESS;
-      break;
-    case 'recovery':
-      stress += LAY_LOW_STRESS_RECOVERY;
-      break;
-    case 'none':
-      break;
+  if (!state || !operative) {
+    return 0;
   }
 
-  return stress;
+  const context = {
+    state,
+    action,
+    operative,
+    target,
+  };
+
+  return calculateActionStressDelta(
+    action,
+    context,
+    operativeModifiers ?? calculateOperativeModifiers(context),
+  );
 }
 
 function getComplicationDelta(action: ActionDefinition, complication: boolean): PressureDelta {
@@ -229,12 +279,20 @@ function applyAssignedOperativeStress(
   action: ActionDefinition,
   operative: OperativeState | undefined,
   assignedOperativeId: string | undefined,
+  target: QueuedOrder['target'],
+  operativeModifiers: OperativeModifierResult,
 ): GameState {
   if (!operative || !assignedOperativeId) {
     return state;
   }
 
-  const stressDelta = getActionStressDelta(action, assignedOperativeId);
+  const stressDelta = getActionStressDelta(
+    action,
+    assignedOperativeId,
+    state,
+    target,
+    operativeModifiers,
+  );
 
   return {
     ...state,
@@ -297,18 +355,19 @@ function createResolutionBody(
   roll: number,
   riskChance: number,
   complication: boolean,
+  operativeModifiers: OperativeModifierResult,
 ): string {
   const operativeName = operative ? getOperativeDefinition(operative.id)?.name : undefined;
   const assignment = operativeName ? ` Assigned: ${operativeName}.` : '';
   const targetLabel = getTargetLabel(order.target);
   const target = targetLabel ? ` Target: ${targetLabel}.` : '';
   const districtImpact = resolveTargetDistrictId(order.target)
-    ? ` Local impact: +${calculateTargetControlGain(action.id, order.target)} control, +${calculateTargetLocalHeatGain(resolvedDelta, order.target)} Heat.`
+    ? ` Local impact: +${calculateTargetControlGain(action.id, order.target, operativeModifiers.districtControlModifier)} control, +${calculateTargetLocalHeatGain(resolvedDelta, order.target)} Heat.`
     : '';
   const rivalId = getTargetControllerId(order.target);
   const rival = rivalId ? getRivalDefinition(rivalId) : undefined;
   const rivalAttention = rival
-    ? ` Rival attention: ${rival.name} +${calculateRivalPressureGain(action.id)}.`
+    ? ` Rival attention: ${rival.name} +${calculateRivalPressureGain(action.id, operativeModifiers.rivalPressureModifier)}.`
     : '';
   const result = complication ? 'Complication triggered.' : 'Resolved cleanly.';
 
