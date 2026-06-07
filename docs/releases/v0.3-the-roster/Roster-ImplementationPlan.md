@@ -819,6 +819,33 @@ Unit tests:
 - Incompatible load creates a new run and notice.
 - Dismissing notice does not alter game state.
 
+### Completion Record
+
+Completed June 7, 2026:
+
+- Moved current-run persistence to `haunted-apex:v0.3:current-run` and retained the
+  v0.2 key only for explicit incompatibility detection and cleanup.
+- Added the schema-3, game-version `0.3.0` save envelope with ISO save timestamps and
+  matching envelope/state schema validation.
+- Loading now returns `loaded`, `empty`, `incompatible`, or `invalid` results and removes
+  rejected current or legacy data.
+- Added strict validation for operative identity and mutable state, roster and hire-pool
+  bounds, active/hire disjointness, traits, assignment histories, queued assignments and
+  recruit targets, signature-event IDs, pending events, logs, flags, territory, rivals,
+  and existing run state.
+- Incompatible and invalid loads now create and persist a complete fresh v0.3 run while
+  exposing the non-blocking compatibility notice through the facade.
+- Added notice dismissal without mutating or re-saving gameplay state.
+- Added pure roster, operative-detail, and hire-pool selectors with player-visible traits,
+  affinities, Stress tiers, recent assignments, adjusted recruit costs, and current
+  recruitment legality.
+- Added facade signals and methods for active roster, hire pool, selected operative
+  detail, assignment options, and compatibility state without bypassing the Command
+  recruitment flow.
+- Preserved autosave after new runs, queue changes, weekly advancement, event choices,
+  and resets.
+- The complete suite passes with `234` tests.
+
 ### Review Gate
 
 Inspect one serialized save and exercise a legacy-save load before UI work makes the

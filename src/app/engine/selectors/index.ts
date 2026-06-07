@@ -49,3 +49,14 @@ export type {
   VenueTerritoryView,
 } from './territory';
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
+export {
+  selectHirePoolViews,
+  selectOperativeDetail,
+  selectRosterViews,
+} from './roster';
+export type {
+  HireCandidateView,
+  OperativeDetailView,
+  OperativeRosterView,
+  TraitView,
+} from './roster';

@@ -1,6 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { newGame, queueOrder } from '../engine';
-import { CURRENT_RUN_STORAGE_KEY, GameStorageService } from './game-storage.service';
+import { newGame, queueOrder, type GameState } from '../engine';
+import {
+  CURRENT_GAME_VERSION,
+  CURRENT_RUN_STORAGE_KEY,
+  CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V02_STORAGE_KEY,
+  GameStorageService,
+  type StoredRunEnvelope,
+} from './game-storage.service';
 
 describe('GameStorageService', () => {
   let service: GameStorageService;
@@ -15,46 +22,89 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips the current run through localStorage', () => {
+  it('round-trips a complete v0.3 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
 
-    expect(service.loadCurrentRun()).toEqual(state);
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
+    const envelope = readEnvelope();
+    expect(envelope.schemaVersion).toBe(CURRENT_SAVE_SCHEMA_VERSION);
+    expect(envelope.gameVersion).toBe(CURRENT_GAME_VERSION);
+    expect(Number.isNaN(Date.parse(envelope.savedAt))).toBeFalse();
+    expect(envelope.state).toEqual(state);
   });
 
-  it('clears the current run', () => {
+  it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
 
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
+    expect(service.loadCurrentRun()).toEqual({ status: 'empty' });
   });
 
-  it('returns undefined for invalid JSON', () => {
+  it('removes and reports invalid JSON', () => {
     localStorage.setItem(CURRENT_RUN_STORAGE_KEY, '{not json');
 
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expect(service.loadCurrentRun()).toEqual({ status: 'invalid' });
+    expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
   });
 
-  it('returns undefined for stale or malformed save data', () => {
+  it('rejects and removes a mismatched envelope schema', () => {
+    storeEnvelope(newGame(), { schemaVersion: 2 });
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 2,
+    });
+    expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.2 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V02_STORAGE_KEY,
+      JSON.stringify(newGame({ seed: 'LEGACY' })),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 2,
+    });
+    expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
+  });
+
+  it('rejects malformed envelope metadata and state', () => {
     localStorage.setItem(
       CURRENT_RUN_STORAGE_KEY,
       JSON.stringify({
-        id: 'run_bad',
-        seed: 'BAD',
+        schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+        gameVersion: '0.2.0',
+        savedAt: 'not-a-date',
+        state: { id: 'bad' },
       }),
     );
 
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expect(service.loadCurrentRun()).toEqual({ status: 'invalid' });
   });
 
-  it('round-trips complete schema 3 territory, rival, activity, and target state', () => {
+  it('rejects a state schema that disagrees with the envelope', () => {
+    const state = structuredClone(newGame());
+    (state as { schemaVersion: number }).schemaVersion = 2;
+
+    expectLoadInvalid(state);
+  });
+
+  it('round-trips territory, rival, activity, target, and assignment state', () => {
     const baseState = newGame({ seed: 'VIOLET-ASH-1047' });
     const queued = queueOrder(baseState, {
       actionId: 'run_small_job',
-      assignedOperativeId: 'op_mara_voss',
+      assignedOperativeId: baseState.operatives[0].id,
       target: {
         type: 'venue',
         id: 'venue_zero_mercy',
@@ -66,107 +116,126 @@ describe('GameStorageService', () => {
       return;
     }
 
-    const state = {
+    const state: GameState = {
       ...queued.state,
+      operatives: queued.state.operatives.map((operative, index) =>
+        index === 0
+          ? {
+              ...operative,
+              weeksAssigned: 1,
+              recentAssignments: [
+                {
+                  id: 'assignment_1_1',
+                  week: 1,
+                  actionId: 'gather_intel',
+                  target: {
+                    type: 'venue',
+                    id: 'venue_glass_saint',
+                  },
+                  targetTags: ['nightlife', 'memory'],
+                  complication: true,
+                  stressDelta: 10,
+                },
+              ],
+            }
+          : operative,
+      ),
       recentActivity: [
         {
           id: 'activity_1_1',
           week: 1,
-          actionId: 'gather_intel' as const,
+          actionId: 'gather_intel',
           target: {
-            type: 'district' as const,
-            id: 'district_violet_ward' as const,
+            type: 'district',
+            id: 'district_violet_ward',
           },
           targetTags: ['nightlife'],
-          rivalId: 'rival_nyx_ardent' as const,
+          rivalId: 'rival_nyx_ardent',
           heatDelta: 2,
           dominionDelta: 1,
         },
       ],
+      seenSignatureEventIds: ['event_mara_ghost_debt'],
     };
 
     service.saveCurrentRun(state);
 
-    expect(service.loadCurrentRun()).toEqual(state);
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
   });
 
-  it('rejects saves without the schema 3 state contract', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const legacyState = {
-      ...state,
-      schemaVersion: 2,
-    };
+  it('rejects invalid operative IDs and duplicate active IDs', () => {
+    const invalidId = structuredClone(newGame());
+    const duplicate = structuredClone(newGame());
+    (invalidId.operatives[0] as { id: string }).id = 'op_missing';
+    duplicate.operatives[1] = structuredClone(duplicate.operatives[0]);
 
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(legacyState));
-
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expectLoadInvalid(invalidId);
+    expectLoadInvalid(duplicate);
   });
 
-  it('rejects a v0.1-shaped save under the v0.2 key', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const { districts: _districts, rivals: _rivals, recentActivity: _activity, ...v01State } =
-      state;
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(v01State));
-
-    expect(service.loadCurrentRun()).toBeUndefined();
-  });
-
-  it('rejects saves missing a district or rival overlay', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const missingDistrict = structuredClone(state);
-    const missingRival = structuredClone(state);
-
+  it('rejects missing territory overlays and illegal queued targets', () => {
+    const missingDistrict = structuredClone(newGame());
+    const missingRival = structuredClone(newGame());
+    const illegalTarget = structuredClone(newGame());
     delete (missingDistrict.districts as Partial<typeof missingDistrict.districts>)
       .district_violet_ward;
     delete (missingRival.rivals as Partial<typeof missingRival.rivals>).rival_knox_marrow;
+    illegalTarget.queuedOrders = [
+      {
+        id: 'order_1_1',
+        actionId: 'run_small_job',
+        assignedOperativeId: illegalTarget.operatives[0].id,
+        target: {
+          type: 'rival',
+          id: 'rival_knox_marrow',
+        },
+      },
+    ];
 
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(missingDistrict));
-    expect(service.loadCurrentRun()).toBeUndefined();
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(missingRival));
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expectLoadInvalid(missingDistrict);
+    expectLoadInvalid(missingRival);
+    expectLoadInvalid(illegalTarget);
   });
 
-  it('rejects queued orders with invalid or illegal targets', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const invalidTarget = {
-      ...state,
-      queuedOrders: [
-        {
-          id: 'order_1_1',
-          actionId: 'run_small_job',
-          assignedOperativeId: 'op_mara_voss',
-          target: {
-            type: 'venue',
-            id: 'venue_missing',
-          },
-        },
-      ],
-    };
-    const illegalTarget = {
-      ...state,
-      queuedOrders: [
-        {
-          id: 'order_1_1',
-          actionId: 'run_small_job',
-          assignedOperativeId: 'op_mara_voss',
-          target: {
-            type: 'rival',
-            id: 'rival_knox_marrow',
-          },
-        },
-      ],
-    };
+  it('rejects roster bounds, hire-pool bounds, and active/hire overlap', () => {
+    const noRoster = structuredClone(newGame());
+    const oversizedPool = structuredClone(newGame());
+    const overlap = structuredClone(newGame());
+    noRoster.operatives = [];
+    oversizedPool.hirePool = [
+      ...oversizedPool.hirePool,
+      'op_mara_voss',
+    ];
+    overlap.hirePool[0] = overlap.operatives[0].id;
 
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(invalidTarget));
-    expect(service.loadCurrentRun()).toBeUndefined();
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(illegalTarget));
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expectLoadInvalid(noRoster);
+    expectLoadInvalid(oversizedPool);
+    expectLoadInvalid(overlap);
   });
 
-  it('round-trips a queued recruit target from the hire pool', () => {
+  it('rejects malformed assignment history and obsolete operative statuses', () => {
+    const malformedHistory = structuredClone(newGame());
+    const obsoleteStatus = structuredClone(newGame());
+    malformedHistory.operatives[0].recentAssignments = [
+      {
+        id: 'assignment_1_1',
+        week: 1,
+        actionId: 'gather_intel',
+        targetTags: [],
+        complication: false,
+        stressDelta: Number.NaN,
+      },
+    ];
+    (obsoleteStatus.operatives[0] as { status: string }).status = 'compromised';
+
+    expectLoadInvalid(malformedHistory);
+    expectLoadInvalid(obsoleteStatus);
+  });
+
+  it('round-trips a queued recruit and rejects recruit targets outside the hire pool', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const queued = queueOrder(state, {
       actionId: 'recruit_operative',
@@ -182,85 +251,68 @@ describe('GameStorageService', () => {
     }
 
     service.saveCurrentRun(queued.state);
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state: queued.state,
+    });
 
-    expect(service.loadCurrentRun()).toEqual(queued.state);
-  });
-
-  it('rejects queued recruit targets outside the hire pool', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const invalidState = {
-      ...state,
-      queuedOrders: [
-        {
-          id: 'order_1_1',
-          actionId: 'recruit_operative' as const,
-          target: {
-            type: 'recruit' as const,
-            id: state.operatives[0].id,
-          },
-        },
-      ],
-    };
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(invalidState));
-
-    expect(service.loadCurrentRun()).toBeUndefined();
-  });
-
-  it('round-trips operative assignment history', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const withHistory = {
-      ...state,
-      operatives: state.operatives.map((operative, index) =>
-        index === 0
-          ? {
-              ...operative,
-              weeksAssigned: 1,
-              recentAssignments: [
-                {
-                  id: 'assignment_1_1',
-                  week: 1,
-                  actionId: 'gather_intel' as const,
-                  target: {
-                    type: 'venue' as const,
-                    id: 'venue_glass_saint' as const,
-                  },
-                  targetTags: ['nightlife', 'memory'],
-                  complication: true,
-                  stressDelta: 10,
-                },
-              ],
-            }
-          : operative,
-      ),
-    };
-
-    service.saveCurrentRun(withHistory);
-
-    expect(service.loadCurrentRun()).toEqual(withHistory);
-  });
-
-  it('rejects malformed assignment history and obsolete operative statuses', () => {
-    const state = newGame({ seed: 'VIOLET-ASH-1047' });
-    const malformedHistory = structuredClone(state);
-    const obsoleteStatus = structuredClone(state);
-
-    malformedHistory.operatives[0].recentAssignments = [
+    const invalid = structuredClone(state);
+    invalid.queuedOrders = [
       {
-        id: 'assignment_1_1',
-        week: 1,
-        actionId: 'gather_intel',
-        targetTags: [],
-        complication: false,
-        stressDelta: Number.NaN,
+        id: 'order_1_1',
+        actionId: 'recruit_operative',
+        target: {
+          type: 'recruit',
+          id: state.operatives[0].id,
+        },
       },
     ];
-    (obsoleteStatus.operatives[0] as { status: string }).status = 'compromised';
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(malformedHistory));
-    expect(service.loadCurrentRun()).toBeUndefined();
-
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(obsoleteStatus));
-    expect(service.loadCurrentRun()).toBeUndefined();
+    expectLoadInvalid(invalid);
   });
+
+  it('rejects invalid and duplicate seen signature event IDs', () => {
+    const invalid = structuredClone(newGame());
+    const duplicate = structuredClone(newGame());
+    invalid.seenSignatureEventIds = ['corp_patrol_sweep'];
+    duplicate.seenSignatureEventIds = [
+      'event_mara_ghost_debt',
+      'event_mara_ghost_debt',
+    ];
+
+    expectLoadInvalid(invalid);
+    expectLoadInvalid(duplicate);
+  });
+
+  function expectLoadInvalid(state: GameState): void {
+    storeEnvelope(state);
+    expect(service.loadCurrentRun()).toEqual({ status: 'invalid' });
+    expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  }
 });
+
+function storeEnvelope(
+  state: GameState,
+  overrides: {
+    schemaVersion?: number;
+    gameVersion?: string;
+    savedAt?: string;
+    state?: GameState;
+  } = {},
+): void {
+  localStorage.setItem(
+    CURRENT_RUN_STORAGE_KEY,
+    JSON.stringify({
+      schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+      gameVersion: CURRENT_GAME_VERSION,
+      savedAt: '2026-06-07T00:00:00.000Z',
+      state,
+      ...overrides,
+    }),
+  );
+}
+
+function readEnvelope(): StoredRunEnvelope {
+  return JSON.parse(
+    localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null',
+  ) as StoredRunEnvelope;
+}

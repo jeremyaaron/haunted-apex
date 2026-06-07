@@ -1,6 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { newGame } from './engine';
-import { CURRENT_RUN_STORAGE_KEY } from './game';
+import {
+  CURRENT_GAME_VERSION,
+  CURRENT_RUN_STORAGE_KEY,
+  CURRENT_SAVE_SCHEMA_VERSION,
+} from './game';
 import { App } from './app';
 
 describe('App', () => {
@@ -182,7 +186,15 @@ describe('App', () => {
   it('updates effects, exact risk, and rival warning for a controlled target', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     state.districts.district_chrome_narrows.heat = 68;
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(
+      CURRENT_RUN_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+        gameVersion: CURRENT_GAME_VERSION,
+        savedAt: '2026-06-07T00:00:00.000Z',
+        state,
+      }),
+    );
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;

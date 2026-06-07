@@ -2,8 +2,10 @@ import { Injectable } from '@angular/core';
 import {
   getActionDefinition,
   getDistrictDefinition,
+  getEventDefinition,
   getOperativeDefinition,
   getRivalDefinition,
+  getTraitDefinition,
   getVenueDefinition,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
@@ -14,15 +16,32 @@ import {
   type OperativeId,
   type Pressures,
   type RivalId,
+  type TraitId,
   type TurnPhase,
   type VenueId,
 } from '../engine';
 
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 3;
+export const CURRENT_GAME_VERSION = '0.3.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
+export const LEGACY_V02_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
+
+export type StoredRunEnvelope = {
+  schemaVersion: typeof CURRENT_SAVE_SCHEMA_VERSION;
+  gameVersion: typeof CURRENT_GAME_VERSION;
+  savedAt: string;
+  state: GameState;
+};
+
+export type LoadCurrentRunResult =
+  | { status: 'loaded'; state: GameState }
+  | { status: 'empty' }
+  | { status: 'incompatible'; foundVersion?: number }
+  | { status: 'invalid' };
 
 export interface GameStorage {
   saveCurrentRun(state: GameState): void;
-  loadCurrentRun(): GameState | undefined;
+  loadCurrentRun(): LoadCurrentRunResult;
   clearCurrentRun(): void;
 }
 
@@ -37,27 +56,71 @@ export class GameStorageService implements GameStorage {
       return;
     }
 
-    storage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(state));
+    const envelope: StoredRunEnvelope = {
+      schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+      gameVersion: CURRENT_GAME_VERSION,
+      savedAt: new Date().toISOString(),
+      state,
+    };
+
+    storage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(envelope));
   }
 
-  loadCurrentRun(): GameState | undefined {
+  loadCurrentRun(): LoadCurrentRunResult {
     const storage = getLocalStorage();
-    const serialized = storage?.getItem(CURRENT_RUN_STORAGE_KEY);
 
-    if (!serialized) {
-      return undefined;
+    if (!storage) {
+      return { status: 'empty' };
     }
 
-    try {
-      const parsed: unknown = JSON.parse(serialized);
-      return isGameState(parsed) ? parsed : undefined;
-    } catch {
-      return undefined;
+    const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
+
+    if (serialized) {
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+
+      try {
+        const parsed: unknown = JSON.parse(serialized);
+
+        if (isRecord(parsed) && typeof parsed['schemaVersion'] === 'number') {
+          if (parsed['schemaVersion'] !== CURRENT_SAVE_SCHEMA_VERSION) {
+            storage.removeItem(CURRENT_RUN_STORAGE_KEY);
+            return {
+              status: 'incompatible',
+              foundVersion: parsed['schemaVersion'],
+            };
+          }
+        }
+
+        if (!isStoredRunEnvelope(parsed)) {
+          storage.removeItem(CURRENT_RUN_STORAGE_KEY);
+          return { status: 'invalid' };
+        }
+
+        return {
+          status: 'loaded',
+          state: parsed.state,
+        };
+      } catch {
+        storage.removeItem(CURRENT_RUN_STORAGE_KEY);
+        return { status: 'invalid' };
+      }
     }
+
+    if (storage.getItem(LEGACY_V02_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 2,
+      };
+    }
+
+    return { status: 'empty' };
   }
 
   clearCurrentRun(): void {
-    getLocalStorage()?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    const storage = getLocalStorage();
+    storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V02_STORAGE_KEY);
   }
 }
 
@@ -78,26 +141,40 @@ function isGameState(value: unknown): value is GameState {
     value['schemaVersion'] === 3 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
-    typeof value['rngCursor'] === 'number' &&
-    typeof value['week'] === 'number' &&
-    typeof value['maxWeeks'] === 'number' &&
+    isNonNegativeInteger(value['rngCursor']) &&
+    isPositiveInteger(value['week']) &&
+    isPositiveInteger(value['maxWeeks']) &&
     isTurnPhase(value['phase']) &&
-    typeof value['commandPointsPerWeek'] === 'number' &&
+    isPositiveInteger(value['commandPointsPerWeek']) &&
     isPressures(value['pressures']) &&
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
-    isStringArray(value['seenSignatureEventIds']) &&
+    isSeenSignatureEventIds(value['seenSignatureEventIds']) &&
     isQueuedOrders(value['queuedOrders'], value['operatives'], value['hirePool']) &&
     isDistrictOverlays(value['districts']) &&
     isRivalOverlays(value['rivals']) &&
     isRecentActivity(value['recentActivity']) &&
-    Array.isArray(value['eventLog']) &&
-    isRecord(value['flags'])
+    isPendingEvent(value['pendingEvent']) &&
+    isEventLog(value['eventLog']) &&
+    isFlags(value['flags']) &&
+    isGameOver(value['gameOver'])
+  );
+}
+
+function isStoredRunEnvelope(value: unknown): value is StoredRunEnvelope {
+  return (
+    isRecord(value) &&
+    value['schemaVersion'] === CURRENT_SAVE_SCHEMA_VERSION &&
+    value['gameVersion'] === CURRENT_GAME_VERSION &&
+    typeof value['savedAt'] === 'string' &&
+    !Number.isNaN(Date.parse(value['savedAt'])) &&
+    isGameState(value['state']) &&
+    value['state'].schemaVersion === value['schemaVersion']
   );
 }
 
 function isOperatives(value: unknown): boolean {
-  if (!Array.isArray(value)) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 5) {
     return false;
   }
 
@@ -109,12 +186,16 @@ function isOperatives(value: unknown): boolean {
       typeof operative['id'] !== 'string' ||
       !getOperativeDefinition(operative['id'] as OperativeId) ||
       ids.has(operative['id']) ||
-      typeof operative['loyalty'] !== 'number' ||
-      typeof operative['stress'] !== 'number' ||
+      !isFiniteNumber(operative['loyalty']) ||
+      operative['loyalty'] < 0 ||
+      operative['loyalty'] > 100 ||
+      !isFiniteNumber(operative['stress']) ||
+      operative['stress'] < 0 ||
+      operative['stress'] > 100 ||
       !isOperativeStatus(operative['status']) ||
-      !isStringArray(operative['revealedTraits']) ||
-      !isRecord(operative['hiddenFlags']) ||
-      typeof operative['weeksAssigned'] !== 'number' ||
+      !isRevealedTraits(operative['revealedTraits']) ||
+      !isFlags(operative['hiddenFlags']) ||
+      !isNonNegativeInteger(operative['weeksAssigned']) ||
       !isRecentAssignments(operative['recentAssignments'])
     ) {
       return false;
@@ -129,6 +210,14 @@ function isOperativeStatus(value: unknown): boolean {
   return value === 'available' || value === 'assigned' || value === 'idle' || value === 'injured';
 }
 
+function isRevealedTraits(value: unknown): boolean {
+  if (!isStringArray(value) || new Set(value).size !== value.length) {
+    return false;
+  }
+
+  return value.every((traitId) => getTraitDefinition(traitId as TraitId) !== undefined);
+}
+
 function isRecentAssignments(value: unknown): boolean {
   if (!Array.isArray(value)) {
     return false;
@@ -141,17 +230,23 @@ function isRecentAssignments(value: unknown): boolean {
       !isRecord(assignment) ||
       typeof assignment['id'] !== 'string' ||
       ids.has(assignment['id']) ||
-      typeof assignment['week'] !== 'number' ||
+      !isPositiveInteger(assignment['week']) ||
       typeof assignment['actionId'] !== 'string' ||
       !getActionDefinition(assignment['actionId'] as ActionId) ||
       !isStringArray(assignment['targetTags']) ||
       typeof assignment['complication'] !== 'boolean' ||
-      typeof assignment['stressDelta'] !== 'number'
+      !isFiniteNumber(assignment['stressDelta'])
     ) {
       return false;
     }
 
-    if (assignment['target'] !== undefined && !parseActionTarget(assignment['target'])) {
+    const action = getActionDefinition(assignment['actionId'] as ActionId);
+    const target = parseActionTarget(assignment['target']);
+
+    if (
+      assignment['target'] !== undefined &&
+      (!target || !action?.allowedTargetTypes.includes(target.type))
+    ) {
       return false;
     }
 
@@ -161,7 +256,7 @@ function isRecentAssignments(value: unknown): boolean {
 }
 
 function isHirePool(value: unknown, operatives: unknown): boolean {
-  if (!Array.isArray(value) || !Array.isArray(operatives)) {
+  if (!Array.isArray(value) || value.length > 4 || !Array.isArray(operatives)) {
     return false;
   }
 
@@ -193,6 +288,8 @@ function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown):
   );
 
   const hireIds = new Set(hirePool.filter((id): id is string => typeof id === 'string'));
+  const orderIds = new Set<string>();
+  const assignedOperativeIds = new Set<string>();
   const queuedRecruitIds = new Set<string>();
   let queuedRecruitCount = 0;
 
@@ -200,6 +297,7 @@ function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown):
     if (
       !isRecord(order) ||
       typeof order['id'] !== 'string' ||
+      orderIds.has(order['id']) ||
       typeof order['actionId'] !== 'string'
     ) {
       return false;
@@ -214,7 +312,15 @@ function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown):
     if (
       order['assignedOperativeId'] !== undefined &&
       (typeof order['assignedOperativeId'] !== 'string' ||
-        !operativeIds.has(order['assignedOperativeId']))
+        !operativeIds.has(order['assignedOperativeId']) ||
+        assignedOperativeIds.has(order['assignedOperativeId']))
+    ) {
+      return false;
+    }
+
+    if (
+      (action.assignment === 'none' && order['assignedOperativeId'] !== undefined) ||
+      (action.assignment === 'required' && order['assignedOperativeId'] === undefined)
     ) {
       return false;
     }
@@ -242,6 +348,12 @@ function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown):
       queuedRecruitCount += 1;
     }
 
+    orderIds.add(order['id']);
+
+    if (typeof order['assignedOperativeId'] === 'string') {
+      assignedOperativeIds.add(order['assignedOperativeId']);
+    }
+
     return !target || action.allowedTargetTypes.includes(target.type);
   });
 
@@ -259,8 +371,8 @@ function isDistrictOverlays(value: unknown): boolean {
     return (
       isRecord(district) &&
       district['id'] === definition.id &&
-      typeof district['control'] === 'number' &&
-      typeof district['heat'] === 'number'
+      isFiniteNumber(district['control']) &&
+      isFiniteNumber(district['heat'])
     );
   });
 }
@@ -276,8 +388,8 @@ function isRivalOverlays(value: unknown): boolean {
     return (
       isRecord(rival) &&
       rival['id'] === definition.id &&
-      typeof rival['pressure'] === 'number' &&
-      typeof rival['disposition'] === 'number' &&
+      isFiniteNumber(rival['pressure']) &&
+      isFiniteNumber(rival['disposition']) &&
       typeof rival['active'] === 'boolean'
     );
   });
@@ -288,17 +400,20 @@ function isRecentActivity(value: unknown): boolean {
     return false;
   }
 
+  const ids = new Set<string>();
+
   return value.every((activity) => {
     if (
       !isRecord(activity) ||
       typeof activity['id'] !== 'string' ||
-      typeof activity['week'] !== 'number' ||
+      ids.has(activity['id']) ||
+      !isPositiveInteger(activity['week']) ||
       typeof activity['actionId'] !== 'string' ||
       !getActionDefinition(activity['actionId'] as ActionId) ||
       !Array.isArray(activity['targetTags']) ||
       !activity['targetTags'].every((tag) => typeof tag === 'string') ||
-      typeof activity['heatDelta'] !== 'number' ||
-      typeof activity['dominionDelta'] !== 'number'
+      !isFiniteNumber(activity['heatDelta']) ||
+      !isFiniteNumber(activity['dominionDelta'])
     ) {
       return false;
     }
@@ -307,12 +422,96 @@ function isRecentActivity(value: unknown): boolean {
       return false;
     }
 
-    return (
+    const validRival =
       activity['rivalId'] === undefined ||
       (typeof activity['rivalId'] === 'string' &&
-        getRivalDefinition(activity['rivalId'] as RivalId) !== undefined)
-    );
+        getRivalDefinition(activity['rivalId'] as RivalId) !== undefined);
+
+    if (validRival) {
+      ids.add(activity['id']);
+    }
+
+    return validRival;
   });
+}
+
+function isSeenSignatureEventIds(value: unknown): boolean {
+  if (!isStringArray(value) || new Set(value).size !== value.length) {
+    return false;
+  }
+
+  return value.every((eventId) => getEventDefinition(eventId)?.kind === 'operative');
+}
+
+function isPendingEvent(value: unknown): boolean {
+  if (value === undefined) {
+    return true;
+  }
+
+  return (
+    isRecord(value) &&
+    typeof value['id'] === 'string' &&
+    typeof value['definitionId'] === 'string' &&
+    getEventDefinition(value['definitionId']) !== undefined &&
+    isPositiveInteger(value['week'])
+  );
+}
+
+function isEventLog(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  const ids = new Set<string>();
+
+  return value.every((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry['id'] !== 'string' ||
+      ids.has(entry['id']) ||
+      !isPositiveInteger(entry['week']) ||
+      !isGameLogEntryType(entry['type']) ||
+      typeof entry['title'] !== 'string' ||
+      (entry['body'] !== undefined && typeof entry['body'] !== 'string') ||
+      (entry['tags'] !== undefined && !isStringArray(entry['tags'])) ||
+      (entry['pressureDelta'] !== undefined && !isPressureDelta(entry['pressureDelta']))
+    ) {
+      return false;
+    }
+
+    ids.add(entry['id']);
+    return true;
+  });
+}
+
+function isGameLogEntryType(value: unknown): boolean {
+  return (
+    value === 'order_queued' ||
+    value === 'order_resolved' ||
+    value === 'operative_condition' ||
+    value === 'complication' ||
+    value === 'drift' ||
+    value === 'rival_effect' ||
+    value === 'event_presented' ||
+    value === 'event_choice' ||
+    value === 'win_loss'
+  );
+}
+
+function isGameOver(value: unknown): boolean {
+  if (value === undefined) {
+    return true;
+  }
+
+  return (
+    isRecord(value) &&
+    (value['result'] === 'victory' || value['result'] === 'loss') &&
+    (value['reason'] === 'dominion_victory' ||
+      value['reason'] === 'heat_lockdown' ||
+      value['reason'] === 'loyalty_collapse' ||
+      value['reason'] === 'bankrupt' ||
+      value['reason'] === 'out_of_time')
+  );
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -366,12 +565,36 @@ function isPressures(value: unknown): value is Pressures {
   }
 
   return (
-    typeof value['dominion'] === 'number' &&
-    typeof value['heat'] === 'number' &&
-    typeof value['loyalty'] === 'number' &&
-    typeof value['resources'] === 'number' &&
-    typeof value['intel'] === 'number' &&
-    typeof value['ruin'] === 'number'
+    isFiniteNumber(value['dominion']) &&
+    isFiniteNumber(value['heat']) &&
+    isFiniteNumber(value['loyalty']) &&
+    isFiniteNumber(value['resources']) &&
+    isFiniteNumber(value['intel']) &&
+    isFiniteNumber(value['ruin'])
+  );
+}
+
+function isPressureDelta(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([pressure, amount]) =>
+      ['dominion', 'heat', 'loyalty', 'resources', 'intel', 'ruin'].includes(pressure) &&
+      isFiniteNumber(amount),
+  );
+}
+
+function isFlags(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (entry) =>
+        typeof entry === 'boolean' ||
+        typeof entry === 'string' ||
+        isFiniteNumber(entry),
+    )
   );
 }
 
@@ -387,4 +610,16 @@ function isTurnPhase(value: unknown): value is TurnPhase {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 1;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0;
 }
