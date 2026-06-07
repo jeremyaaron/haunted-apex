@@ -9,6 +9,13 @@ export type OperativeSkill = 'violence' | 'charm' | 'tech' | 'subtlety';
 
 export type OperativeStatus = 'available' | 'assigned' | 'idle' | 'injured';
 
+export type OperativeStateDelta = {
+  loyalty?: number;
+  stress?: number;
+  status?: OperativeStatus;
+  hiddenFlags?: Record<string, boolean | number | string>;
+};
+
 export type OperativeId =
   | 'op_mara_voss'
   | 'op_juno_hex'

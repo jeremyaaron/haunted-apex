@@ -1,6 +1,8 @@
 import {
   getOperativeDefinition,
+  getEventDefinition,
   getTraitDefinition,
+  ROSTER_EVENTS,
   ROSTER_OPERATIVES,
   ROSTER_TRAITS,
 } from './index';
@@ -136,6 +138,25 @@ describe('Roster content', () => {
 
     for (const trait of ROSTER_TRAITS) {
       expect(getTraitDefinition(trait.id)).toBe(trait);
+    }
+  });
+
+  it('defines six unique signature events owned by their referenced operatives', () => {
+    const eventIds = ROSTER_EVENTS.map((event) => event.id);
+
+    expect(ROSTER_EVENTS.length).toBe(6);
+    expect(new Set(eventIds).size).toBe(eventIds.length);
+
+    for (const event of ROSTER_EVENTS) {
+      const operative = getOperativeDefinition(event.operativeId);
+
+      expect(getEventDefinition(event.id)).toBe(event);
+      expect(operative?.eventIds)
+        .withContext(`${event.id} must be referenced by ${event.operativeId}`)
+        .toContain(event.id);
+      expect(operative?.stressProfile.breakingEventIds)
+        .withContext(`${event.id} must be registered for breaking stress`)
+        .toContain(event.id);
     }
   });
 });

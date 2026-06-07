@@ -20,6 +20,12 @@ export {
   selectWeeklyEvent,
 } from './select-weekly-event';
 export { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
+export {
+  evaluateOperativeEventPredicate,
+  evaluateOperativeEventTrigger,
+  getOperativeEventEligibility,
+  isOperativeEventEligible,
+} from './operative-events';
 export type { QueueOrderResult, RemoveQueuedOrderResult } from './queue-order';
 export type { ActionResolution } from './resolve-action';
 export type { AdvanceWeekResult, OrderResolutionDiagnostic } from './resolve-week';
@@ -36,3 +42,4 @@ export type {
   EventChoiceUnavailableReason,
   ResolveEventChoiceResult,
 } from './resolve-event';
+export type { OperativeEventEligibilityDiagnostics } from './operative-events';

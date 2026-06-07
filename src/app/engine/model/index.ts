@@ -24,12 +24,17 @@ export type {
   TurnPhase,
 } from './game-state';
 export type {
+  CityEventDefinition,
   EventChoiceDefinition,
   EventDefinition,
   EventId,
   EventTag,
   EventWeightRule,
   GameEventInstance,
+  OperativeEventDefinition,
+  OperativeEventPredicate,
+  OperativeEventTrigger,
+  OperativeEventTriggerCondition,
   SpecialCost,
 } from './events';
 export type {
@@ -41,6 +46,7 @@ export type {
   OperativeRoleTag,
   OperativeSkill,
   OperativeState,
+  OperativeStateDelta,
   OperativeStats,
   OperativeStatus,
   RecentAssignment,

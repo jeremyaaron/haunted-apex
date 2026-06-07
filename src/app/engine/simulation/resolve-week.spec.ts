@@ -1,5 +1,6 @@
 import type { ActionTarget, GameState } from '../model';
 import { getOperativeDefinition } from '../content';
+import { materializeOperativeState } from '../roster';
 import { getGameOverState } from './win-loss';
 import { advanceWeek } from './resolve-week';
 import { clampPressures } from './clamps';
@@ -295,6 +296,21 @@ describe('advanceWeek', () => {
     ).toEqual([3, 4, 5]);
   });
 
+  it('marks a signature event seen when it is presented and still presents one event', () => {
+    const result = findAdvanceSelectingOperativeEvent();
+
+    expect(result.state.pendingEvent?.definitionId).toBe(result.eventSelection.definition.id);
+    expect(result.eventSelection.definition.kind).toBe('operative');
+    expect(result.state.seenSignatureEventIds).toContain(
+      result.eventSelection.definition.id,
+    );
+    expect(
+      result.state.eventLog.filter(
+        (entry) => entry.week === result.state.week && entry.type === 'event_presented',
+      ).length,
+    ).toBe(1);
+  });
+
   it('cools districts, applies rival effects, then presents an event before win/loss', () => {
     const baseState = newGame({ seed: 'VIOLET-ASH-1047' });
     const pressuredState: GameState = {
@@ -365,6 +381,33 @@ describe('advanceWeek', () => {
     });
   });
 });
+
+function findAdvanceSelectingOperativeEvent(): Extract<
+  ReturnType<typeof advanceWeek>,
+  { ok: true }
+> {
+  for (let index = 0; index < 100; index += 1) {
+    const state = newGame({ seed: `OPERATIVE-EVENT-${index}` });
+    const mara = materializeOperativeState('op_mara_voss');
+    mara.stress = 80;
+    const result = advanceWeek({
+      ...state,
+      operatives: [mara],
+      queuedOrders: [
+        {
+          id: 'order_1_1',
+          actionId: 'gather_intel',
+        },
+      ],
+    });
+
+    if (result.ok && result.eventSelection.definition.kind === 'operative') {
+      return result;
+    }
+  }
+
+  throw new Error('Expected at least one deterministic seed to select an operative event.');
+}
 
 describe('weekly drift', () => {
   it('applies upkeep, natural cooling, and fatigue', () => {

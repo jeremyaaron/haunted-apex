@@ -1,5 +1,6 @@
 import { DISTRICT_ZERO_EVENTS } from '../content';
 import type { GameLogEntry, GameState, RecentActivityEntry, RivalId } from '../model';
+import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
 import {
   buildEventWeightContext,
@@ -179,6 +180,64 @@ describe('weekly event selection', () => {
     expect(context.recentDistrictIds.has('district_violet_ward')).toBeTrue();
     expect(context.rivalPressures.rival_nyx_ardent).toBe(55);
     expect(selection.diagnostics).toEqual(weighted.diagnostics);
+  });
+
+  it('merges eligible operative events into the city event pool with diagnostics', () => {
+    const mara = materializeOperativeState('op_mara_voss');
+    mara.stress = 80;
+    const state = {
+      ...newGame({ seed: 'VIOLET-ASH-1047' }),
+      operatives: [mara],
+    };
+    const weighted = getWeightedEvents(state);
+    const operativeEvent = requireWeightedEvent(state, 'event_mara_ghost_debt');
+
+    expect(weighted.some((candidate) => candidate.event.kind === 'city')).toBeTrue();
+    expect(operativeEvent.event.kind).toBe('operative');
+    expect(operativeEvent.weight).toBeLessThan(
+      weighted.reduce((sum, candidate) => sum + candidate.weight, 0),
+    );
+    expect(operativeEvent.diagnostics.operativeEligibility?.eligible).toBeTrue();
+    expect(operativeEvent.diagnostics.contextModifiers.map((modifier) => modifier.id))
+      .withContext('operative weighting diagnostics')
+      .toContain('operative_stress');
+  });
+
+  it('removes seen operative events from the weighted pool', () => {
+    const mara = materializeOperativeState('op_mara_voss');
+    mara.stress = 80;
+    const state = {
+      ...newGame({ seed: 'VIOLET-ASH-1047' }),
+      operatives: [mara],
+      seenSignatureEventIds: ['event_mara_ghost_debt'] as GameState['seenSignatureEventIds'],
+    };
+
+    expect(
+      getWeightedEvents(state).some(
+        (candidate) => candidate.event.id === 'event_mara_ghost_debt',
+      ),
+    ).toBeFalse();
+  });
+
+  it('keeps seeded operative-event selection deterministic', () => {
+    const juno = materializeOperativeState('op_juno_hex');
+    juno.stress = 70;
+    juno.recentAssignments = [
+      {
+        id: 'assignment_1_1',
+        week: 1,
+        actionId: 'gather_intel',
+        targetTags: ['memory'],
+        complication: false,
+        stressDelta: 8,
+      },
+    ];
+    const state = {
+      ...newGame({ seed: 'STATIC-VOICE' }),
+      operatives: [juno],
+    };
+
+    expect(selectWeeklyEvent(state)).toEqual(selectWeeklyEvent(state));
   });
 });
 

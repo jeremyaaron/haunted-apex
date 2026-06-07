@@ -715,6 +715,33 @@ Unit tests:
 - Same state and RNG cursor select the same event.
 - Existing event repetition penalties still apply.
 
+### Completion Record
+
+Completed June 7, 2026:
+
+- Added discriminated city and operative event definitions while preserving one shared
+  event registry and weekly event slot.
+- Added reusable operative-event predicates for Stress, Loyalty, assignment recency and
+  count, assignment tags, global pressures, and rival pressure.
+- Added nested `all` and `any` trigger groups so authored conditions retain their
+  intended boolean structure.
+- Added the six initial signature events for Mara Voss, Juno Hex, Saint Calder, Knox
+  Riven, Iris Vale, and Orchid Seven.
+- Restricted operative-event eligibility to active roster members, excluding hire
+  candidates and signature events already presented during the run.
+- Merged eligible operative events into the existing seeded weighted pool with
+  eligibility, Stress, and recent-assignment diagnostics.
+- Signature event IDs are recorded when presented, preventing reloads or interrupted
+  choices from making them eligible again.
+- Extended event choices with operative and rival-pressure effects, including clamped
+  operative Loyalty, operative Stress, and rival pressure.
+- Preserved existing city-event weights, repetition penalties, choice flow, and exactly
+  one event presentation per week.
+- Added focused coverage for every predicate type, nested trigger modes, all six authored
+  events, deterministic weighted selection, once-per-run presentation, and extended
+  choice consequences.
+- The complete suite passes with `226` tests.
+
 ### Review Gate
 
 Force each signature event through deterministic tests and inspect one natural multi-week

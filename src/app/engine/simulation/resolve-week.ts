@@ -74,9 +74,14 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
   next = pruneRecentActivity(next);
 
   const selectedEvent = selectWeeklyEvent(next);
+  const seenSignatureEventIds =
+    selectedEvent.definition.kind === 'operative'
+      ? [...next.seenSignatureEventIds, selectedEvent.definition.id]
+      : next.seenSignatureEventIds;
   next = {
     ...next,
     rngCursor: selectedEvent.rng.cursor,
+    seenSignatureEventIds,
     queuedOrders: [],
     pendingEvent: selectedEvent.event,
     phase: 'EVENT_CHOICE',

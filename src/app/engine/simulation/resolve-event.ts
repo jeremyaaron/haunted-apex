@@ -1,11 +1,15 @@
 import { getEventDefinition } from '../content';
 import type {
   EventChoiceDefinition,
+  EventDefinition,
   GameLogEntry,
   GameState,
+  OperativeState,
   PressureDelta,
+  RivalId,
   SpecialCost,
 } from '../model';
+import { clampStress } from './clamps';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { applyWinLoss } from './win-loss';
 
@@ -77,6 +81,11 @@ export function resolveEventChoice(
     ...state,
     pendingEvent: undefined,
     pressures: applyPressureDelta(state.pressures, pressureDelta),
+  };
+  next = applyOperativeEffects(next, definition, choice);
+  next = applyRivalPressureEffects(next, choice.rivalPressure);
+  next = {
+    ...next,
     flags,
   };
   next = appendLog(next, {
@@ -103,6 +112,75 @@ export function resolveEventChoice(
       phase: 'COMMAND',
     },
   };
+}
+
+function applyOperativeEffects(
+  state: GameState,
+  definition: EventDefinition,
+  choice: EventChoiceDefinition,
+): GameState {
+  if (definition.kind !== 'operative' || !choice.operativeEffects) {
+    return state;
+  }
+
+  return {
+    ...state,
+    operatives: state.operatives.map((operative) =>
+      operative.id === definition.operativeId
+        ? applyOperativeDelta(operative, choice.operativeEffects ?? {})
+        : operative,
+    ),
+  };
+}
+
+function applyOperativeDelta(
+  operative: OperativeState,
+  delta: NonNullable<EventChoiceDefinition['operativeEffects']>,
+): OperativeState {
+  return {
+    ...operative,
+    loyalty: clampPercent(operative.loyalty + (delta.loyalty ?? 0)),
+    stress: clampStress(operative.stress + (delta.stress ?? 0)),
+    status: delta.status ?? operative.status,
+    hiddenFlags: {
+      ...operative.hiddenFlags,
+      ...(delta.hiddenFlags ?? {}),
+    },
+  };
+}
+
+function applyRivalPressureEffects(
+  state: GameState,
+  effects: EventChoiceDefinition['rivalPressure'],
+): GameState {
+  if (!effects) {
+    return state;
+  }
+
+  const rivals = { ...state.rivals };
+
+  for (const [rivalId, amount] of Object.entries(effects) as [
+    RivalId,
+    number | undefined,
+  ][]) {
+    if (amount === undefined) {
+      continue;
+    }
+
+    rivals[rivalId] = {
+      ...rivals[rivalId],
+      pressure: clampPercent(rivals[rivalId].pressure + amount),
+    };
+  }
+
+  return {
+    ...state,
+    rivals,
+  };
+}
+
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value));
 }
 
 export function getEventChoiceAvailability(

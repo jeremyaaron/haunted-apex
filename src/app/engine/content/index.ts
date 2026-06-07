@@ -10,7 +10,8 @@ export {
   DISTRICT_ZERO_ACTIONS,
   getActionDefinition,
 } from './district-zero-actions';
-export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './district-zero-events';
+export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './event-registry';
+export { ROSTER_EVENTS } from './roster-events';
 export {
   getDistrictDefinition,
   RIVAL_TERRITORY_DISTRICTS,
