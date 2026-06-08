@@ -1067,6 +1067,35 @@ Unit tests:
 - Agents complete runs without `agent_stalled`.
 - Same seed and agent produce the same trace.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Kept legal order generation centralized through engine selectors and shared previews,
+  including recruit targets and every available action-operative-target combination.
+- Added roster-aware scoring to all five agents without reading hidden flags or exact
+  operative-event trigger predicates.
+- RandomBot continues selecting random legal orders and event choices from the complete
+  legal option set.
+- CautiousBot now prefers Stable and Strained assignments, values heat-control and
+  stability roles, uses Lay Low for high Stress, and recruits for heat-control gaps or a
+  dangerously stressed roster.
+- AggressiveBot now values visible role fit for violence, money, rival pressure, Control,
+  and Dominion-forward moves while tolerating Stress when the move materially advances
+  the board.
+- GreedyBot now values money, Intel, tech, lucrative visible modifiers, and candidate
+  economics while preserving Heat and Resource reserve brakes.
+- OperatorBot now scores survival margin, Dominion progress, risk, relevant skill,
+  current/projected Stress, visible modifier sources, role coverage, candidate role gaps,
+  recruitment cost, and territory/rival consequences.
+- Added focused harness coverage for complete legal option generation, recruit-target
+  parity with the hire pool, legal first-order choices across 24 varied rosters, absent
+  candidate protection, roster cap protection, Breaking assignment availability, Cautious
+  Stress avoidance, Aggressive justified Stress tolerance, Greedy reserve discipline,
+  Operator role-gap recruitment, non-stalling runs, and deterministic batch output.
+- The complete suite passes with `250` tests.
+- Standard and `/haunted-apex/` production builds pass at `351.11 kB` initial output.
+
 ### Review Gate
 
 Run a representative batch and inspect traces from weak and strong roster compositions.
