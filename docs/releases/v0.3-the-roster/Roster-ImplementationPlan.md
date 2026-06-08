@@ -934,6 +934,44 @@ Manual checks:
 - Verify no horizontal overflow or text overlap.
 - Stop all temporary validation processes.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Updated the release identity and Field Guide label to `The Roster`.
+- Replaced raw operative-state cards with roster view models showing identity, rarity,
+  roles, Loyalty, Stress tier, status, signature trait, and visible liability.
+- Added a shared accessible dossier dialog for active operatives and hire candidates,
+  with explicit, Escape, and backdrop close behavior.
+- Added a persistent four-candidate hire pool beneath the active roster, including
+  candidate cost, identity, roles, signature trait, and full-roster explanations.
+- Kept recruitment inside the normal Command loop and added selected-candidate identity,
+  roles, rarity, and projected roster count to the Recruit action preview.
+- Added selected-operative explanation strips showing projected Stress, final risk, and
+  only the visible traits and affinities that match the current action and target.
+- Added restrained Stable, Strained, Unstable, and Breaking presentation states while
+  keeping Breaking assignments enabled.
+- Extended the Field Guide with roster generation, rarity, roles, recruitment, Stress,
+  visible traits, liabilities, and affinity-preview guidance.
+- Added the one-time compatibility notice surface.
+- Extended the hidden debug panel with generated roster IDs, hire-pool IDs, mutable
+  operative state, assignment histories, matched sources, eligible operative-event
+  weights, seen signature events, and save schema.
+- Added a global border-box reset and mobile stacking rules for stable true-phone
+  rendering.
+- Increased the component-style production budget from `18 kB` to `22 kB` for the
+  expanded roster and dossier surfaces; the finished component stylesheet is `19.43 kB`.
+- Added component coverage for roster and hire-pool rendering, dossiers, accessible
+  closing, recruit target parity, non-first-candidate recruitment, full-roster state,
+  assignment explanations, Breaking legality, compatibility dismissal, hidden
+  diagnostics, and release identity.
+- The complete suite passes with `242` tests.
+- Standard and `/haunted-apex/` production builds pass at `347.51 kB` initial output.
+- Desktop rendering was inspected at `1440 x 1200`.
+- Chrome device emulation at `390 x 844` reported matching `390 px` viewport, document,
+  and body widths with no overflowing elements.
+- All temporary Angular and Chrome validation processes were stopped.
+
 ### Review Gate
 
 Review the central v0.3 question:

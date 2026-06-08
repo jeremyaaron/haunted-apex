@@ -5,19 +5,25 @@ import {
   STRATEGY_AGENTS,
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   formatBatchReport,
+  generateRoster,
+  getWeightedEvents,
   pressureDeltaToView,
   simulateBatch,
   type ActionCardView,
   type ActionId,
   type ActionTarget,
   type ActionTargetOption,
+  type AppliedModifierSource,
   type EventChoiceDefinition,
+  type HireCandidateView,
+  type OperativeId,
   type PressureDelta,
   type PressureDeltaView,
   type PressureId,
   type SpecialCost,
+  type StressTier,
 } from './engine';
-import { GameFacade } from './game';
+import { CURRENT_SAVE_SCHEMA_VERSION, GameFacade } from './game';
 
 type ActionCardUiView = ActionCardView & {
   targetOptions: ActionTargetOption[];
@@ -54,10 +60,25 @@ export class App {
   );
   protected readonly debugView = computed(() => {
     const state = this.game.state();
+    const generatedRoster = generateRoster(state.seed);
     const recentEventTags = state.eventLog
       .slice(-5)
       .flatMap((entry) => entry.tags ?? [])
       .filter((tag, index, tags) => tags.indexOf(tag) === index);
+    const operativeEvents = getWeightedEvents(state).flatMap((candidate) => {
+      if (candidate.event.kind !== 'operative') {
+        return [];
+      }
+
+      return [
+        {
+          eventId: candidate.event.id,
+          operativeId: candidate.event.operativeId,
+          weight: candidate.weight,
+          diagnostics: candidate.diagnostics,
+        },
+      ];
+    });
 
     return {
       seed: state.seed,
@@ -71,6 +92,30 @@ export class App {
       districtsJson: JSON.stringify(state.districts, null, 2),
       rivalsJson: JSON.stringify(state.rivals, null, 2),
       recentActivityJson: JSON.stringify(state.recentActivity, null, 2),
+      startingRosterIdsJson: JSON.stringify(generatedRoster.startingOperativeIds, null, 2),
+      hirePoolIdsJson: JSON.stringify(state.hirePool, null, 2),
+      operativeStateJson: JSON.stringify(state.operatives, null, 2),
+      recentAssignmentsJson: JSON.stringify(
+        state.operatives.map((operative) => ({
+          operativeId: operative.id,
+          assignments: operative.recentAssignments,
+        })),
+        null,
+        2,
+      ),
+      matchedSourcesJson: JSON.stringify(
+        this.actionViews().map((action) => ({
+          actionId: action.actionId,
+          target: action.selectedTarget,
+          operativeId: action.selectedOperative?.operativeId,
+          sources: action.selectedOperative?.appliedSources ?? [],
+        })),
+        null,
+        2,
+      ),
+      eligibleOperativeEventsJson: JSON.stringify(operativeEvents, null, 2),
+      seenSignatureEventsJson: JSON.stringify(state.seenSignatureEventIds, null, 2),
+      saveSchemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
       targetPreviewsJson: JSON.stringify(
         this.actionViews().map((action) => ({
           actionId: action.actionId,
@@ -180,11 +225,35 @@ export class App {
   }
 
   @HostListener('window:keydown', ['$event'])
-  protected toggleDebugPanel(event: KeyboardEvent): void {
+  protected handleKeyboard(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'd') {
       event.preventDefault();
       this.debugVisible.update((visible) => !visible);
+      return;
     }
+
+    if (event.key === 'Escape' && this.game.selectedOperativeDetail()) {
+      event.preventDefault();
+      this.closeOperativeDetail();
+    }
+  }
+
+  protected openOperativeDetail(operativeId: OperativeId): void {
+    this.game.selectOperative(operativeId);
+  }
+
+  protected closeOperativeDetail(): void {
+    this.game.selectOperative(undefined);
+  }
+
+  protected closeOperativeDetailFromBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeOperativeDetail();
+    }
+  }
+
+  protected dismissCompatibilityNotice(): void {
+    this.game.dismissCompatibilityNotice();
   }
 
   protected isAdvanceEnabled(): boolean {
@@ -242,6 +311,75 @@ export class App {
     return value > 0 ? `+${value}` : `${value}`;
   }
 
+  protected modifierEffects(source: AppliedModifierSource): string[] {
+    const effects = source.effects
+      ? this.deltaRows(source.effects).map(
+          (delta) => `${this.signed(delta.value)} ${this.pressureLabel(delta.id)}`,
+        )
+      : [];
+
+    return [
+      ...effects,
+      ...(source.riskModifier ? [`${this.signed(source.riskModifier)}% Risk`] : []),
+      ...(source.stressModifier ? [`${this.signed(source.stressModifier)} Stress`] : []),
+      ...(source.resourceCostModifier
+        ? [`${this.signed(source.resourceCostModifier)} Resource cost`]
+        : []),
+      ...(source.rivalPressureModifier
+        ? [`${this.signed(source.rivalPressureModifier)} Rival Pressure`]
+        : []),
+      ...(source.districtControlModifier
+        ? [`${this.signed(source.districtControlModifier)} Control`]
+        : []),
+    ];
+  }
+
+  protected hireCandidate(operativeId: OperativeId): HireCandidateView | undefined {
+    return this.game.hirePool().find((candidate) => candidate.id === operativeId);
+  }
+
+  protected projectedRosterCount(): number {
+    const queuedRecruits = this.game
+      .state()
+      .queuedOrders.filter((order) => order.target?.type === 'recruit').length;
+
+    return this.game.state().operatives.length + queuedRecruits + 1;
+  }
+
+  protected stressConsequence(tier: StressTier): string {
+    switch (tier) {
+      case 'stable':
+        return 'No Stress risk penalty.';
+      case 'strained':
+        return 'Adds 2% complication risk.';
+      case 'unstable':
+        return 'Adds 5% complication risk and invites harder personal fallout.';
+      case 'breaking':
+        return 'Adds 10% complication risk and severe personal fallout, but remains assignable.';
+    }
+  }
+
+  protected displayToken(value: string): string {
+    return value
+      .replace(/^op_/, '')
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  }
+
+  protected unavailableReason(reason: string | undefined): string {
+    switch (reason) {
+      case 'roster_full':
+        return 'Roster full: five active operatives is the current limit.';
+      case 'not_enough_resources':
+        return 'Insufficient Resources for this candidate.';
+      case 'recruit_already_queued':
+        return 'This candidate is already queued for recruitment.';
+      default:
+        return reason ? this.displayToken(reason) : '';
+    }
+  }
+
   protected initials(name: string): string {
     return name
       .split(' ')
@@ -258,16 +396,9 @@ export class App {
   private withSelectedOperative(card: ActionCardView): ActionCardUiView {
     const assignedOperativeId = this.selectedOperatives()[card.actionId];
     const target = this.selectedTargets()[card.actionId];
-    const preview =
-      this.game.getActionPreview(card.actionId, assignedOperativeId, target) ?? card;
-    const availability = this.game.getOrderAvailability(
-      card.actionId,
-      assignedOperativeId,
-      target,
-    );
-    const queued = this.game
-      .state()
-      .queuedOrders.some((order) => order.actionId === card.actionId);
+    const preview = this.game.getActionPreview(card.actionId, assignedOperativeId, target) ?? card;
+    const availability = this.game.getOrderAvailability(card.actionId, assignedOperativeId, target);
+    const queued = this.game.state().queuedOrders.some((order) => order.actionId === card.actionId);
 
     return {
       ...card,
@@ -296,7 +427,10 @@ export class App {
     if (id === 'dominion') {
       return Math.max(
         0,
-        Math.min(100, Math.round((value / DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) * 100)),
+        Math.min(
+          100,
+          Math.round((value / DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) * 100),
+        ),
       );
     }
 

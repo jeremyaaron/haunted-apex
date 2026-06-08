@@ -1,7 +1,7 @@
 <main class="black-ledger-shell">
   <header class="ledger-header">
     <div>
-      <p class="eyebrow">Rival Territory</p>
+      <p class="eyebrow">The Roster</p>
       <h1>The Black Ledger</h1>
       <p class="header-deck">Haunted Apex command channel // District Zero uplink</p>
     </div>
@@ -25,6 +25,18 @@
     </div>
   </header>
 
+  @if (game.compatibilityNotice(); as notice) {
+    <section class="compatibility-notice" role="status">
+      <div>
+        <strong>Save compatibility update</strong>
+        <p>{{ notice }}</p>
+      </div>
+      <button type="button" class="secondary" (click)="dismissCompatibilityNotice()">
+        Dismiss
+      </button>
+    </section>
+  }
+
   <section class="status-strip" aria-label="Run status">
     <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
     <span>{{ game.commandPointsRemaining() }} Command</span>
@@ -45,7 +57,11 @@
 
       <div class="pressure-list">
         @for (pressure of pressureViews(); track pressure.id) {
-          <div class="pressure-row" [class.warning]="pressure.status === 'warning'" [class.critical]="pressure.status === 'critical'">
+          <div
+            class="pressure-row"
+            [class.warning]="pressure.status === 'warning'"
+            [class.critical]="pressure.status === 'critical'"
+          >
             <div class="pressure-copy">
               <span>{{ pressure.label }}</span>
               <div>
@@ -73,10 +89,17 @@
       @if (game.state().phase === 'COMMAND') {
         <div class="action-grid">
           @for (action of actionViews(); track action.actionId) {
-            <article class="action-card" [class.queued]="action.state === 'queued'" [class.unavailable]="action.state === 'unavailable'">
+            <article
+              class="action-card"
+              [class.queued]="action.state === 'queued'"
+              [class.unavailable]="action.state === 'unavailable'"
+            >
               <div class="card-topline">
                 <h3>{{ action.label }}</h3>
-                <span class="risk" [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'">
+                <span
+                  class="risk"
+                  [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'"
+                >
                   Risk: {{ action.riskLabel }} {{ action.riskChance }}%
                 </span>
               </div>
@@ -88,13 +111,20 @@
 
               <div class="delta-list">
                 @for (delta of deltaRows(action.adjustedEffects); track delta.id) {
-                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                  <span [class.negative]="delta.value < 0"
+                    >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span
+                  >
                 }
               </div>
 
               @if (action.targetOptions.length > 0) {
                 <label class="target-control">
-                  <span>Target @if (action.requiresTarget) { <b>Required</b> }</span>
+                  <span
+                    >Target
+                    @if (action.requiresTarget) {
+                      <b>Required</b>
+                    }
+                  </span>
                   <select
                     [ngModel]="selectedTarget(action.actionId)"
                     (ngModelChange)="setSelectedTarget(action.actionId, $event)"
@@ -104,7 +134,10 @@
                     <option value="">
                       {{ action.requiresTarget ? 'Select a target' : 'No target' }}
                     </option>
-                    @for (option of action.targetOptions; track option.target.type + ':' + option.target.id) {
+                    @for (
+                      option of action.targetOptions;
+                      track option.target.type + ':' + option.target.id
+                    ) {
                       <option [value]="option.target.type + ':' + option.target.id">
                         {{ targetOptionLabel(option) }}
                       </option>
@@ -113,27 +146,78 @@
                 </label>
               }
 
-              <label class="assignment-control">
-                <span>Assign</span>
-                <select
-                  [ngModel]="selectedOperative(action.actionId)"
-                  (ngModelChange)="setSelectedOperative(action.actionId, $event)"
-                  [disabled]="action.availableOperatives.length === 0 || action.state === 'queued'"
-                >
-                  <option value="">No operative</option>
-                  @for (operative of action.availableOperatives; track operative.id) {
-                    <option [value]="operative.id" [disabled]="operative.disabled">
-                      {{ operative.name }}
-                    </option>
+              @if (action.actionId !== 'recruit_operative') {
+                <label class="assignment-control">
+                  <span>Assign</span>
+                  <select
+                    [ngModel]="selectedOperative(action.actionId)"
+                    (ngModelChange)="setSelectedOperative(action.actionId, $event)"
+                    [disabled]="
+                      action.availableOperatives.length === 0 || action.state === 'queued'
+                    "
+                    [attr.aria-label]="action.label + ' operative'"
+                  >
+                    <option value="">No operative</option>
+                    @for (operative of action.availableOperatives; track operative.id) {
+                      <option [value]="operative.id" [disabled]="operative.disabled">
+                        {{ operative.name }} · {{ operative.stressTier }}
+                      </option>
+                    }
+                  </select>
+                </label>
+              }
+
+              @if (action.selectedOperative; as selected) {
+                @if (selected.recruitCandidate) {
+                  @if (hireCandidate(selected.operativeId); as candidate) {
+                    <div class="selection-strip recruit-summary">
+                      <div>
+                        <span>Recruit candidate</span>
+                        <strong>{{ candidate.name }}</strong>
+                      </div>
+                      <p>{{ candidate.rarity }} · {{ candidate.roleTags.join(' / ') }}</p>
+                      <small>Projected roster: {{ projectedRosterCount() }} / 5</small>
+                    </div>
                   }
-                </select>
-              </label>
+                } @else {
+                  <div
+                    class="selection-strip assignment-summary"
+                    [class.breaking]="selected.projectedStressTier === 'breaking'"
+                  >
+                    <div>
+                      <span>Assignment fit</span>
+                      <strong>{{ selected.name }}</strong>
+                    </div>
+                    <p>
+                      {{ selected.stressTier }} {{ selected.stress }}
+                      →
+                      {{ selected.projectedStressTier }} {{ selected.projectedStress }} · Risk
+                      {{ action.riskChance }}%
+                    </p>
+                    @if (selected.appliedSources.length > 0) {
+                      <ul>
+                        @for (source of selected.appliedSources; track source.sourceId) {
+                          <li>
+                            <strong>{{ source.label }}</strong>
+                            <span>{{ modifierEffects(source).join(' · ') }}</span>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <small>No visible trait or affinity modifies this order.</small>
+                    }
+                  </div>
+                }
+              }
 
               @if (action.rivalAttention; as attention) {
                 <div class="impact-strip rival-warning">
                   <span>{{ attention.rivalName }}</span>
                   <strong>Pressure +{{ attention.pressureGain }}</strong>
-                  <small>{{ attention.currentPressure }} → {{ attention.projectedPressure }} / {{ attention.projectedTier }}</small>
+                  <small
+                    >{{ attention.currentPressure }} → {{ attention.projectedPressure }} /
+                    {{ attention.projectedTier }}</small
+                  >
                 </div>
               }
 
@@ -193,7 +277,9 @@
                   <small class="choice-meta">Cost: {{ formatCost(choice.cost) }}</small>
                   <small class="choice-effects">
                     @for (delta of deltaRows(choice.effects); track delta.id) {
-                      <b [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</b>
+                      <b [class.negative]="delta.value < 0"
+                        >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</b
+                      >
                     }
                   </small>
                 </button>
@@ -232,10 +318,14 @@
               </div>
               <div class="delta-list">
                 @for (delta of deltaRows(order.adjustedEffects); track delta.id) {
-                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                  <span [class.negative]="delta.value < 0"
+                    >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span
+                  >
                 }
               </div>
-              <button type="button" class="secondary" (click)="removeOrder(order.id)">Remove</button>
+              <button type="button" class="secondary" (click)="removeOrder(order.id)">
+                Remove
+              </button>
             </div>
           }
         } @else {
@@ -246,13 +336,22 @@
 
     <aside class="panel operative-panel">
       <div class="panel-heading">
-        <p class="panel-label">Operative Roster</p>
-        <h2>Assets</h2>
+        <div>
+          <p class="panel-label">Operative Roster</p>
+          <h2>Active Crew</h2>
+        </div>
+        <span class="panel-count">{{ game.roster().length }} / 5</span>
       </div>
 
       <div class="operative-list">
-        @for (operative of game.operatives(); track operative.id) {
-          <article class="operative-card">
+        @for (operative of game.roster(); track operative.id) {
+          <button
+            type="button"
+            class="operative-card"
+            [class]="'operative-card tier-' + operative.stressTier"
+            (click)="openOperativeDetail(operative.id)"
+            [attr.aria-label]="'Open dossier for ' + operative.name"
+          >
             <div class="operative-topline">
               <div class="portrait-slot">
                 <span>{{ initials(operative.name) }}</span>
@@ -263,39 +362,70 @@
               </div>
               <span class="status-pill">{{ operative.status }}</span>
             </div>
-            <dl>
+            <div class="identity-tags">
+              <span class="rarity-tag">{{ operative.rarity }}</span>
+              @for (role of operative.roleTags; track role) {
+                <span>{{ displayToken(role) }}</span>
+              }
+            </div>
+            <dl class="roster-metrics">
               <div>
                 <dt>Loyalty</dt>
                 <dd>{{ operative.loyalty }}</dd>
               </div>
               <div>
                 <dt>Stress</dt>
-                <dd>{{ operative.stress }}</dd>
-              </div>
-              <div>
-                <dt>Violence</dt>
-                <dd>{{ operative.violence }}</dd>
-              </div>
-              <div>
-                <dt>Charm</dt>
-                <dd>{{ operative.charm }}</dd>
-              </div>
-              <div>
-                <dt>Tech</dt>
-                <dd>{{ operative.tech }}</dd>
-              </div>
-              <div>
-                <dt>Subtlety</dt>
-                <dd>{{ operative.subtlety }}</dd>
+                <dd>{{ operative.stress }} · {{ operative.stressTier }}</dd>
               </div>
             </dl>
-            <div class="trait-list">
-              @for (trait of operative.traits; track trait) {
-                <span>{{ trait }}</span>
+            <div class="trait-summary">
+              <p><span>Signature</span>{{ operative.signatureTrait.name }}</p>
+              @if (operative.liabilityTrait; as liability) {
+                <p class="liability"><span>Liability</span>{{ liability.name }}</p>
               }
             </div>
-          </article>
+          </button>
         }
+      </div>
+
+      <div class="hire-pool">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Hire Pool</p>
+            <h2>Available Contacts</h2>
+          </div>
+          <span class="panel-count">{{ game.hirePool().length }}</span>
+        </div>
+
+        <div class="hire-list">
+          @for (candidate of game.hirePool(); track candidate.id) {
+            <button
+              type="button"
+              class="hire-card"
+              [class.unavailable]="!candidate.recruitable"
+              (click)="openOperativeDetail(candidate.id)"
+              [attr.aria-label]="'Open candidate dossier for ' + candidate.name"
+            >
+              <div class="hire-heading">
+                <div>
+                  <strong>{{ candidate.name }}</strong>
+                  <span>{{ candidate.archetype }}</span>
+                </div>
+                <b>{{ candidate.recruitCost }} R</b>
+              </div>
+              <div class="identity-tags">
+                <span class="rarity-tag">{{ candidate.rarity }}</span>
+                @for (role of candidate.roleTags; track role) {
+                  <span>{{ displayToken(role) }}</span>
+                }
+              </div>
+              <p>{{ candidate.signatureTrait.name }}</p>
+              @if (!candidate.recruitable) {
+                <small>{{ unavailableReason(candidate.unavailableReason) }}</small>
+              }
+            </button>
+          }
+        </div>
       </div>
     </aside>
   </section>
@@ -345,12 +475,24 @@
                     <span>{{ venue.archetype }}</span>
                   </div>
                   <div class="venue-modifiers">
-                    @if (venue.wealthMod) { <span>Wealth {{ signed(venue.wealthMod) }}</span> }
-                    @if (venue.intelMod) { <span>Intel {{ signed(venue.intelMod) }}</span> }
-                    @if (venue.dominionMod) { <span>Dominion {{ signed(venue.dominionMod) }}</span> }
-                    @if (venue.heatMod) { <span>Heat {{ signed(venue.heatMod) }}</span> }
-                    @if (venue.loyaltyMod) { <span>Loyalty {{ signed(venue.loyaltyMod) }}</span> }
-                    @if (venue.ruinMod) { <span>Ruin {{ signed(venue.ruinMod) }}</span> }
+                    @if (venue.wealthMod) {
+                      <span>Wealth {{ signed(venue.wealthMod) }}</span>
+                    }
+                    @if (venue.intelMod) {
+                      <span>Intel {{ signed(venue.intelMod) }}</span>
+                    }
+                    @if (venue.dominionMod) {
+                      <span>Dominion {{ signed(venue.dominionMod) }}</span>
+                    }
+                    @if (venue.heatMod) {
+                      <span>Heat {{ signed(venue.heatMod) }}</span>
+                    }
+                    @if (venue.loyaltyMod) {
+                      <span>Loyalty {{ signed(venue.loyaltyMod) }}</span>
+                    }
+                    @if (venue.ruinMod) {
+                      <span>Ruin {{ signed(venue.ruinMod) }}</span>
+                    }
                   </div>
                 </div>
               }
@@ -431,7 +573,9 @@
             @if (entry.pressureDelta) {
               <div class="delta-list">
                 @for (delta of deltaRows(entry.pressureDelta); track delta.id) {
-                  <span [class.negative]="delta.value < 0">{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span>
+                  <span [class.negative]="delta.value < 0"
+                    >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span
+                  >
                 }
               </div>
             }
@@ -456,89 +600,105 @@
         <p class="panel-label">Network Reference</p>
         <h2 id="field-guide-title">Field Guide</h2>
       </div>
-      <span class="panel-count">Rival Territory</span>
+      <span class="panel-count">The Roster</span>
     </div>
 
     <div class="guide-scroll">
       <div class="guide-intro">
         <strong>Build Dominion to 85 before week 8 closes.</strong>
         <p>
-          Heat at 100, Loyalty at 0, or Resources below 0 ends the run. Action cards
-          recalculate their displayed outcome and complication risk as targets and
-          operatives change.
+          Heat at 100, Loyalty at 0, or Resources below 0 ends the run. Action cards recalculate
+          their displayed outcome and complication risk as targets and operatives change.
         </p>
       </div>
 
       <details open>
         <summary>Running a week</summary>
         <p>
-          Each week begins on the Command Board with a pool of Command points. Queue
-          orders by choosing actions and paying the Command cost printed on each card.
-          You may assign an operative or select a target where the action allows it; the
-          card preview updates before you commit the order.
+          Each week begins on the Command Board with a pool of Command points. Queue orders by
+          choosing actions and paying the Command cost printed on each card. You may assign an
+          operative or select a target where the action allows it; the card preview updates before
+          you commit the order.
         </p>
         <p>
-          Queue at least one order, then Advance Week when your plan is ready. Queued
-          orders resolve in sequence, followed by weekly fallout and a city event. Choose
-          one event response to apply its consequences and begin the next week. Unspent
-          Command does not carry forward.
+          Queue at least one order, then Advance Week when your plan is ready. Queued orders resolve
+          in sequence, followed by weekly fallout and a city event. Choose one event response to
+          apply its consequences and begin the next week. Unspent Command does not carry forward.
         </p>
       </details>
 
       <details>
         <summary>Actions and risk</summary>
         <p>
-          Risk is the percentage chance that an order suffers a complication. A
-          complication worsens the resolved outcome; it is not the chance that the order
-          produces nothing.
+          Risk is the percentage chance that an order suffers a complication. A complication worsens
+          the resolved outcome; it is not the chance that the order produces nothing.
         </p>
         <p>
-          Gather Intel tests Subtlety, Small Jobs test Violence, and Bribe Official plus
-          Expand Influence test Charm. Higher relevant skill and Loyalty reduce risk.
-          Stress raises it, especially at 60 or higher. Some operatives also have
-          action-specific advantages already included in the preview.
+          Gather Intel tests Subtlety, Small Jobs test Violence, and Bribe Official plus Expand
+          Influence test Charm. Higher relevant skill and Loyalty reduce risk. Stress raises it,
+          especially at 60 or higher. Some operatives also have action-specific advantages already
+          included in the preview.
+        </p>
+      </details>
+
+      <details>
+        <summary>The roster, recruitment, and Stress</summary>
+        <p>
+          Every seed assembles three starting operatives and four visible hire candidates. Rarity
+          changes how often an operative appears, not whether they are stronger. Role tags are quick
+          strategic signals; dossiers provide the full stats, visible traits, liabilities,
+          affinities, and recent assignment history.
+        </p>
+        <p>
+          Stable, Strained, Unstable, and Breaking Stress tiers add progressively more complication
+          risk. Breaking operatives remain assignable, but using them invites severe personal
+          fallout. Action previews show the visible traits and affinities that currently match, plus
+          the projected Stress tier.
+        </p>
+        <p>
+          Recruitment is a normal queued order: select Recruit Operative on the Command Board,
+          choose a candidate, pay its Resource and Command costs, then advance the week. The active
+          roster can hold five operatives.
         </p>
       </details>
 
       <details>
         <summary>Districts, venues, and control</summary>
         <p>
-          Control is your network foothold in a district, not its ownership rating.
-          Higher Control reduces action risk at 40 and again at 70. Gather Intel, Small
-          Jobs, and Expand Influence can raise it. Rival ownership is fixed in this
-          release, so even high Control does not transfer a district or venue to you.
+          Control is your network foothold in a district, not its ownership rating. Higher Control
+          reduces action risk at 40 and again at 70. Gather Intel, Small Jobs, and Expand Influence
+          can raise it. Rival ownership is fixed in this release, so even high Control does not
+          transfer a district or venue to you.
         </p>
         <p>
-          Local Heat makes future work in that district riskier when it rises above the
-          district's base. It cools toward base each week. Venues modify only outcomes an
-          action already affects: Wealth modifies Resources, while the other labels match
-          their pressure meters.
+          Local Heat makes future work in that district riskier when it rises above the district's
+          base. It cools toward base each week. Venues modify only outcomes an action already
+          affects: Wealth modifies Resources, while the other labels match their pressure meters.
         </p>
       </details>
 
       <details>
         <summary>Rivals and pressure</summary>
         <p>
-          Targeting a rival or property they control raises that kingpin's Pressure.
-          Pressure status advances through Watching (0-24), Interested (25-49), Provoked
-          (50-74), and Retaliating (75-100). Higher Pressure also changes which city
-          events are likely to surface.
+          Targeting a rival or property they control raises that kingpin's Pressure. Pressure status
+          advances through Watching (0-24), Interested (25-49), Provoked (50-74), and Retaliating
+          (75-100). Higher Pressure also changes which city events are likely to surface.
         </p>
         <p>
-          At 40 Pressure, Knox can add Heat each week. Nyx can erode Loyalty each week
-          when your Intel is below 20. Attack names the pressure meter each rival prefers
-          to damage. Disposition and the remaining profile ratings are intelligence for
-          future systems; they do not modify actions in this release.
+          At 40 Pressure, Knox can add Heat each week. Nyx can erode Loyalty each week when your
+          Intel is below 20. Attack names the pressure meter each rival prefers to damage.
+          Disposition and the remaining profile ratings are intelligence for future systems; they do
+          not modify actions in this release.
         </p>
       </details>
 
       <details>
         <summary>Weekly fallout</summary>
         <p>
-          Every advance resolves queued orders, operative stress, network upkeep, local
-          cooling, rival reprisals, and one city event. The Event Feed records these
-          changes. Leave room for upkeep and retaliation instead of budgeting only around
-          the values printed on queued orders.
+          Every advance resolves queued orders, operative stress, network upkeep, local cooling,
+          rival reprisals, and one city event. The Event Feed records these changes. Leave room for
+          upkeep and retaliation instead of budgeting only around the values printed on queued
+          orders.
         </p>
       </details>
     </div>
@@ -621,6 +781,46 @@
           <pre>{{ debugView().recentActivityJson }}</pre>
         </div>
 
+        <div class="debug-block">
+          <h3>Save Schema</h3>
+          <pre>{{ debugView().saveSchemaVersion }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Generated Starting Roster IDs</h3>
+          <pre>{{ debugView().startingRosterIdsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Hire Pool IDs</h3>
+          <pre>{{ debugView().hirePoolIdsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Operative Mutable State</h3>
+          <pre>{{ debugView().operativeStateJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Recent Assignments</h3>
+          <pre>{{ debugView().recentAssignmentsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Matched Modifier Sources</h3>
+          <pre>{{ debugView().matchedSourcesJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Eligible Operative Events and Weights</h3>
+          <pre>{{ debugView().eligibleOperativeEventsJson }}</pre>
+        </div>
+
+        <div class="debug-block wide">
+          <h3>Seen Signature Event IDs</h3>
+          <pre>{{ debugView().seenSignatureEventsJson }}</pre>
+        </div>
+
         <div class="debug-block wide">
           <h3>Target Preview JSON</h3>
           <pre>{{ debugView().targetPreviewsJson }}</pre>
@@ -632,5 +832,130 @@
         </div>
       </div>
     </section>
+  }
+
+  @if (game.selectedOperativeDetail(); as detail) {
+    <div class="operative-detail-backdrop" (click)="closeOperativeDetailFromBackdrop($event)">
+      <section
+        class="operative-detail"
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="'operative-detail-' + detail.id"
+      >
+        <header class="detail-header">
+          <div>
+            <p class="panel-label">
+              {{ detail.candidate ? 'Hire Candidate' : 'Active Operative' }}
+            </p>
+            <h2 [id]="'operative-detail-' + detail.id">{{ detail.name }}</h2>
+            <p>{{ detail.archetype }} · {{ detail.rarity }}</p>
+          </div>
+          <button
+            type="button"
+            class="secondary detail-close"
+            autofocus
+            (click)="closeOperativeDetail()"
+          >
+            Close
+          </button>
+        </header>
+
+        @if (detail.quote) {
+          <blockquote>{{ detail.quote }}</blockquote>
+        }
+        <p class="dossier">{{ detail.dossier }}</p>
+
+        <div class="detail-status" [class]="'detail-status tier-' + detail.stressTier">
+          <div>
+            <span>Stress</span>
+            <strong>{{ detail.stress }} · {{ detail.stressTier }}</strong>
+          </div>
+          <p>{{ stressConsequence(detail.stressTier) }}</p>
+        </div>
+
+        <div class="detail-columns">
+          <section>
+            <h3>Profile</h3>
+            <div class="identity-tags">
+              @for (role of detail.roleTags; track role) {
+                <span>{{ displayToken(role) }}</span>
+              }
+            </div>
+            <dl class="detail-stats">
+              <div>
+                <dt>Loyalty</dt>
+                <dd>{{ detail.loyalty }}</dd>
+              </div>
+              <div>
+                <dt>Violence</dt>
+                <dd>{{ detail.baseStats.violence }}</dd>
+              </div>
+              <div>
+                <dt>Charm</dt>
+                <dd>{{ detail.baseStats.charm }}</dd>
+              </div>
+              <div>
+                <dt>Tech</dt>
+                <dd>{{ detail.baseStats.tech }}</dd>
+              </div>
+              <div>
+                <dt>Subtlety</dt>
+                <dd>{{ detail.baseStats.subtlety }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section>
+            <h3>Visible Traits</h3>
+            <div class="detail-traits">
+              <div>
+                <span>Signature</span>
+                <strong>{{ detail.signatureTrait.name }}</strong>
+                <p>{{ detail.signatureTrait.description }}</p>
+              </div>
+              @if (detail.liabilityTrait; as liability) {
+                <div class="liability">
+                  <span>Liability</span>
+                  <strong>{{ liability.name }}</strong>
+                  <p>{{ liability.description }}</p>
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+
+        <section class="detail-section">
+          <h3>Affinities</h3>
+          <ul>
+            @for (affinity of detail.affinities; track affinity) {
+              <li>{{ affinity }}</li>
+            }
+          </ul>
+        </section>
+
+        <section class="detail-section">
+          <h3>Recent Assignments</h3>
+          @if (detail.recentAssignments.length > 0) {
+            <div class="assignment-history">
+              @for (assignment of detail.recentAssignments; track assignment.id) {
+                <div>
+                  <strong
+                    >Week {{ assignment.week }} · {{ displayToken(assignment.actionId) }}</strong
+                  >
+                  <span>
+                    Stress {{ signed(assignment.stressDelta) }}
+                    @if (assignment.complication) {
+                      · Complication
+                    }
+                  </span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="muted">No recent assignments.</p>
+          }
+        </section>
+      </section>
+    </div>
   }
 </main>
