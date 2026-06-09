@@ -108,7 +108,7 @@
                 <span>{{ action.commandCost }} Command</span>
                 @if (action.ledgerCosts?.length) {
                   @for (cost of action.ledgerCosts; track cost.id) {
-                    <span>{{ cost.value }} {{ pressureLabel(cost.id) }}</span>
+                    <span>{{ ledgerCostText(cost) }}</span>
                   }
                   @if (action.ledgerConsumesEntry) {
                     <span>Consumes Entry</span>
@@ -245,6 +245,45 @@
                 </div>
               }
 
+              @if (action.secretDiscovery; as discovery) {
+                @if (discovery.eligible) {
+                  <div class="impact-strip secret-preview">
+                    <span>Secret Chance</span>
+                    <strong>{{ discovery.chance }}%</strong>
+                    <small>{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small>
+                  </div>
+                }
+              }
+
+              @if (action.ledgerUse; as ledgerUse) {
+                @if (ledgerUse.ok) {
+                  <div class="selection-strip ledger-use-preview">
+                    <div>
+                      <span>Ledger use</span>
+                      <strong>{{ ledgerUse.entryName }}</strong>
+                    </div>
+                    <p>{{ ledgerUse.useOptionLabel }} · Risk {{ ledgerUse.riskChance }}%</p>
+                    <div class="ledger-preview-rows">
+                      @for (cost of ledgerUse.costRows; track cost.id) {
+                        <span class="negative">{{ ledgerCostText(cost) }}</span>
+                      }
+                      @for (effect of deltaRows(ledgerUse.effects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @if (ledgerUse.consumesEntry) {
+                        <span>Consumes Entry</span>
+                      }
+                    </div>
+                  </div>
+                } @else if (action.selectedTarget?.type === 'ledger') {
+                  <p class="inline-warning">
+                    {{ actionUnavailableReason(ledgerUse.reason) }}
+                  </p>
+                }
+              }
+
               <button
                 type="button"
                 class="queue-button"
@@ -256,11 +295,7 @@
 
               @if (action.unavailableReason && action.state === 'unavailable') {
                 <p class="inline-warning">
-                  {{
-                    action.unavailableReason === 'target_required'
-                      ? 'Select a target to queue this order.'
-                      : action.unavailableReason
-                  }}
+                  {{ actionUnavailableReason(action.unavailableReason) }}
                 </p>
               }
             </article>
@@ -454,6 +489,157 @@
       </div>
     </aside>
   </section>
+
+  <section class="panel black-ledger-panel" aria-labelledby="black-ledger-title">
+    <div class="panel-heading">
+      <div>
+        <p class="panel-label">Black Ledger</p>
+        <h2 id="black-ledger-title">Secrets, Debts, and Favors</h2>
+      </div>
+      <span class="panel-count">{{ ledgerEntries().length }} entries</span>
+    </div>
+
+    <div class="ledger-summary-strip status-strip">
+      <span>{{ game.ledgerPanel().secrets.length }} Secrets</span>
+      <span>{{ game.ledgerPanel().debts.length }} Debts</span>
+      <span>{{ game.ledgerPanel().favors.length }} Favors</span>
+      <span>{{ game.ledgerPanel().consumed.length }} Spent / Resolved</span>
+    </div>
+
+    <div class="ledger-section-grid">
+      <section class="ledger-section">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Secrets</p>
+            <h3>Hidden Leverage</h3>
+          </div>
+          <span class="panel-count">{{ game.ledgerPanel().secrets.length }}</span>
+        </div>
+
+        @if (game.ledgerPanel().secrets.length > 0) {
+          @for (entry of game.ledgerPanel().secrets; track entry.id) {
+            <article class="ledger-entry-card kind-secret">
+              <ng-container
+                [ngTemplateOutlet]="ledgerEntryCard"
+                [ngTemplateOutletContext]="{ entry: entry }"
+              />
+            </article>
+          }
+        } @else {
+          <p class="muted">No active Secrets. Targeted Gather Intel can surface new leverage.</p>
+        }
+      </section>
+
+      <section class="ledger-section">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Debts</p>
+            <h3>Open Obligations</h3>
+          </div>
+          <span class="panel-count">{{ game.ledgerPanel().debts.length }}</span>
+        </div>
+
+        @if (game.ledgerPanel().debts.length > 0) {
+          @for (entry of game.ledgerPanel().debts; track entry.id) {
+            <article class="ledger-entry-card kind-debt">
+              <ng-container
+                [ngTemplateOutlet]="ledgerEntryCard"
+                [ngTemplateOutletContext]="{ entry: entry }"
+              />
+            </article>
+          }
+        } @else {
+          <p class="muted">No active Debts.</p>
+        }
+      </section>
+
+      <section class="ledger-section">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Favors</p>
+            <h3>Banked Openings</h3>
+          </div>
+          <span class="panel-count">{{ game.ledgerPanel().favors.length }}</span>
+        </div>
+
+        @if (game.ledgerPanel().favors.length > 0) {
+          @for (entry of game.ledgerPanel().favors; track entry.id) {
+            <article class="ledger-entry-card kind-favor">
+              <ng-container
+                [ngTemplateOutlet]="ledgerEntryCard"
+                [ngTemplateOutletContext]="{ entry: entry }"
+              />
+            </article>
+          }
+        } @else {
+          <p class="muted">No active Favors.</p>
+        }
+      </section>
+    </div>
+
+    <details class="spent-ledger-section">
+      <summary>Spent / Resolved Ledger Entries</summary>
+      @if (game.ledgerPanel().consumed.length > 0) {
+        <div class="spent-ledger-grid">
+          @for (entry of game.ledgerPanel().consumed; track entry.id) {
+            <article class="ledger-entry-card consumed">
+              <ng-container
+                [ngTemplateOutlet]="ledgerEntryCard"
+                [ngTemplateOutletContext]="{ entry: entry }"
+              />
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="muted">No spent or resolved entries yet.</p>
+      }
+    </details>
+  </section>
+
+  <ng-template #ledgerEntryCard let-entry="entry">
+    <div class="ledger-entry-heading">
+      <div>
+        <span>{{ displayToken(entry.kind) }}</span>
+        <h3>{{ entry.name }}</h3>
+      </div>
+      <b>{{ displayToken(entry.status) }}</b>
+    </div>
+    <p>{{ entry.description }}</p>
+    <dl class="ledger-entry-meta">
+      <div>
+        <dt>Created</dt>
+        <dd>Week {{ entry.createdWeek }}</dd>
+      </div>
+      <div>
+        <dt>Potency</dt>
+        <dd>{{ entry.potency }}</dd>
+      </div>
+      <div>
+        <dt>Source</dt>
+        <dd>{{ entry.sourceLabel }}</dd>
+      </div>
+      @if (entry.relatedContextLabel) {
+        <div>
+          <dt>Context</dt>
+          <dd>{{ entry.relatedContextLabel }}</dd>
+        </div>
+      }
+    </dl>
+    <div class="identity-tags ledger-tags">
+      @for (tag of entry.tags; track tag) {
+        <span>{{ displayToken(tag) }}</span>
+      }
+    </div>
+    @if (primaryLedgerUse(entry); as use) {
+      <div class="ledger-primary-use" [class.unavailable]="!use.affordable">
+        <strong>{{ use.label }}</strong>
+        <span>{{ ledgerUseSummary(use) }}</span>
+        @if (!use.affordable) {
+          <small>{{ ledgerUseUnavailableReason(use) }}</small>
+        }
+      </div>
+    }
+  </ng-template>
 
   <section class="territory-rival-grid" aria-label="Territory and rival intelligence">
     <section class="panel territory-panel">

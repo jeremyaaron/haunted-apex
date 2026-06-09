@@ -17,6 +17,7 @@ import {
   selectActionCards,
   selectAssignmentOptions,
   selectActionTargetOptions,
+  selectLedgerPanelView,
   selectDistrictTerritoryViews,
   selectHirePoolViews,
   selectOperativeDetail,
@@ -30,6 +31,7 @@ import {
   type EventChoiceAvailability,
   type EventChoicePreview,
   type GameState,
+  type LedgerPanelView,
   type NewGameConfig,
   type OrderAvailability,
   type OperativeOptionView,
@@ -67,6 +69,7 @@ export class GameFacade {
   );
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
+  readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
   readonly districts = computed(() => selectDistrictTerritoryViews(this.stateSignal()));
   readonly rivals = computed(() => selectRivalTerritoryViews(this.stateSignal()));
   readonly roster = computed(() => selectRosterViews(this.stateSignal()));

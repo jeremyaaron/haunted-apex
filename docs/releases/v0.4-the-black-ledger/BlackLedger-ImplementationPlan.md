@@ -810,6 +810,25 @@ Manual checks:
 - No clipped effect labels in compact cards.
 - No debug-only state is visible by default.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Exposed the engine-backed Ledger panel through `GameFacade`.
+- Added a visible Black Ledger panel with active Secrets, Debts, Favors, and a
+  collapsed Spent / Resolved section.
+- Rendered Ledger entry cards with kind, name, description, created week,
+  source/context, potency, tags, status, and primary use preview.
+- Kept `Work the Ledger` in the existing target dropdown flow and added action-card
+  previews for selected Ledger use costs, effects, risk, and consumption.
+- Rendered Ledger costs as negative pressure movement in command-card previews.
+- Added clear unavailable copy for unaffordable Ledger uses.
+- Added targeted `Gather Intel` `Secret Chance` previews.
+- Kept event-choice Ledger consequence chips visible next to pressure effects.
+- Added responsive Ledger panel styling for desktop, tablet, and mobile layouts.
+- Added UI tests for empty, active, consumed, dropdown, selected-use,
+  unaffordable-use, Secret Chance, and event-choice Ledger effect states.
+
 ### Review Gate
 
 Do a usability pass before adding run-end summary and harness metrics.

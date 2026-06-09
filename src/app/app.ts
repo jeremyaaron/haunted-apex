@@ -1,4 +1,5 @@
 import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   PRESSURE_IDS,
@@ -17,6 +18,9 @@ import {
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
   type HireCandidateView,
+  type LedgerDeltaRow,
+  type LedgerEntryView,
+  type LedgerUseOptionView,
   type OperativeId,
   type PressureDelta,
   type PressureDeltaView,
@@ -32,7 +36,7 @@ type ActionCardUiView = ActionCardView & {
 
 @Component({
   selector: 'app-root',
-  imports: [FormsModule],
+  imports: [FormsModule, NgTemplateOutlet],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
@@ -318,6 +322,74 @@ export class App {
     }
 
     return row.entryName;
+  }
+
+  protected ledgerEntries(): LedgerEntryView[] {
+    const panel = this.game.ledgerPanel();
+    return [
+      ...panel.secrets,
+      ...panel.debts,
+      ...panel.favors,
+      ...panel.consumed,
+    ];
+  }
+
+  protected primaryLedgerUse(entry: LedgerEntryView): LedgerUseOptionView | undefined {
+    return entry.useOptions[0];
+  }
+
+  protected ledgerDeltaText(row: LedgerDeltaRow): string {
+    return `${this.signed(row.value)} ${this.pressureLabel(row.id)}`;
+  }
+
+  protected ledgerCostText(row: LedgerDeltaRow): string {
+    return `${this.signed(-Math.abs(row.value))} ${this.pressureLabel(row.id)}`;
+  }
+
+  protected ledgerUseSummary(option: LedgerUseOptionView): string {
+    const rows = [...option.costRows, ...option.effectRows].map((row) =>
+      this.ledgerDeltaText(row),
+    );
+
+    if (option.consumesEntry) {
+      rows.push('Consumes Entry');
+    }
+
+    return rows.length > 0 ? rows.join(' · ') : 'No pressure change';
+  }
+
+  protected ledgerUseUnavailableReason(option: LedgerUseOptionView): string {
+    switch (option.unavailableReason) {
+      case 'insufficient_resources':
+        return 'Insufficient Resources';
+      case 'insufficient_intel':
+        return 'Insufficient Intel';
+      case 'entry_consumed':
+        return 'Entry already spent';
+      default:
+        return option.unavailableReason ? this.displayToken(option.unavailableReason) : '';
+    }
+  }
+
+  protected actionUnavailableReason(reason: string | undefined): string {
+    switch (reason) {
+      case 'target_required':
+        return 'Select a target to queue this order.';
+      case 'not_enough_resources':
+        return 'Insufficient Resources for this order.';
+      case 'not_enough_intel':
+        return 'Insufficient Intel for this Ledger use.';
+      case 'ledger_target_required':
+        return 'Select a Ledger entry and use option.';
+      case 'ledger_entry_unknown':
+        return 'That Ledger entry is no longer available.';
+      case 'ledger_entry_consumed':
+        return 'That Ledger entry has already been spent or resolved.';
+      case 'ledger_use_option_not_found':
+        return 'That Ledger use option is no longer available.';
+      default:
+        return reason ? this.displayToken(reason) : '';
+    }
   }
 
   protected pressureLabel(id: PressureId): string {
