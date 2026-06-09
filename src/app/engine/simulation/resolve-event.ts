@@ -1,4 +1,4 @@
-import { getEventDefinition } from '../content';
+import { getEventDefinition, getLedgerEntryDefinition } from '../content';
 import {
   applyEventLedgerEffects,
   eventLedgerEffectsAreAvailable,
@@ -92,7 +92,6 @@ export function resolveEventChoice(
   const flags = applyEventFlags(clearTransientFlags(state.flags), choice);
   let next: GameState = {
     ...state,
-    pendingEvent: undefined,
     pressures: applyPressureDelta(state.pressures, pressureDelta),
   };
   next = applyOperativeEffects(next, definition, choice);
@@ -103,10 +102,14 @@ export function resolveEventChoice(
   };
   const ledgerApplication = applyEventLedgerEffects(next, definition, choice);
   next = ledgerApplication.state;
+  next = {
+    ...next,
+    pendingEvent: undefined,
+  };
   next = appendLog(next, {
     type: 'event_choice',
     title: choice.label,
-    body: createEventChoiceLogBody(definition, ledgerApplication.appliedRows),
+    body: createEventChoiceLogBody(state, definition, ledgerApplication.appliedRows),
     pressureDelta,
     tags: definition.tags,
   });
@@ -319,6 +322,7 @@ function applyEventFlags(
 }
 
 function createEventChoiceLogBody(
+  state: GameState,
   definition: EventDefinition,
   ledgerRows: readonly EventLedgerEffectPreviewRow[],
 ): string {
@@ -326,7 +330,7 @@ function createEventChoiceLogBody(
     ? ` Ledger: ${ledgerRows.map(formatLedgerEffectRow).join('; ')}.`
     : '';
 
-  return `Response to ${definition.title}.${ledger}`;
+  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}`;
 }
 
 function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
@@ -346,6 +350,17 @@ function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
 
 function capitalize(value: string): string {
   return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+function renderEventTitle(state: GameState, title: string): string {
+  const selectedEntry = state.pendingEvent?.selectedLedgerEntryId
+    ? state.ledger.entries.find((entry) => entry.id === state.pendingEvent?.selectedLedgerEntryId)
+    : undefined;
+  const selectedDefinition = selectedEntry
+    ? getLedgerEntryDefinition(selectedEntry.definitionId)
+    : undefined;
+
+  return title.replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry');
 }
 
 function clearTransientFlags(

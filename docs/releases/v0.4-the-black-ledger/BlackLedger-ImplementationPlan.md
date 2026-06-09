@@ -714,6 +714,31 @@ Unit tests:
 - Recent-event penalties still apply.
 - Non-Ledger event weighting remains functional.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Extended pending weekly event state with optional `selectedLedgerEntryId`.
+- Added three Ledger-specific city events:
+  - `Debt Comes Due`
+  - `Leverage Window`
+  - `Favor Returned`
+- Added selected-entry event choices that resolve, consume, or preserve the specific
+  active Ledger entry selected for the weekly event.
+- Extended event weighting context with active Secret/Debt/Favor counts, oldest
+  entry ages, and active Ledger tags.
+- Added soft Ledger event weighting modifiers for active entries, older Debts,
+  Secret leverage pressure, and Favor comeback pressure.
+- Kept Ledger events in the normal weighted event pool, including normal recent
+  penalty behavior through event tags.
+- Weekly event selection now attaches the oldest active matching Ledger entry to
+  Ledger-specific pending events.
+- Rendered selected Ledger entry names in event title/body display and event logs.
+- Updated pending-event save validation for optional selected Ledger entry ids.
+- Added tests for Ledger event eligibility, weighting, age pressure, selected entry
+  persistence, selected-entry resolution/consumption/preservation, recent penalties,
+  and mixed Ledger/non-Ledger event pools.
+
 ### Review Gate
 
 Run harness smoke tests to confirm Ledger events appear but do not dominate the pool.

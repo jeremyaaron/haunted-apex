@@ -338,4 +338,118 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
       },
     ],
   },
+  {
+    kind: 'city',
+    id: 'ledger_debt_comes_due',
+    title: 'Debt Comes Due: {ledgerEntryName}',
+    text: 'The Ledger lights up around {ledgerEntryName}. Whoever holds the claim has stopped waiting politely.',
+    tags: ['LEDGER', 'RESOURCE', 'LOYALTY'],
+    baseWeight: 0,
+    choices: [
+      {
+        id: 'pay_what_is_owed',
+        label: 'Pay what is owed',
+        cost: { resources: 950 },
+        effects: { loyalty: 3, ruin: -1 },
+        ledgerEffects: [
+          {
+            type: 'resolve',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+      {
+        id: 'offer_information_instead',
+        label: 'Offer information instead',
+        cost: { intel: 5 },
+        effects: { heat: -3 },
+        ledgerEffects: [
+          {
+            type: 'resolve',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+      {
+        id: 'refuse_the_claim',
+        label: 'Refuse the claim',
+        effects: { loyalty: -5, heat: 4, ruin: 2 },
+      },
+    ],
+  },
+  {
+    kind: 'city',
+    id: 'ledger_leverage_window',
+    title: 'Leverage Window: {ledgerEntryName}',
+    text: '{ledgerEntryName} is suddenly worth more than it was yesterday. The city has given you a narrow opening.',
+    tags: ['LEDGER', 'OPPORTUNITY', 'RUIN'],
+    baseWeight: 0,
+    choices: [
+      {
+        id: 'use_the_leverage',
+        label: 'Use the leverage',
+        effects: { dominion: 6, heat: -4, ruin: 2 },
+        ledgerEffects: [
+          {
+            type: 'consume',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+      {
+        id: 'hold_it',
+        label: 'Hold it',
+        effects: { intel: 3 },
+      },
+      {
+        id: 'sell_it_quietly',
+        label: 'Sell it quietly',
+        cost: { intel: 3 },
+        effects: { resources: 1200, ruin: 1 },
+        ledgerEffects: [
+          {
+            type: 'consume',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    kind: 'city',
+    id: 'ledger_favor_returned',
+    title: 'Favor Returned: {ledgerEntryName}',
+    text: '{ledgerEntryName} is ready to answer, but favors hate being held under bright lights.',
+    tags: ['LEDGER', 'OPPORTUNITY', 'HEAT'],
+    baseWeight: 0,
+    choices: [
+      {
+        id: 'call_it_in_now',
+        label: 'Call it in now',
+        effects: { heat: -8, loyalty: 3 },
+        ledgerEffects: [
+          {
+            type: 'consume',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+      {
+        id: 'ask_for_money',
+        label: 'Ask for money',
+        effects: { resources: 1000 },
+        ledgerEffects: [
+          {
+            type: 'consume',
+            entrySelector: { type: 'selected_entry' },
+          },
+        ],
+      },
+      {
+        id: 'save_the_favor',
+        label: 'Save the favor',
+        effects: { intel: 2 },
+      },
+    ],
+  },
 ] as const;

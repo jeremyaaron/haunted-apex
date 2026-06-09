@@ -597,7 +597,9 @@ function isPendingEvent(value: unknown): boolean {
     typeof value['id'] === 'string' &&
     typeof value['definitionId'] === 'string' &&
     getEventDefinition(value['definitionId']) !== undefined &&
-    isPositiveInteger(value['week'])
+    isPositiveInteger(value['week']) &&
+    (value['selectedLedgerEntryId'] === undefined ||
+      typeof value['selectedLedgerEntryId'] === 'string')
   );
 }
 

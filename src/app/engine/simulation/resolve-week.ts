@@ -1,4 +1,5 @@
-import type { GameState, QueuedOrder } from '../model';
+import { getLedgerEntryDefinition } from '../content';
+import type { GameEventInstance, GameState, QueuedOrder } from '../model';
 import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
 import { applyLocalDistrictCooling } from './district-effects';
@@ -93,8 +94,8 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
         id: `log_${next.week}_${next.eventLog.length + 1}_event_presented`,
         week: next.week,
         type: 'event_presented',
-        title: selectedEvent.definition.title,
-        body: selectedEvent.definition.text,
+        title: renderSelectedEventText(next, selectedEvent.event, selectedEvent.definition.title),
+        body: renderSelectedEventText(next, selectedEvent.event, selectedEvent.definition.text),
         tags: selectedEvent.definition.tags,
       },
     ],
@@ -107,4 +108,22 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
     eventCandidates,
     orderResolutions,
   };
+}
+
+function renderSelectedEventText(
+  state: GameState,
+  event: GameEventInstance,
+  text: string,
+): string {
+  const selectedLedgerEntry = event.selectedLedgerEntryId
+    ? state.ledger.entries.find((entry) => entry.id === event.selectedLedgerEntryId)
+    : undefined;
+  const selectedLedgerDefinition = selectedLedgerEntry
+    ? getLedgerEntryDefinition(selectedLedgerEntry.definitionId)
+    : undefined;
+
+  return text.replaceAll(
+    '{ledgerEntryName}',
+    selectedLedgerDefinition?.name ?? 'Ledger Entry',
+  );
 }

@@ -1,10 +1,12 @@
-import { DISTRICT_ZERO_EVENTS } from '../content';
+import { DISTRICT_ZERO_EVENTS, getLedgerEntryDefinition } from '../content';
 import type {
   DistrictId,
   EventDefinition,
   EventTag,
   GameEventInstance,
   GameState,
+  LedgerEntry,
+  LedgerEntryKind,
   OperativeEventDefinition,
   RivalId,
 } from '../model';
@@ -42,6 +44,13 @@ export type EventWeightContext = {
   recentDistrictIds: Set<DistrictId>;
   rivalPressures: Record<RivalId, number>;
   districtHeat: Record<DistrictId, number>;
+  activeSecrets: number;
+  activeDebts: number;
+  activeFavors: number;
+  oldestDebtAge: number;
+  oldestSecretAge: number;
+  oldestFavorAge: number;
+  ledgerTags: Set<string>;
 };
 
 export type EventWeightModifierId =
@@ -53,7 +62,13 @@ export type EventWeightModifierId =
   | 'recent_high_local_heat'
   | 'operative_eligible'
   | 'operative_stress'
-  | 'operative_recent_assignment';
+  | 'operative_recent_assignment'
+  | 'active_debts'
+  | 'old_debt'
+  | 'active_secrets'
+  | 'leverage_pressure'
+  | 'active_favors'
+  | 'favor_comeback';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -131,6 +146,19 @@ export function buildEventWeightContext(state: GameState): EventWeightContext {
   const recentTargetTags = new Set<string>();
   const recentRivalIds = new Set<RivalId>();
   const recentDistrictIds = new Set<DistrictId>();
+  const activeLedgerEntries = state.ledger.entries.filter((entry) => !entry.consumed);
+  const activeSecrets = activeLedgerEntries.filter((entry) => entry.kind === 'secret');
+  const activeDebts = activeLedgerEntries.filter((entry) => entry.kind === 'debt');
+  const activeFavors = activeLedgerEntries.filter((entry) => entry.kind === 'favor');
+  const ledgerTags = new Set<string>();
+
+  for (const entry of activeLedgerEntries) {
+    const definition = getLedgerDefinition(entry);
+
+    for (const tag of definition?.tags ?? []) {
+      ledgerTags.add(tag);
+    }
+  }
 
   for (const activity of state.recentActivity) {
     for (const tag of activity.targetTags) {
@@ -161,6 +189,13 @@ export function buildEventWeightContext(state: GameState): EventWeightContext {
       district_chrome_narrows: state.districts.district_chrome_narrows.heat,
       district_ghostline_market: state.districts.district_ghostline_market.heat,
     },
+    activeSecrets: activeSecrets.length,
+    activeDebts: activeDebts.length,
+    activeFavors: activeFavors.length,
+    oldestDebtAge: getOldestLedgerAge(state, activeDebts),
+    oldestSecretAge: getOldestLedgerAge(state, activeSecrets),
+    oldestFavorAge: getOldestLedgerAge(state, activeFavors),
+    ledgerTags,
   };
 }
 
@@ -252,6 +287,37 @@ function getContextModifiers(
     modifiers.push({ id: 'recent_high_local_heat', amount: 4 });
   }
 
+  if (event.id === 'ledger_debt_comes_due' && context.activeDebts > 0) {
+    modifiers.push({ id: 'active_debts', amount: Math.min(10, 5 + context.activeDebts * 2) });
+
+    if (context.oldestDebtAge >= 2) {
+      modifiers.push({ id: 'old_debt', amount: Math.min(8, context.oldestDebtAge * 2) });
+    }
+
+    if (state.pressures.heat >= 60 || state.pressures.loyalty <= 45) {
+      modifiers.push({ id: 'leverage_pressure', amount: 4 });
+    }
+  }
+
+  if (event.id === 'ledger_leverage_window' && context.activeSecrets > 0) {
+    modifiers.push({
+      id: 'active_secrets',
+      amount: Math.min(9, 4 + context.activeSecrets * 2),
+    });
+
+    if (context.oldestSecretAge >= 2 || state.pressures.dominion < 45 || state.pressures.heat >= 65) {
+      modifiers.push({ id: 'leverage_pressure', amount: 5 });
+    }
+  }
+
+  if (event.id === 'ledger_favor_returned' && context.activeFavors > 0) {
+    modifiers.push({ id: 'active_favors', amount: Math.min(8, 3 + context.activeFavors * 2) });
+
+    if (state.pressures.heat >= 65 || state.pressures.loyalty <= 40 || state.pressures.resources <= 1000) {
+      modifiers.push({ id: 'favor_comeback', amount: 6 });
+    }
+  }
+
   return modifiers;
 }
 
@@ -267,6 +333,8 @@ function createSelection(
   selected: WeightedEvent,
   rng: RngState,
 ): EventSelection {
+  const selectedLedgerEntry = selectLedgerEntryForEvent(state, selected.event);
+
   return {
     definition: selected.event,
     rng,
@@ -275,8 +343,46 @@ function createSelection(
       id: `event_${state.week}_${rng.cursor}`,
       definitionId: selected.event.id,
       week: state.week,
+      ...(selectedLedgerEntry ? { selectedLedgerEntryId: selectedLedgerEntry.id } : {}),
     },
   };
+}
+
+function selectLedgerEntryForEvent(
+  state: GameState,
+  event: EventDefinition,
+): LedgerEntry | undefined {
+  switch (event.id) {
+    case 'ledger_debt_comes_due':
+      return selectOldestActiveLedgerEntry(state, 'debt');
+    case 'ledger_leverage_window':
+      return selectOldestActiveLedgerEntry(state, 'secret');
+    case 'ledger_favor_returned':
+      return selectOldestActiveLedgerEntry(state, 'favor');
+    default:
+      return undefined;
+  }
+}
+
+function selectOldestActiveLedgerEntry(
+  state: GameState,
+  kind: LedgerEntryKind,
+): LedgerEntry | undefined {
+  return state.ledger.entries
+    .filter((entry) => entry.kind === kind && !entry.consumed)
+    .sort((left, right) => left.createdWeek - right.createdWeek || left.id.localeCompare(right.id))[0];
+}
+
+function getOldestLedgerAge(state: GameState, entries: readonly LedgerEntry[]): number {
+  if (entries.length === 0) {
+    return 0;
+  }
+
+  return Math.max(...entries.map((entry) => Math.max(0, state.week - entry.createdWeek)));
+}
+
+function getLedgerDefinition(entry: LedgerEntry) {
+  return getLedgerEntryDefinition(entry.definitionId);
 }
 
 function getRecentPenaltyTags(state: GameState): Set<EventTag> {

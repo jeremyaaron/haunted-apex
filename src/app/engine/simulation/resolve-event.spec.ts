@@ -220,6 +220,71 @@ describe('resolveEventChoice', () => {
     expect(result.state.ledger.consumedCount).toBe(1);
   });
 
+  it('resolves the selected Debt for Debt Comes Due', () => {
+    const withDebt = addLedgerEntry(withPendingEvent('ledger_debt_comes_due'), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const state = {
+      ...withDebt,
+      pendingEvent: {
+        ...withDebt.pendingEvent!,
+        selectedLedgerEntryId: withDebt.ledger.entries[0].id,
+      },
+    };
+    const preview = getEventChoicePreview(state, 'event_1_1', 'pay_what_is_owed');
+    const result = resolveEventChoice(state, 'event_1_1', 'pay_what_is_owed');
+
+    if (!result.ok) {
+      fail(`Expected selected Debt resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(preview?.ledgerEffects).toEqual([
+      jasmine.objectContaining({
+        type: 'resolve',
+        entryName: 'Owes the Liaison',
+        available: true,
+        entryId: withDebt.ledger.entries[0].id,
+      }),
+    ]);
+    expect(result.state.ledger.entries[0].consumed).toBeTrue();
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Response to Debt Comes Due: Owes the Liaison.',
+    );
+  });
+
+  it('can preserve or consume the selected Secret from Leverage Window', () => {
+    const withSecret = addLedgerEntry(withPendingEvent('ledger_leverage_window'), {
+      definitionId: 'secret_dead_channel_trace',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const state = {
+      ...withSecret,
+      pendingEvent: {
+        ...withSecret.pendingEvent!,
+        selectedLedgerEntryId: withSecret.ledger.entries[0].id,
+      },
+    };
+    const held = resolveEventChoice(state, 'event_1_1', 'hold_it');
+    const used = resolveEventChoice(state, 'event_1_1', 'use_the_leverage');
+
+    if (!held.ok || !used.ok) {
+      fail('Expected Leverage Window choices to resolve');
+      return;
+    }
+
+    expect(held.state.ledger.entries[0].consumed).toBeFalse();
+    expect(used.state.ledger.entries[0].consumed).toBeTrue();
+  });
+
   it('leaves optional Ledger resolution choices affordable without a matching entry', () => {
     const state = withPendingEvent('operative_wants_more');
 

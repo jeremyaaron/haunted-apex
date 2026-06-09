@@ -6,6 +6,7 @@ import {
   getEventDefinition,
   getEventChoiceAvailability,
   getEventChoicePreview,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
   getOrderAvailability,
@@ -100,7 +101,17 @@ export class GameFacade {
   readonly commandPointsRemaining = computed(() => getCommandPointsRemaining(this.stateSignal()));
   readonly pendingEventDefinition = computed(() => {
     const pendingEvent = this.stateSignal().pendingEvent;
-    return pendingEvent ? getEventDefinition(pendingEvent.definitionId) : undefined;
+    const definition = pendingEvent ? getEventDefinition(pendingEvent.definitionId) : undefined;
+
+    if (!pendingEvent || !definition) {
+      return undefined;
+    }
+
+    return {
+      ...definition,
+      title: renderPendingEventText(this.stateSignal(), definition.title),
+      text: renderPendingEventText(this.stateSignal(), definition.text),
+    };
   });
 
   constructor() {
@@ -253,6 +264,21 @@ export class GameFacade {
     this.stateSignal.set(state);
     this.storage.saveCurrentRun(state);
   }
+}
+
+function renderPendingEventText(state: GameState, text: string): string {
+  const selectedLedgerEntryId = state.pendingEvent?.selectedLedgerEntryId;
+  const selectedLedgerEntry = selectedLedgerEntryId
+    ? state.ledger.entries.find((entry) => entry.id === selectedLedgerEntryId)
+    : undefined;
+  const selectedLedgerDefinition = selectedLedgerEntry
+    ? getLedgerEntryDefinition(selectedLedgerEntry.definitionId)
+    : undefined;
+
+  return text.replaceAll(
+    '{ledgerEntryName}',
+    selectedLedgerDefinition?.name ?? 'Ledger Entry',
+  );
 }
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {

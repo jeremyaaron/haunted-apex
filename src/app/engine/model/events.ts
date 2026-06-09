@@ -25,7 +25,10 @@ export type EventId =
   | 'event_saint_lie_comes_due'
   | 'event_knox_blood_applause'
   | 'event_iris_velvet_access'
-  | 'event_orchid_route_memory';
+  | 'event_orchid_route_memory'
+  | 'ledger_debt_comes_due'
+  | 'ledger_leverage_window'
+  | 'ledger_favor_returned';
 
 export type EventTag =
   | 'HEAT'
@@ -40,7 +43,8 @@ export type EventTag =
   | 'INTEL'
   | 'CORP'
   | 'BLACKMAIL'
-  | 'OPERATIVE';
+  | 'OPERATIVE'
+  | 'LEDGER';
 
 export type EventWeightRule = {
   pressure?: PressureId;
@@ -136,4 +140,5 @@ export type GameEventInstance = {
   id: string;
   definitionId: EventId;
   week: number;
+  selectedLedgerEntryId?: LedgerEntryId;
 };

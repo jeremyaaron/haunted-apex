@@ -167,7 +167,7 @@ function selectLedgerEntry(
     case 'kind':
       return activeEntries.find((entry) => entry.kind === selector.kind);
     case 'selected_entry':
-      return undefined;
+      return activeEntries.find((entry) => entry.id === state.pendingEvent?.selectedLedgerEntryId);
   }
 
   return undefined;
@@ -198,7 +198,7 @@ function consumeLedgerEntry(
     }`,
     body: `${choice.label} ${
       effectType === 'resolve' ? 'resolved' : 'consumed'
-    } this Ledger entry during ${definition.title}.`,
+    } this Ledger entry during ${renderEventTitle(state, definition.title)}.`,
     tags: [
       'LEDGER',
       effectType.toUpperCase(),
@@ -236,4 +236,15 @@ function consumeLedgerEntry(
       },
     ],
   };
+}
+
+function renderEventTitle(state: GameState, title: string): string {
+  const selectedEntry = state.pendingEvent?.selectedLedgerEntryId
+    ? state.ledger.entries.find((entry) => entry.id === state.pendingEvent?.selectedLedgerEntryId)
+    : undefined;
+  const selectedDefinition = selectedEntry
+    ? getLedgerEntryDefinition(selectedEntry.definitionId)
+    : undefined;
+
+  return title.replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry');
 }

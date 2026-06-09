@@ -1,4 +1,5 @@
 import { DISTRICT_ZERO_EVENTS } from '../content';
+import { addLedgerEntry } from '../ledger';
 import type { GameLogEntry, GameState, RecentActivityEntry, RivalId } from '../model';
 import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
@@ -219,6 +220,126 @@ describe('weekly event selection', () => {
     ).toBeFalse();
   });
 
+  it('keeps Ledger events ineligible without matching active entries', () => {
+    const state = newGame({ seed: 'LEDGER-NO-EVENTS' });
+    const weighted = getWeightedEvents(state);
+
+    expect(weighted.some((candidate) => candidate.event.id === 'ledger_debt_comes_due')).toBeFalse();
+    expect(weighted.some((candidate) => candidate.event.id === 'ledger_leverage_window')).toBeFalse();
+    expect(weighted.some((candidate) => candidate.event.id === 'ledger_favor_returned')).toBeFalse();
+  });
+
+  it('weights Debt Comes Due with active Debt count and age', () => {
+    const youngDebt = addLedgerEntry(newGame({ seed: 'LEDGER-DEBT-YOUNG' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const oldDebt = {
+      ...youngDebt,
+      week: 4,
+    };
+    const youngWeighted = requireWeightedEvent(youngDebt, 'ledger_debt_comes_due');
+    const oldWeighted = requireWeightedEvent(oldDebt, 'ledger_debt_comes_due');
+    const context = buildEventWeightContext(oldDebt);
+
+    expect(context.activeDebts).toBe(1);
+    expect(context.oldestDebtAge).toBe(3);
+    expect(oldWeighted.weight).toBeGreaterThan(youngWeighted.weight);
+    expect(modifierIdsFor(oldDebt, 'ledger_debt_comes_due')).toContain('old_debt');
+  });
+
+  it('weights Leverage Window only with active Secrets', () => {
+    const withSecret = addLedgerEntry(newGame({ seed: 'LEDGER-SECRET' }), {
+      definitionId: 'secret_dead_channel_trace',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const weighted = requireWeightedEvent(withSecret, 'ledger_leverage_window');
+
+    expect(weighted.weight).toBeGreaterThan(0);
+    expect(modifierIdsFor(withSecret, 'ledger_leverage_window')).toContain('active_secrets');
+  });
+
+  it('weights Favor Returned only with active Favors and comeback pressure', () => {
+    const base = addLedgerEntry(newGame({ seed: 'LEDGER-FAVOR' }), {
+      definitionId: 'favor_checkpoint_captain',
+      source: {
+        type: 'event',
+        eventId: 'rival_sends_flowers',
+        choiceId: 'display_them',
+      },
+    });
+    const pressured = {
+      ...base,
+      pressures: {
+        ...base.pressures,
+        heat: 70,
+      },
+    };
+    const weighted = requireWeightedEvent(pressured, 'ledger_favor_returned');
+
+    expect(weighted.weight).toBeGreaterThan(0);
+    expect(modifierIdsFor(pressured, 'ledger_favor_returned')).toContain('favor_comeback');
+  });
+
+  it('keeps non-Ledger events available when Ledger events enter the pool', () => {
+    const withLedger = addLedgerEntry(newGame({ seed: 'LEDGER-MIXED-POOL' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const weighted = getWeightedEvents(withLedger);
+
+    expect(weighted.some((candidate) => candidate.event.id === 'ledger_debt_comes_due')).toBeTrue();
+    expect(weighted.some((candidate) => !candidate.event.id.startsWith('ledger_'))).toBeTrue();
+  });
+
+  it('preserves selected Ledger entry id on selected Ledger events', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-SELECT-9' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const selected = findSelection(state, 'ledger_debt_comes_due');
+
+    expect(selected.event.selectedLedgerEntryId).toBe(state.ledger.entries[0].id);
+  });
+
+  it('applies recent penalties to Ledger events through normal event tags', () => {
+    const base = addLedgerEntry(newGame({ seed: 'LEDGER-PENALTY' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const penalized = {
+      ...base,
+      eventLog: [
+        presentedLog('unexpected_windfall', ['RESOURCE']),
+        presentedLog('operative_wants_more', ['RESOURCE']),
+      ],
+    };
+    const baselineWeight = requireWeightedEvent(base, 'ledger_debt_comes_due').weight;
+    const penalizedEvent = requireWeightedEvent(penalized, 'ledger_debt_comes_due');
+
+    expect(penalizedEvent.diagnostics.recentPenaltyApplied).toBeTrue();
+    expect(penalizedEvent.weight).toBeLessThan(baselineWeight);
+  });
+
   it('keeps seeded operative-event selection deterministic', () => {
     const juno = materializeOperativeState('op_juno_hex');
     juno.stress = 70;
@@ -321,4 +442,19 @@ function requireWeightedEvent(state: GameState, eventId: string) {
   }
 
   return weighted;
+}
+
+function findSelection(state: GameState, eventId: string) {
+  for (let index = 1; index <= 500; index += 1) {
+    const selection = selectWeeklyEvent({
+      ...state,
+      seed: `LEDGER-SELECT-${index}`,
+    });
+
+    if (selection.definition.id === eventId) {
+      return selection;
+    }
+  }
+
+  throw new Error(`Expected to select ${eventId}`);
 }
