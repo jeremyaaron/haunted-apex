@@ -136,9 +136,9 @@
                     </option>
                     @for (
                       option of action.targetOptions;
-                      track option.target.type + ':' + option.target.id
+                      track targetOptionValue(option)
                     ) {
-                      <option [value]="option.target.type + ':' + option.target.id">
+                      <option [value]="targetOptionValue(option)">
                         {{ targetOptionLabel(option) }}
                       </option>
                     }

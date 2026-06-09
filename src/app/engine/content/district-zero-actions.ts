@@ -101,6 +101,18 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     requiresTarget: false,
     allowedTargetTypes: ['district', 'venue'],
   },
+  {
+    id: 'work_the_ledger',
+    label: 'Work the Ledger',
+    commandCost: 1,
+    resourceCost: 0,
+    effects: {},
+    baseRisk: 0,
+    stressType: 'none',
+    assignment: 'none',
+    requiresTarget: true,
+    allowedTargetTypes: ['ledger'],
+  },
 ] as const;
 
 export function getActionDefinition(actionId: ActionId): ActionDefinition | undefined {

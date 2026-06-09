@@ -699,6 +699,14 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
             id: id as OperativeId,
           }
         : undefined;
+    case 'ledger':
+      return typeof value['entryId'] === 'string' && typeof value['useOptionId'] === 'string'
+        ? {
+            type: 'ledger',
+            entryId: value['entryId'],
+            useOptionId: value['useOptionId'],
+          }
+        : undefined;
     default:
       return undefined;
   }

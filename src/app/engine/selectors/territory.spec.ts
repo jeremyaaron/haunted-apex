@@ -1,4 +1,5 @@
-import type { GameState } from '../model';
+import type { ActionTarget, GameState } from '../model';
+import { addLedgerEntry } from '../ledger';
 import { newGame } from '../simulation';
 import {
   getTargetControllerId,
@@ -16,7 +17,7 @@ describe('territory selectors', () => {
       'gather_intel',
     );
 
-    expect(options.map((option) => `${option.target.type}:${option.target.id}`)).toEqual([
+    expect(options.map((option) => targetKey(option.target))).toEqual([
       'district:district_violet_ward',
       'district:district_chrome_narrows',
       'district:district_ghostline_market',
@@ -40,9 +41,71 @@ describe('territory selectors', () => {
     ).toEqual(['district', 'district', 'district', 'venue', 'venue', 'venue', 'venue']);
     expect(
       selectActionTargetOptions(state, 'recruit_operative').map(
-        (option) => `${option.targetType}:${option.target.id}`,
+        (option) => `${option.targetType}:${targetKey(option.target).split(':').at(-1)}`,
       ),
     ).toEqual(state.hirePool.map((operativeId) => `recruit:${operativeId}`));
+  });
+
+  it('returns Ledger target options for active entries and use options', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-TARGETS' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const entryId = state.ledger.entries[0].id;
+    const options = selectActionTargetOptions(state, 'work_the_ledger');
+
+    expect(options).toEqual([
+      jasmine.objectContaining({
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'pay_in_credits',
+        },
+        label: 'Owes the Liaison - Pay in Credits',
+        targetType: 'ledger',
+        entryName: 'Owes the Liaison',
+        useOptionLabel: 'Pay in Credits',
+        kind: 'debt',
+        affordable: true,
+      }),
+      jasmine.objectContaining({
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'offer_information',
+        },
+        label: 'Owes the Liaison - Offer Information',
+        targetType: 'ledger',
+        useOptionLabel: 'Offer Information',
+      }),
+    ]);
+  });
+
+  it('omits consumed Ledger entries from Ledger target options', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-SPENT-TARGETS' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const consumed = {
+      ...state,
+      ledger: {
+        ...state.ledger,
+        entries: state.ledger.entries.map((entry) => ({
+          ...entry,
+          consumed: true,
+        })),
+        consumedCount: 1,
+      },
+    };
+
+    expect(selectActionTargetOptions(consumed, 'work_the_ledger')).toEqual([]);
   });
 
   it('exposes authored recruit candidate metadata in hire-pool order', () => {
@@ -67,13 +130,15 @@ describe('territory selectors', () => {
       (option) => option.targetType === 'rival',
     );
 
-    expect(rivalTargets.map((option) => option.target.id)).toEqual(['rival_knox_marrow']);
+    expect(rivalTargets.map((option) => targetKey(option.target))).toEqual([
+      'rival:rival_knox_marrow',
+    ]);
   });
 
   it('includes district and controller metadata', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const options = selectActionTargetOptions(state, 'gather_intel');
-    const glassSaint = options.find((option) => option.target.id === 'venue_glass_saint');
+    const glassSaint = options.find((option) => targetKey(option.target) === 'venue:venue_glass_saint');
 
     expect(glassSaint).toEqual(
       jasmine.objectContaining({
@@ -191,6 +256,12 @@ describe('territory selectors', () => {
     );
   });
 });
+
+function targetKey(target: ActionTarget): string {
+  return target.type === 'ledger'
+    ? `ledger:${target.entryId}:${target.useOptionId}`
+    : `${target.type}:${target.id}`;
+}
 
 function withInactiveRival(rivalId: 'rival_nyx_ardent' | 'rival_knox_marrow'): GameState {
   const state = newGame({ seed: 'VIOLET-ASH-1047' });

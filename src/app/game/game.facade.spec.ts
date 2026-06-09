@@ -126,8 +126,11 @@ describe('GameFacade', () => {
       id: 'venue_glass_saint' as const,
     };
 
-    expect(facade.getTargetOptions('run_small_job').some((option) => option.target.id === target.id))
-      .toBeTrue();
+    expect(
+      facade
+        .getTargetOptions('run_small_job')
+        .some((option) => option.target.type === 'venue' && option.target.id === target.id),
+    ).toBeTrue();
     expect(facade.getActionPreview('run_small_job', 'op_mara_voss', target)?.targetLabel).toBe(
       'The Glass Saint',
     );

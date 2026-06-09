@@ -1019,10 +1019,13 @@ function recordOperativeOrderStats(
   for (const resolution of resolutions) {
     if (
       resolution.order.actionId === 'recruit_operative' &&
-      resolution.order.target?.type === 'recruit' &&
-      state.operatives.some((operative) => operative.id === resolution.order.target?.id)
+      resolution.order.target?.type === 'recruit'
     ) {
-      operativeStats[resolution.order.target.id as OperativeId].recruited = true;
+      const recruitedId = resolution.order.target.id;
+
+      if (state.operatives.some((operative) => operative.id === recruitedId)) {
+        operativeStats[recruitedId as OperativeId].recruited = true;
+      }
     }
 
     const operativeId = resolution.order.assignedOperativeId;
@@ -1476,7 +1479,7 @@ function recordTargetSelection(
   const key = getTargetKey(target);
   const current = targetUsage[key] ?? {
     targetType: target.type,
-    targetId: target.id,
+    targetId: getTargetReportId(target),
     selections: 0,
     complications: 0,
   };
@@ -1529,7 +1532,15 @@ function recordContextualEvent(
 }
 
 function getTargetKey(target: ActionTarget): string {
+  if (target.type === 'ledger') {
+    return `ledger:${target.entryId}:${target.useOptionId}`;
+  }
+
   return `${target.type}:${target.id}`;
+}
+
+function getTargetReportId(target: ActionTarget): string {
+  return target.type === 'ledger' ? `${target.entryId}:${target.useOptionId}` : target.id;
 }
 
 function getTargetReportLabel(target: TargetRunStats): string {
@@ -1542,6 +1553,8 @@ function getTargetReportLabel(target: TargetRunStats): string {
       return getRivalDefinition(target.targetId as RivalId)?.name ?? target.targetId;
     case 'recruit':
       return getOperativeDefinition(target.targetId as OperativeId)?.name ?? target.targetId;
+    case 'ledger':
+      return target.targetId;
   }
 }
 

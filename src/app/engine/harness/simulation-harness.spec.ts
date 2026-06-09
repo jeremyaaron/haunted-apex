@@ -12,6 +12,7 @@ import {
   simulateRun,
 } from './index';
 import { materializeOperativeState } from '../roster';
+import type { ActionTarget } from '../model';
 import { newGame, queueOrder } from '../simulation';
 
 describe('simulation harness', () => {
@@ -90,7 +91,9 @@ describe('simulation harness', () => {
       targetedOptions.every(
         (option) =>
           option.preview.selectedTarget?.type === option.target?.type &&
-          option.preview.selectedTarget?.id === option.target?.id,
+          option.preview.selectedTarget !== undefined &&
+          option.target !== undefined &&
+          targetKey(option.preview.selectedTarget) === targetKey(option.target),
       ),
     ).toBeTrue();
   });
@@ -104,7 +107,11 @@ describe('simulation harness', () => {
     const recruitOptions = options.filter((option) => option.actionId === 'recruit_operative');
 
     expect(gatherOptions.length).toBe(state.operatives.length + 1);
-    expect(recruitOptions.map((option) => option.target?.id)).toEqual(state.hirePool);
+    expect(
+      recruitOptions.map((option) =>
+        option.target?.type === 'recruit' ? option.target.id : undefined,
+      ),
+    ).toEqual(state.hirePool);
     expect(recruitOptions.every((option) => !option.assignedOperativeId)).toBeTrue();
 
     for (const option of options) {
@@ -333,6 +340,12 @@ describe('simulation harness', () => {
     expect(simulateBatch(options)).toEqual(simulateBatch(options));
   });
 });
+
+function targetKey(target: ActionTarget): string {
+  return target.type === 'ledger'
+    ? `ledger:${target.entryId}:${target.useOptionId}`
+    : `${target.type}:${target.id}`;
+}
 
 function createTestContext(seed: string, agentId: string): AgentDecisionContext {
   let cursor = seed.length + agentId.length;

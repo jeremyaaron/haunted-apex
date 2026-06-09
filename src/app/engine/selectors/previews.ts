@@ -2,6 +2,7 @@ import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
   getDistrictDefinition,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
@@ -13,6 +14,7 @@ import type {
   DistrictDefinition,
   DistrictId,
   GameState,
+  LedgerUseOptionDefinition,
   OperativeDefinition,
   OperativeId,
   OperativeState,
@@ -55,6 +57,7 @@ export type QueueOrderUnavailableReason =
   | 'action_not_found'
   | 'not_enough_command_points'
   | 'not_enough_resources'
+  | 'not_enough_intel'
   | 'operative_not_allowed'
   | 'operative_required'
   | 'operative_not_found'
@@ -66,7 +69,9 @@ export type QueueOrderUnavailableReason =
   | 'target_required'
   | 'target_not_allowed'
   | 'target_not_found'
-  | 'target_inactive';
+  | 'target_inactive'
+  | 'ledger_entry_consumed'
+  | 'ledger_use_option_not_found';
 
 export type OrderAvailability = {
   available: boolean;
@@ -174,8 +179,19 @@ export function getQueuedResourceCost(state: GameState): number {
       return cost;
     }
 
-    return cost + getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target);
+    return (
+      cost +
+      getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target) +
+      getLedgerUseCost(state, order.target, 'resources')
+    );
   }, 0);
+}
+
+export function getQueuedIntelCost(state: GameState): number {
+  return state.queuedOrders.reduce(
+    (cost, order) => cost + getLedgerUseCost(state, order.target, 'intel'),
+    0,
+  );
 }
 
 export function getOrderAvailability(
@@ -281,7 +297,45 @@ function getTargetAvailability(
       )
         ? unavailable('recruit_already_queued')
         : { available: true };
+    case 'ledger':
+      return getLedgerTargetAvailability(state, target);
   }
+}
+
+function getLedgerTargetAvailability(
+  state: GameState,
+  target: Extract<ActionTarget, { type: 'ledger' }>,
+): OrderAvailability {
+  const entry = state.ledger.entries.find((candidate) => candidate.id === target.entryId);
+
+  if (!entry) {
+    return unavailable('target_not_found');
+  }
+
+  if (entry.consumed) {
+    return unavailable('ledger_entry_consumed');
+  }
+
+  const useOption = getLedgerUseOption(state, target);
+
+  if (!useOption) {
+    return unavailable('ledger_use_option_not_found');
+  }
+
+  if (
+    state.pressures.resources - getQueuedResourceCost(state) <
+    (useOption.cost?.resources ?? 0)
+  ) {
+    return unavailable('not_enough_resources');
+  }
+
+  if (state.pressures.intel - getQueuedIntelCost(state) < (useOption.cost?.intel ?? 0)) {
+    return unavailable('not_enough_intel');
+  }
+
+  return {
+    available: true,
+  };
 }
 
 export function getActionPreview(
@@ -333,7 +387,7 @@ export function getActionPreview(
       modifiers,
     ),
     selectedTarget: target,
-    targetLabel: getTargetLabel(target),
+    targetLabel: getTargetLabel(target, state),
     riskChance,
     riskLabel: riskLabel(riskChance),
     rivalAttention: getRivalAttentionPreview(
@@ -360,6 +414,7 @@ export function selectActionCards(state: GameState): ActionCardView[] {
     'recruit_operative',
     'expand_influence',
     'lay_low',
+    'work_the_ledger',
   ] satisfies ActionId[];
 
   return actionIds.map((actionId) => {
@@ -825,6 +880,28 @@ function wouldExceedRosterCap(state: GameState): boolean {
   ).length;
 
   return state.operatives.length + queuedRecruitCount >= DISTRICT_ZERO_MAX_OPERATIVES;
+}
+
+function getLedgerUseOption(
+  state: GameState,
+  target: ActionTarget | undefined,
+): LedgerUseOptionDefinition | undefined {
+  if (target?.type !== 'ledger') {
+    return undefined;
+  }
+
+  const entry = state.ledger.entries.find((candidate) => candidate.id === target.entryId);
+  const definition = entry ? getLedgerEntryDefinition(entry.definitionId) : undefined;
+
+  return definition?.useOptions.find((option) => option.id === target.useOptionId);
+}
+
+function getLedgerUseCost(
+  state: GameState,
+  target: ActionTarget | undefined,
+  pressure: 'resources' | 'intel',
+): number {
+  return getLedgerUseOption(state, target)?.cost?.[pressure] ?? 0;
 }
 
 function mergePressureDeltas(base: PressureDelta, modifier: PressureDelta = {}): PressureDelta {

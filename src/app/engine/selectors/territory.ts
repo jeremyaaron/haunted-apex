@@ -1,6 +1,7 @@
 import {
   getActionDefinition,
   getDistrictDefinition,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
@@ -13,6 +14,8 @@ import type {
   DistrictArchetype,
   DistrictId,
   GameState,
+  LedgerEntryKind,
+  LedgerUseOptionId,
   OperativeId,
   OperativeRarity,
   OperativeRoleTag,
@@ -25,6 +28,7 @@ import type {
   VenueId,
 } from '../model';
 import { getRivalPressureTier } from './rivals';
+import { selectActiveLedgerEntryViews } from '../ledger';
 
 export type TerritoryTargetOption = {
   target: Exclude<ActionTarget, { type: 'recruit' }>;
@@ -46,7 +50,20 @@ export type RecruitTargetOption = {
   roleTags: readonly OperativeRoleTag[];
 };
 
-export type ActionTargetOption = TerritoryTargetOption | RecruitTargetOption;
+export type LedgerTargetOption = {
+  target: { type: 'ledger'; entryId: string; useOptionId: LedgerUseOptionId };
+  label: string;
+  targetType: 'ledger';
+  entryId: string;
+  useOptionId: LedgerUseOptionId;
+  entryName: string;
+  useOptionLabel: string;
+  kind: LedgerEntryKind;
+  affordable: boolean;
+  unavailableReason?: string;
+};
+
+export type ActionTargetOption = TerritoryTargetOption | RecruitTargetOption | LedgerTargetOption;
 
 export type VenueTerritoryView = {
   id: VenueId;
@@ -196,6 +213,29 @@ export function selectActionTargetOptions(
     }
   }
 
+  if (allowedTypes.has('ledger')) {
+    for (const entry of selectActiveLedgerEntryViews(state)) {
+      for (const useOption of entry.useOptions) {
+        options.push({
+          target: {
+            type: 'ledger',
+            entryId: entry.id,
+            useOptionId: useOption.id,
+          },
+          label: `${entry.name} - ${useOption.label}`,
+          targetType: 'ledger',
+          entryId: entry.id,
+          useOptionId: useOption.id,
+          entryName: entry.name,
+          useOptionLabel: useOption.label,
+          kind: entry.kind,
+          affordable: useOption.affordable,
+          unavailableReason: useOption.unavailableReason,
+        });
+      }
+    }
+  }
+
   return options;
 }
 
@@ -295,6 +335,7 @@ export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | und
       return getVenueDefinition(target.id)?.districtId;
     case 'rival':
     case 'recruit':
+    case 'ledger':
       return undefined;
   }
 }
@@ -315,6 +356,7 @@ export function getTargetTags(target?: ActionTarget): string[] {
     case 'rival':
       return [...(getRivalDefinition(target.id)?.traits ?? [])];
     case 'recruit':
+    case 'ledger':
       return [];
   }
 }
@@ -341,11 +383,12 @@ export function getTargetControllerId(target?: ActionTarget): RivalId | undefine
     case 'rival':
       return getRivalDefinition(target.id)?.id;
     case 'recruit':
+    case 'ledger':
       return undefined;
   }
 }
 
-export function getTargetLabel(target?: ActionTarget): string | undefined {
+export function getTargetLabel(target?: ActionTarget, state?: GameState): string | undefined {
   if (!target) {
     return undefined;
   }
@@ -359,6 +402,17 @@ export function getTargetLabel(target?: ActionTarget): string | undefined {
       return getRivalDefinition(target.id)?.name;
     case 'recruit':
       return getOperativeDefinition(target.id)?.name;
+    case 'ledger': {
+      const entry = state?.ledger.entries.find((candidate) => candidate.id === target.entryId);
+      const definition = entry ? getLedgerEntryDefinition(entry.definitionId) : undefined;
+      const useOption = definition?.useOptions.find(
+        (candidate) => candidate.id === target.useOptionId,
+      );
+
+      return definition && useOption
+        ? `${definition.name} - ${useOption.label}`
+        : target.entryId;
+    }
   }
 }
 
@@ -367,7 +421,12 @@ export function calculateTargetControlGain(
   target?: ActionTarget,
   operativeModifier = 0,
 ): number {
-  if (!target || target.type === 'rival' || target.type === 'recruit') {
+  if (
+    !target ||
+    target.type === 'rival' ||
+    target.type === 'recruit' ||
+    target.type === 'ledger'
+  ) {
     return 0;
   }
 
@@ -381,6 +440,7 @@ export function calculateTargetControlGain(
     case 'bribe_official':
     case 'recruit_operative':
     case 'lay_low':
+    case 'work_the_ledger':
       return 0;
   }
 }

@@ -184,6 +184,10 @@ export class App {
     return option.label;
   }
 
+  protected targetOptionValue(option: ActionTargetOption): string {
+    return this.targetKey(option.target);
+  }
+
   protected queueAction(actionId: ActionId): void {
     const assignedOperativeId = this.selectedOperatives()[actionId];
     const target = this.selectedTargets()[actionId];
@@ -420,6 +424,10 @@ export class App {
   }
 
   private targetKey(target: ActionTarget): string {
+    if (target.type === 'ledger') {
+      return `${target.type}:${target.entryId}:${target.useOptionId}`;
+    }
+
     return `${target.type}:${target.id}`;
   }
 

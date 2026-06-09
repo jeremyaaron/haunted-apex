@@ -505,12 +505,15 @@ describe('action previews', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const cards = selectActionCards(state);
     const recruitCard = cards.find((card) => card.actionId === 'recruit_operative');
+    const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
 
-    expect(cards.length).toBe(6);
+    expect(cards.length).toBe(7);
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
     expect(recruitCard?.availableOperatives.every((operative) => operative.disabled)).toBeTrue();
     expect(recruitCard?.availableOperatives[0].reason).toBe('operative_not_allowed');
+    expect(ledgerCard?.state).toBe('unavailable');
+    expect(ledgerCard?.unavailableReason).toBe('target_required');
   });
 
   it('converts pressure deltas into stable display rows', () => {

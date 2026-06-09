@@ -260,6 +260,8 @@ function getTargetLabel(target: ActionTarget): string | undefined {
       return getRivalDefinition(target.id)?.name;
     case 'recruit':
       return getOperativeDefinition(target.id)?.name;
+    case 'ledger':
+      return target.entryId;
   }
 }
 

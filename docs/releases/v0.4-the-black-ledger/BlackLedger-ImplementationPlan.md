@@ -407,6 +407,31 @@ Unit tests:
 - Removing a queued Ledger order restores command availability.
 - Existing non-Ledger targets still validate correctly.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Added `work_the_ledger` as a command-phase action with 1 Command cost, no base
+  Resource cost, no base pressure effects, no assignment, and required Ledger targeting.
+- Extended `ActionTarget` with Ledger entry/use-option targets:
+  `{ type: 'ledger'; entryId; useOptionId }`.
+- Added active Ledger target option generation from unresolved Ledger entries and their
+  authored use options.
+- Added queue validation for missing Ledger targets, unknown entries, consumed entries,
+  unknown use options, insufficient Resources, and insufficient Intel.
+- Added queued Ledger Resource/Intel cost accounting so multiple queued Ledger uses cannot
+  silently overcommit the current bank or Intel pool.
+- Preserved Ledger target labels in action previews and queued order views as
+  `Entry Name - Use Option Label`.
+- Updated app target-key handling so the current dropdown infrastructure can select Ledger
+  targets without special casing the action card.
+- Updated target parsing, target label helpers, harness target reporting, and exhaustive
+  action/target switches for the new action and target type.
+- Added unit coverage for legal Ledger target option generation, consumed-entry omission,
+  invalid Ledger targets, unaffordable use options, successful queueing, target id
+  preservation, command point spend, and order removal.
+- Left Ledger use effects and consumption resolution for Phase 4.
+
 ### Review Gate
 
 Confirm the command action and target shape before applying Ledger effects.

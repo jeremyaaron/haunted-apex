@@ -1,3 +1,4 @@
+import { addLedgerEntry } from '../ledger';
 import { getCommandPointsRemaining, getOrderAvailability, selectQueuedOrderViews } from '../selectors';
 import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
@@ -83,6 +84,17 @@ describe('queueOrder', () => {
     expect(
       getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
         actionId: 'recruit_operative',
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_required',
+    });
+  });
+
+  it('requires a Ledger target for Work the Ledger', () => {
+    expect(
+      getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
+        actionId: 'work_the_ledger',
       }),
     ).toEqual({
       available: false,
@@ -210,6 +222,115 @@ describe('queueOrder', () => {
     });
   });
 
+  it('rejects invalid Ledger targets', () => {
+    const active = addLedgerEntry(newGame({ seed: 'LEDGER-QUEUE' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const entryId = active.ledger.entries[0].id;
+    const consumed = {
+      ...active,
+      ledger: {
+        ...active.ledger,
+        entries: active.ledger.entries.map((entry) => ({
+          ...entry,
+          consumed: true,
+        })),
+        consumedCount: 1,
+      },
+    };
+
+    expect(
+      getOrderAvailability(active, {
+        actionId: 'work_the_ledger',
+        target: {
+          type: 'ledger',
+          entryId: 'ledger_missing',
+          useOptionId: 'burn_patrol_window',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_not_found',
+    });
+    expect(
+      getOrderAvailability(consumed, {
+        actionId: 'work_the_ledger',
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'burn_patrol_window',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'ledger_entry_consumed',
+    });
+    expect(
+      getOrderAvailability(active, {
+        actionId: 'work_the_ledger',
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'missing_option',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'ledger_use_option_not_found',
+    });
+  });
+
+  it('rejects unaffordable Ledger use options', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-BROKE' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const entryId = state.ledger.entries[0].id;
+    const brokeState = {
+      ...state,
+      pressures: {
+        ...state.pressures,
+        resources: 100,
+        intel: 1,
+      },
+    };
+
+    expect(
+      getOrderAvailability(brokeState, {
+        actionId: 'work_the_ledger',
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'pay_in_credits',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'not_enough_resources',
+    });
+    expect(
+      getOrderAvailability(brokeState, {
+        actionId: 'work_the_ledger',
+        target: {
+          type: 'ledger',
+          entryId,
+          useOptionId: 'offer_information',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'not_enough_intel',
+    });
+  });
+
   it('preserves the target on a queued order', () => {
     const target = {
       type: 'venue',
@@ -227,6 +348,84 @@ describe('queueOrder', () => {
 
     expect(result.order.target).toEqual(target);
     expect(result.order.target).not.toBe(target);
+  });
+
+  it('queues an affordable active Ledger use and preserves entry and use option ids', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-QUEUE' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const target = {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'pay_in_credits',
+    } as const;
+    const result = queueOrder(state, {
+      actionId: 'work_the_ledger',
+      target,
+    });
+
+    if (!result.ok) {
+      fail(`Expected Ledger order, got ${result.error}`);
+      return;
+    }
+
+    expect(result.order).toEqual({
+      id: 'order_1_1',
+      actionId: 'work_the_ledger',
+      target,
+    });
+    expect(getCommandPointsRemaining(result.state)).toBe(1);
+    expect(selectQueuedOrderViews(result.state)[0]).toEqual(
+      jasmine.objectContaining({
+        actionId: 'work_the_ledger',
+        label: 'Work the Ledger',
+        targetLabel: 'Owes the Liaison - Pay in Credits',
+      }),
+    );
+  });
+
+  it('removes a queued Ledger order and restores command availability', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-REMOVE' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const target = {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'burn_patrol_window',
+    } as const;
+    const queued = queueOrder(state, {
+      actionId: 'work_the_ledger',
+      target,
+    });
+
+    if (!queued.ok) {
+      fail(`Expected Ledger order, got ${queued.error}`);
+      return;
+    }
+
+    const removed = removeQueuedOrder(queued.state, queued.order.id);
+
+    if (!removed.ok) {
+      fail(`Expected removed order, got ${removed.error}`);
+      return;
+    }
+
+    expect(getOrderAvailability(removed.state, {
+      actionId: 'work_the_ledger',
+      target,
+    })).toEqual({
+      available: true,
+    });
+    expect(getCommandPointsRemaining(removed.state)).toBe(2);
   });
 
   it('restores normal availability after removing a targeted order', () => {
