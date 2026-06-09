@@ -13,12 +13,16 @@ export function applyTargetedActionConsequences(
   actionId: ActionId,
   target: ActionTarget | undefined,
   resolvedDelta: PressureDelta,
+  districtControlModifier = 0,
+  rivalPressureModifier = 0,
 ): GameState {
   const districtId = resolveTargetDistrictId(target);
   const rivalId = getTargetControllerId(target);
-  const controlGain = calculateTargetControlGain(actionId, target);
+  const controlGain = calculateTargetControlGain(actionId, target, districtControlModifier);
   const localHeatGain = calculateTargetLocalHeatGain(resolvedDelta, target);
-  const rivalPressureGain = rivalId ? calculateRivalPressureGain(actionId) : 0;
+  const rivalPressureGain = rivalId
+    ? calculateRivalPressureGain(actionId, rivalPressureModifier)
+    : 0;
 
   return {
     ...state,

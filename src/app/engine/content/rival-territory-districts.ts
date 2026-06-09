@@ -37,7 +37,7 @@ export const RIVAL_TERRITORY_DISTRICTS = [
     secrecy: 85,
     volatility: 75,
     venueIds: ['venue_black_halo_exchange'],
-    tags: ['intel', 'memory', 'weird'],
+    tags: ['intel', 'memory', 'weird', 'black_market'],
   },
 ] as const satisfies readonly DistrictDefinition[];
 

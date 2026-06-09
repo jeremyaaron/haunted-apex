@@ -5,16 +5,22 @@ import {
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
+  getOperativeDefinition,
+  getTraitDefinition,
   getOrderAvailability,
   newGame,
   queueOrder,
   removeQueuedOrder,
   resolveEventChoice,
   selectActionCards,
+  selectAssignmentOptions,
   selectActionTargetOptions,
   selectDistrictTerritoryViews,
+  selectHirePoolViews,
+  selectOperativeDetail,
   selectQueuedOrderViews,
   selectRivalTerritoryViews,
+  selectRosterViews,
   type ActionId,
   type ActionPreview,
   type ActionTarget,
@@ -23,45 +29,113 @@ import {
   type GameState,
   type NewGameConfig,
   type OrderAvailability,
+  type OperativeOptionView,
+  type OperativeId,
   type QueueOrderResult,
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
 } from '../engine';
-import { GameStorageService } from './game-storage.service';
+import {
+  GameStorageService,
+  type LoadCurrentRunResult,
+} from './game-storage.service';
+
+export const SAVE_COMPATIBILITY_NOTICE =
+  'This save was created with an older prototype version and is not compatible with v0.3.0 - The Roster. A new run has been started with the updated roster system.';
 
 @Injectable({
   providedIn: 'root',
 })
 export class GameFacade {
   private readonly storage = inject(GameStorageService);
-  private readonly stateSignal = signal<GameState>(this.storage.loadCurrentRun() ?? newGame());
+  private readonly initialLoadResult = this.storage.loadCurrentRun();
+  private readonly stateSignal = signal<GameState>(
+    this.initialLoadResult.status === 'loaded'
+      ? this.initialLoadResult.state
+      : newGame(),
+  );
+  private readonly selectedOperativeId = signal<OperativeId | undefined>(undefined);
 
   readonly state = this.stateSignal.asReadonly();
+  readonly compatibilityNotice = signal<string | undefined>(
+    requiresCompatibilityNotice(this.initialLoadResult)
+      ? SAVE_COMPATIBILITY_NOTICE
+      : undefined,
+  );
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly districts = computed(() => selectDistrictTerritoryViews(this.stateSignal()));
   readonly rivals = computed(() => selectRivalTerritoryViews(this.stateSignal()));
+  readonly roster = computed(() => selectRosterViews(this.stateSignal()));
+  readonly hirePool = computed(() => selectHirePoolViews(this.stateSignal()));
+  readonly selectedOperativeDetail = computed(() => {
+    const operativeId = this.selectedOperativeId();
+    return operativeId
+      ? selectOperativeDetail(this.stateSignal(), operativeId)
+      : undefined;
+  });
+  readonly operatives = computed(() =>
+    this.stateSignal().operatives.flatMap((operative) => {
+      const definition = getOperativeDefinition(operative.id);
+
+      if (!definition) {
+        return [];
+      }
+
+      return [
+        {
+          ...operative,
+          name: definition.name,
+          archetype: definition.archetype,
+          ...definition.baseStats,
+          traits: operative.revealedTraits.map(
+            (traitId) => getTraitDefinition(traitId)?.name ?? traitId,
+          ),
+        },
+      ];
+    }),
+  );
   readonly commandPointsRemaining = computed(() => getCommandPointsRemaining(this.stateSignal()));
   readonly pendingEventDefinition = computed(() => {
     const pendingEvent = this.stateSignal().pendingEvent;
     return pendingEvent ? getEventDefinition(pendingEvent.definitionId) : undefined;
   });
 
+  constructor() {
+    if (requiresCompatibilityNotice(this.initialLoadResult)) {
+      this.storage.saveCurrentRun(this.stateSignal());
+    }
+  }
+
   startNewGame(config: NewGameConfig = {}): GameState {
     const state = newGame(config);
+    this.selectedOperativeId.set(undefined);
     this.setAndSave(state);
     return state;
   }
 
   loadCurrentRun(): boolean {
-    const loaded = this.storage.loadCurrentRun();
+    const result = this.storage.loadCurrentRun();
 
-    if (!loaded) {
+    if (result.status === 'loaded') {
+      this.stateSignal.set(result.state);
+      this.selectedOperativeId.set(undefined);
+      return true;
+    }
+
+    if (requiresCompatibilityNotice(result)) {
+      const state = newGame();
+      this.stateSignal.set(state);
+      this.selectedOperativeId.set(undefined);
+      this.compatibilityNotice.set(SAVE_COMPATIBILITY_NOTICE);
+      this.storage.saveCurrentRun(state);
+    }
+
+    if (result.status === 'empty') {
       return false;
     }
 
-    this.stateSignal.set(loaded);
-    return true;
+    return false;
   }
 
   resetCurrentRun(config: NewGameConfig = {}): GameState {
@@ -73,8 +147,28 @@ export class GameFacade {
     this.storage.clearCurrentRun();
   }
 
+  dismissCompatibilityNotice(): void {
+    this.compatibilityNotice.set(undefined);
+  }
+
+  selectOperative(operativeId: OperativeId | undefined): void {
+    this.selectedOperativeId.set(
+      operativeId && selectOperativeDetail(this.stateSignal(), operativeId)
+        ? operativeId
+        : undefined,
+    );
+  }
+
+  getOperativeDetail(operativeId: OperativeId) {
+    return selectOperativeDetail(this.stateSignal(), operativeId);
+  }
+
   getTargetOptions(actionId: ActionId): ActionTargetOption[] {
     return selectActionTargetOptions(this.stateSignal(), actionId);
+  }
+
+  getAssignmentOptions(actionId: ActionId, target?: ActionTarget): OperativeOptionView[] {
+    return selectAssignmentOptions(this.stateSignal(), actionId, target);
   }
 
   getActionPreview(
@@ -153,4 +247,8 @@ export class GameFacade {
     this.stateSignal.set(state);
     this.storage.saveCurrentRun(state);
   }
+}
+
+function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {
+  return result.status === 'incompatible' || result.status === 'invalid';
 }

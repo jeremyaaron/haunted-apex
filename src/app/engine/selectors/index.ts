@@ -12,12 +12,14 @@ export {
   pressureDeltaToView,
   riskLabel,
   selectActionCards,
+  selectAssignmentOptions,
   selectQueuedOrderViews,
 } from './previews';
 export type {
   ActionCardView,
   ActionPreview,
   LocalImpactPreview,
+  OperativeAssignmentPreview,
   OperativeOptionView,
   OrderAvailability,
   PressureDeltaView,
@@ -41,7 +43,20 @@ export {
 export type {
   ActionTargetOption,
   DistrictTerritoryView,
+  RecruitTargetOption,
   RivalTerritoryView,
+  TerritoryTargetOption,
   VenueTerritoryView,
 } from './territory';
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
+export {
+  selectHirePoolViews,
+  selectOperativeDetail,
+  selectRosterViews,
+} from './roster';
+export type {
+  HireCandidateView,
+  OperativeDetailView,
+  OperativeRosterView,
+  TraitView,
+} from './roster';

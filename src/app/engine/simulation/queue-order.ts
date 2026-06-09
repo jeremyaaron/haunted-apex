@@ -53,7 +53,9 @@ export function queueOrder(state: GameState, request: QueueOrderRequest): QueueO
   const order: QueuedOrder = {
     id: nextOrderId(state),
     actionId: action.id,
-    assignedOperativeId: request.assignedOperativeId,
+    ...(request.assignedOperativeId
+      ? { assignedOperativeId: request.assignedOperativeId }
+      : {}),
     ...(request.target ? { target: { ...request.target } } : {}),
   };
 

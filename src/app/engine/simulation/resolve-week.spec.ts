@@ -1,4 +1,6 @@
 import type { ActionTarget, GameState } from '../model';
+import { getOperativeDefinition } from '../content';
+import { materializeOperativeState } from '../roster';
 import { getGameOverState } from './win-loss';
 import { advanceWeek } from './resolve-week';
 import { clampPressures } from './clamps';
@@ -21,7 +23,7 @@ describe('advanceWeek', () => {
 
     expect(result.state.phase).toBe('EVENT_CHOICE');
     expect(result.state.week).toBe(1);
-    expect(result.state.rngCursor).toBe(2);
+    expect(result.state.rngCursor).toBe(12);
     expect(result.state.queuedOrders).toEqual([]);
     expect(result.state.pendingEvent).toEqual(
       jasmine.objectContaining({
@@ -39,7 +41,7 @@ describe('advanceWeek', () => {
       ruin: 0,
     });
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
-      24,
+      25,
     );
     expect(result.state.operatives.find((operative) => operative.id === 'op_juno_hex')?.stress).toBe(
       30,
@@ -52,6 +54,18 @@ describe('advanceWeek', () => {
       'drift',
       'event_presented',
     ]);
+    expect(result.orderResolutions[0]).toEqual(
+      jasmine.objectContaining({
+        complication: false,
+        riskChance: 3,
+        resolvedDelta: {
+          heat: 1,
+          intel: 10,
+          resources: -400,
+        },
+        stressDelta: 7,
+      }),
+    );
   });
 
   it('applies dangerous action stress for Run a Small Job', () => {
@@ -71,15 +85,15 @@ describe('advanceWeek', () => {
     }
 
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
-      28,
+      30,
     );
-    expect(result.state.pressures.resources).toBe(6050);
+    expect(result.state.pressures.resources).toBe(6450);
     expect(result.state.pressures.dominion).toBe(18);
-    expect(result.state.pressures.heat).toBe(28);
+    expect(result.state.pressures.heat).toBe(31);
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
       control: 11,
-      heat: 31,
+      heat: 32,
     });
     expect(result.state.rivals.rival_knox_marrow.pressure).toBe(10);
     expect(result.state.recentActivity).toEqual([
@@ -90,7 +104,7 @@ describe('advanceWeek', () => {
           id: 'venue_zero_mercy',
         },
         rivalId: 'rival_knox_marrow',
-        heatDelta: 12,
+        heatDelta: 15,
         dominionDelta: 6,
       }),
     ]);
@@ -175,9 +189,17 @@ describe('advanceWeek', () => {
     ]);
   });
 
-  it('recruits the first candidate from the recruit pool', () => {
-    const queued = mustQueue(newGame({ seed: 'VIOLET-ASH-1047' }), {
+  it('recruits the selected candidate and preserves remaining hire order', () => {
+    const initial = newGame({ seed: 'VIOLET-ASH-1047' });
+    const selectedCandidate = initial.hirePool[1];
+    const untouchedDistricts = structuredClone(initial.districts);
+    const untouchedRivals = structuredClone(initial.rivals);
+    const queued = mustQueue(initial, {
       actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: selectedCandidate,
+      },
     });
     const result = advanceWeek(queued);
 
@@ -186,18 +208,33 @@ describe('advanceWeek', () => {
       return;
     }
 
-    expect(result.state.operatives.map((operative) => operative.name)).toContain('Iris Vale');
-    expect(result.state.recruitPool.map((candidate) => candidate.name)).toEqual([
-      'Knox Riven',
-      'Orchid Seven',
+    expect(result.state.operatives.map((operative) => operative.id)).toContain(selectedCandidate);
+    expect(result.state.operatives.map((operative) => operative.id)).not.toContain(
+      initial.hirePool[0],
+    );
+    expect(result.state.hirePool).toEqual([
+      initial.hirePool[0],
+      initial.hirePool[2],
+      initial.hirePool[3],
     ]);
-    expect(result.state.operatives.find((operative) => operative.name === 'Iris Vale')).toEqual(
+    expect(result.state.hirePool.length).toBe(3);
+    expect(result.state.operatives.find((operative) => operative.id === selectedCandidate)).toEqual(
       jasmine.objectContaining({
-        loyalty: 55,
-        stress: 8,
+        loyalty: getOperativeDefinition(selectedCandidate)?.startingLoyalty,
+        stress: 12,
         status: 'available',
       }),
     );
+    expect(result.state.districts).toEqual(untouchedDistricts);
+    expect(result.state.rivals).toEqual(untouchedRivals);
+    expect(result.state.recentActivity[0]).toEqual(
+      jasmine.objectContaining({
+        actionId: 'recruit_operative',
+        targetTags: [],
+      }),
+    );
+    expect(result.state.recentActivity[0].target).toBeUndefined();
+    expect(result.state.recentActivity[0].rivalId).toBeUndefined();
   });
 
   it('recovers assigned stress for Lay Low', () => {
@@ -218,6 +255,60 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       16,
     );
+  });
+
+  it('prunes operative assignment history after resolving the current week', () => {
+    const base = newGame({ seed: 'VIOLET-ASH-1047' });
+    const historicalState: GameState = {
+      ...base,
+      week: 5,
+      operatives: base.operatives.map((operative) =>
+        operative.id === 'op_mara_voss'
+          ? {
+              ...operative,
+              recentAssignments: [1, 2, 3, 4].map((week) => ({
+                id: `assignment_${week}_1`,
+                week,
+                actionId: 'gather_intel' as const,
+                targetTags: [],
+                complication: false,
+                stressDelta: 7,
+              })),
+            }
+          : operative,
+      ),
+    };
+    const queued = mustQueue(historicalState, {
+      actionId: 'gather_intel',
+      assignedOperativeId: 'op_mara_voss',
+    });
+    const result = advanceWeek(queued);
+
+    if (!result.ok) {
+      fail(`Expected week resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(
+      result.state.operatives
+        .find((operative) => operative.id === 'op_mara_voss')
+        ?.recentAssignments.map((assignment) => assignment.week),
+    ).toEqual([3, 4, 5]);
+  });
+
+  it('marks a signature event seen when it is presented and still presents one event', () => {
+    const result = findAdvanceSelectingOperativeEvent();
+
+    expect(result.state.pendingEvent?.definitionId).toBe(result.eventSelection.definition.id);
+    expect(result.eventSelection.definition.kind).toBe('operative');
+    expect(result.state.seenSignatureEventIds).toContain(
+      result.eventSelection.definition.id,
+    );
+    expect(
+      result.state.eventLog.filter(
+        (entry) => entry.week === result.state.week && entry.type === 'event_presented',
+      ).length,
+    ).toBe(1);
   });
 
   it('cools districts, applies rival effects, then presents an event before win/loss', () => {
@@ -291,6 +382,33 @@ describe('advanceWeek', () => {
   });
 });
 
+function findAdvanceSelectingOperativeEvent(): Extract<
+  ReturnType<typeof advanceWeek>,
+  { ok: true }
+> {
+  for (let index = 0; index < 100; index += 1) {
+    const state = newGame({ seed: `OPERATIVE-EVENT-${index}` });
+    const mara = materializeOperativeState('op_mara_voss');
+    mara.stress = 80;
+    const result = advanceWeek({
+      ...state,
+      operatives: [mara],
+      queuedOrders: [
+        {
+          id: 'order_1_1',
+          actionId: 'gather_intel',
+        },
+      ],
+    });
+
+    if (result.ok && result.eventSelection.definition.kind === 'operative') {
+      return result;
+    }
+  }
+
+  throw new Error('Expected at least one deterministic seed to select an operative event.');
+}
+
 describe('weekly drift', () => {
   it('applies upkeep, natural cooling, and fatigue', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
@@ -353,14 +471,14 @@ describe('clamps and win/loss', () => {
   });
 
   it('detects dominion victory', () => {
-    expect(getGameOverState(withPressures({ dominion: 85 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 90 }))).toEqual({
       result: 'victory',
       reason: 'dominion_victory',
     });
   });
 
   it('detects loss before victory when fail and win thresholds are both crossed', () => {
-    expect(getGameOverState(withPressures({ dominion: 85, heat: 100 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 90, heat: 100 }))).toEqual({
       result: 'loss',
       reason: 'heat_lockdown',
     });

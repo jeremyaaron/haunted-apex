@@ -1,4 +1,5 @@
 import { getCommandPointsRemaining, getOrderAvailability, selectQueuedOrderViews } from '../selectors';
+import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
 import { queueOrder, removeQueuedOrder } from './queue-order';
 
@@ -78,6 +79,17 @@ describe('queueOrder', () => {
     });
   });
 
+  it('requires a candidate target for recruitment', () => {
+    expect(
+      getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
+        actionId: 'recruit_operative',
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_required',
+    });
+  });
+
   it('allows optional target actions to queue without a target', () => {
     const result = queueOrder(newGame({ seed: 'VIOLET-ASH-1047' }), {
       actionId: 'gather_intel',
@@ -99,6 +111,46 @@ describe('queueOrder', () => {
       available: false,
       reason: 'target_not_allowed',
     });
+  });
+
+  it('rejects district, venue, and rival recruitment targets', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const targets = [
+      { type: 'district', id: 'district_violet_ward' },
+      { type: 'venue', id: 'venue_pale_circuit' },
+      { type: 'rival', id: 'rival_nyx_ardent' },
+    ];
+
+    for (const target of targets) {
+      expect(
+        getOrderAvailability(state, {
+          actionId: 'recruit_operative',
+          target: target as never,
+        }),
+      ).toEqual({
+        available: false,
+        reason: 'target_not_allowed',
+      });
+    }
+  });
+
+  it('rejects unknown and absent recruit candidates', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+
+    for (const operativeId of ['op_missing', state.operatives[0].id]) {
+      expect(
+        getOrderAvailability(state, {
+          actionId: 'recruit_operative',
+          target: {
+            type: 'recruit',
+            id: operativeId,
+          } as never,
+        }),
+      ).toEqual({
+        available: false,
+        reason: 'recruit_not_in_hire_pool',
+      });
+    }
   });
 
   it('rejects unknown district, venue, and rival IDs', () => {
@@ -284,6 +336,10 @@ describe('queueOrder', () => {
     const availability = getOrderAvailability(state, {
       actionId: 'recruit_operative',
       assignedOperativeId: 'op_saint_calder',
+      target: {
+        type: 'recruit',
+        id: state.hirePool[0],
+      },
     });
 
     expect(availability).toEqual({
@@ -292,13 +348,97 @@ describe('queueOrder', () => {
     });
   });
 
+  it('rejects duplicate candidate recruitment', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const target = {
+      type: 'recruit',
+      id: state.hirePool[0],
+    } as const;
+    const first = queueOrder(state, {
+      actionId: 'recruit_operative',
+      target,
+    });
+
+    if (!first.ok) {
+      fail(`Expected first recruitment, got ${first.error}`);
+      return;
+    }
+
+    expect(
+      getOrderAvailability(first.state, {
+        actionId: 'recruit_operative',
+        target,
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'recruit_already_queued',
+    });
+  });
+
+  it('queues two distinct candidates when the roster cap permits', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const first = queueOrder(state, {
+      actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: state.hirePool[0],
+      },
+    });
+
+    if (!first.ok) {
+      fail(`Expected first recruitment, got ${first.error}`);
+      return;
+    }
+
+    const second = queueOrder(first.state, {
+      actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: state.hirePool[1],
+      },
+    });
+
+    expect(second.ok).toBeTrue();
+    expect(second.ok && second.state.queuedOrders.length).toBe(2);
+  });
+
   it('does not queue recruitment when the roster would exceed the cap', () => {
     const state = queueOneRecruitmentWithFourOperatives();
     const availability = getOrderAvailability(state, {
       actionId: 'recruit_operative',
+      target: {
+        type: 'recruit',
+        id: state.hirePool[1],
+      },
     });
 
     expect(availability).toEqual({
+      available: false,
+      reason: 'roster_full',
+    });
+  });
+
+  it('disables recruitment for a full active roster', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const recruitedIds = state.hirePool.slice(0, 2);
+    const fullState = {
+      ...state,
+      operatives: [
+        ...state.operatives,
+        ...recruitedIds.map(materializeOperativeState),
+      ],
+      hirePool: state.hirePool.slice(2),
+    };
+
+    expect(
+      getOrderAvailability(fullState, {
+        actionId: 'recruit_operative',
+        target: {
+          type: 'recruit',
+          id: fullState.hirePool[0],
+        },
+      }),
+    ).toEqual({
       available: false,
       reason: 'roster_full',
     });
@@ -351,9 +491,9 @@ describe('queueOrder', () => {
         targetLabel: 'Zero Mercy',
         adjustedEffects: {
           dominion: 6,
-          heat: 12,
+          heat: 15,
           loyalty: -1,
-          resources: 1550,
+          resources: 1950,
         },
       }),
     ]);
@@ -384,27 +524,18 @@ function queueTwoOrders() {
 
 function queueOneRecruitmentWithFourOperatives() {
   const state = newGame({ seed: 'VIOLET-ASH-1047' });
+  const extraOperativeId = state.hirePool[0];
   const fourOperativeState = {
     ...state,
-    operatives: [
-      ...state.operatives,
-      {
-        id: 'op_test_extra',
-        name: 'Test Extra',
-        archetype: 'Analyst',
-        loyalty: 50,
-        stress: 0,
-        violence: 40,
-        charm: 40,
-        tech: 40,
-        subtlety: 40,
-        traitIds: [],
-        status: 'available' as const,
-      },
-    ],
+    operatives: [...state.operatives, materializeOperativeState(extraOperativeId)],
+    hirePool: state.hirePool.slice(1),
   };
   const first = queueOrder(fourOperativeState, {
     actionId: 'recruit_operative',
+    target: {
+      type: 'recruit',
+      id: fourOperativeState.hirePool[0],
+    },
   });
 
   if (!first.ok) {

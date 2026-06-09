@@ -1,4 +1,25 @@
+import type { ActionId } from './actions';
+import type { OperativeId, OperativeStateDelta } from './operatives';
 import type { PressureDelta, PressureId } from './pressures';
+import type { RivalId } from './rivals';
+
+export type EventId =
+  | 'corp_patrol_sweep'
+  | 'rival_tests_border'
+  | 'liaison_favor'
+  | 'operative_wants_more'
+  | 'blackmail_lead'
+  | 'job_goes_loud'
+  | 'heat_cools'
+  | 'safehouse_compromised'
+  | 'unexpected_windfall'
+  | 'rival_sends_flowers'
+  | 'event_mara_ghost_debt'
+  | 'event_juno_static_in_her_voice'
+  | 'event_saint_lie_comes_due'
+  | 'event_knox_blood_applause'
+  | 'event_iris_velvet_access'
+  | 'event_orchid_route_memory';
 
 export type EventTag =
   | 'HEAT'
@@ -12,7 +33,8 @@ export type EventTag =
   | 'RUIN'
   | 'INTEL'
   | 'CORP'
-  | 'BLACKMAIL';
+  | 'BLACKMAIL'
+  | 'OPERATIVE';
 
 export type EventWeightRule = {
   pressure?: PressureId;
@@ -33,10 +55,34 @@ export type EventChoiceDefinition = {
   cost?: PressureDelta | SpecialCost;
   effects: PressureDelta;
   flags?: string[];
+  operativeEffects?: OperativeStateDelta;
+  rivalPressure?: Partial<Record<RivalId, number>>;
 };
 
-export type EventDefinition = {
-  id: string;
+export type OperativeEventPredicate =
+  | { type: 'operative_stress_at_least'; amount: number }
+  | { type: 'operative_loyalty_at_most'; amount: number }
+  | { type: 'operative_assigned_within_weeks'; weeks: number }
+  | { type: 'operative_assignment_count'; count: number; actionId?: ActionId }
+  | { type: 'recent_assignment_tag'; tag: string; count?: number }
+  | { type: 'global_pressure_at_least'; pressure: PressureId; amount: number }
+  | { type: 'global_pressure_at_most'; pressure: PressureId; amount: number }
+  | { type: 'rival_pressure_at_least'; rivalId: RivalId; amount: number };
+
+export type OperativeEventTriggerCondition =
+  | OperativeEventPredicate
+  | {
+      mode: 'all' | 'any';
+      predicates: OperativeEventTriggerCondition[];
+    };
+
+export type OperativeEventTrigger = {
+  mode: 'all' | 'any';
+  predicates: OperativeEventTriggerCondition[];
+};
+
+type BaseEventDefinition = {
+  id: EventId;
   title: string;
   text: string;
   tags: EventTag[];
@@ -45,8 +91,21 @@ export type EventDefinition = {
   choices: EventChoiceDefinition[];
 };
 
+export type CityEventDefinition = BaseEventDefinition & {
+  kind: 'city';
+};
+
+export type OperativeEventDefinition = BaseEventDefinition & {
+  kind: 'operative';
+  operativeId: OperativeId;
+  trigger: OperativeEventTrigger;
+  severeAtBreaking?: boolean;
+};
+
+export type EventDefinition = CityEventDefinition | OperativeEventDefinition;
+
 export type GameEventInstance = {
   id: string;
-  definitionId: string;
+  definitionId: EventId;
   week: number;
 };

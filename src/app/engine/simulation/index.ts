@@ -2,7 +2,7 @@ export { newGame } from './new-game';
 export { queueOrder, removeQueuedOrder } from './queue-order';
 export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
-export { applyIdleStressRecovery } from './stress';
+export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyDrift } from './weekly-drift';
 export {
   applyLocalDistrictCooling,
@@ -20,6 +20,12 @@ export {
   selectWeeklyEvent,
 } from './select-weekly-event';
 export { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
+export {
+  evaluateOperativeEventPredicate,
+  evaluateOperativeEventTrigger,
+  getOperativeEventEligibility,
+  isOperativeEventEligible,
+} from './operative-events';
 export type { QueueOrderResult, RemoveQueuedOrderResult } from './queue-order';
 export type { ActionResolution } from './resolve-action';
 export type { AdvanceWeekResult, OrderResolutionDiagnostic } from './resolve-week';
@@ -36,3 +42,4 @@ export type {
   EventChoiceUnavailableReason,
   ResolveEventChoiceResult,
 } from './resolve-event';
+export type { OperativeEventEligibilityDiagnostics } from './operative-events';

@@ -2,6 +2,7 @@ import type { EventDefinition } from '../model';
 
 export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
   {
+    kind: 'city',
     id: 'corp_patrol_sweep',
     title: 'Corp Patrol Sweep',
     text: 'Private security floods the lower avenues, checking faces against a list they insist does not exist.',
@@ -32,6 +33,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'rival_tests_border',
     title: 'Rival Tests Your Border',
     text: 'A rival crew starts collecting protection money two blocks from your safehouse.',
@@ -58,6 +60,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'liaison_favor',
     title: 'A Favor in Violet Light',
     text: 'A dangerous liaison offers access to an elite room where people trade secrets like perfume.',
@@ -85,6 +88,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'operative_wants_more',
     title: 'Someone Wants More',
     text: 'One of your people has noticed the city getting richer around you and asks why their cut still feels symbolic.',
@@ -115,6 +119,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'blackmail_lead',
     title: 'A Name Behind the Glass',
     text: 'Your surveillance finds a corporate magistrate entering a room that officially does not exist.',
@@ -141,6 +146,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'job_goes_loud',
     title: 'The Job Goes Loud',
     text: 'Someone fires when they were supposed to smile. The street remembers the sound.',
@@ -169,6 +175,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'heat_cools',
     title: 'A Bigger Fire Elsewhere',
     text: 'For once, the city looks away. Someone more theatrical has made themselves useful.',
@@ -197,6 +204,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'safehouse_compromised',
     title: 'The Safehouse Is No Longer Safe',
     text: 'The lock is untouched. The camera is untouched. The ash on the table is arranged in your private signal.',
@@ -227,6 +235,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'unexpected_windfall',
     title: 'Money From a Dead Channel',
     text: 'An old account lights up. No message. No signature. Just money and the sense that someone is watching.',
@@ -256,6 +265,7 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
   {
+    kind: 'city',
     id: 'rival_sends_flowers',
     title: 'The Rival Sends Flowers',
     text: 'Black orchids arrive at your lounge, each stem wired with a listening device delicate enough to be art.',
@@ -283,7 +293,3 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
     ],
   },
 ] as const;
-
-export function getEventDefinition(eventDefinitionId: string): EventDefinition | undefined {
-  return DISTRICT_ZERO_EVENTS.find((event) => event.id === eventDefinitionId);
-}

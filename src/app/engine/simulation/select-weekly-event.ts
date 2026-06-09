@@ -5,10 +5,15 @@ import type {
   EventTag,
   GameEventInstance,
   GameState,
+  OperativeEventDefinition,
   RivalId,
 } from '../model';
 import { createRng, nextInt, type RngState } from '../rng';
 import { resolveTargetDistrictId } from '../selectors';
+import {
+  getOperativeEventEligibility,
+  type OperativeEventEligibilityDiagnostics,
+} from './operative-events';
 
 const MAJOR_NEGATIVE_TAGS = new Set<EventTag>([
   'HEAT',
@@ -45,7 +50,10 @@ export type EventWeightModifierId =
   | 'recent_memory'
   | 'nyx_pressure'
   | 'knox_pressure'
-  | 'recent_high_local_heat';
+  | 'recent_high_local_heat'
+  | 'operative_eligible'
+  | 'operative_stress'
+  | 'operative_recent_assignment';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -58,6 +66,7 @@ export type EventWeightDiagnostics = {
   weightBeforePenalty: number;
   recentPenaltyApplied: boolean;
   finalWeight: number;
+  operativeEligibility?: OperativeEventEligibilityDiagnostics;
 };
 
 export function selectWeeklyEvent(state: GameState): EventSelection {
@@ -87,9 +96,11 @@ export function getWeightedEvents(state: GameState): WeightedEvent[] {
   const context = buildEventWeightContext(state);
   const recentPenaltyTags = getRecentPenaltyTags(state);
 
-  return DISTRICT_ZERO_EVENTS.map((event) =>
-    calculateWeightedEvent(state, event, context, recentPenaltyTags),
-  ).filter((candidate) => candidate.weight > 0);
+  return DISTRICT_ZERO_EVENTS.filter(
+    (event) => event.kind === 'city' || isEligibleOperativeEvent(state, event),
+  )
+    .map((event) => calculateWeightedEvent(state, event, context, recentPenaltyTags))
+    .filter((candidate) => candidate.weight > 0);
 }
 
 export function calculateEventWeight(state: GameState, event: EventDefinition): number {
@@ -160,7 +171,7 @@ function calculateWeightedEvent(
   recentPenaltyTags: Set<EventTag>,
 ): WeightedEvent {
   const baseAndRuleWeight = calculateEventWeight(state, event);
-  const contextModifiers = getContextModifiers(event, context);
+  const contextModifiers = getContextModifiers(state, event, context);
   const weightBeforePenalty = Math.max(
     0,
     baseAndRuleWeight + contextModifiers.reduce((sum, modifier) => sum + modifier.amount, 0),
@@ -177,15 +188,32 @@ function calculateWeightedEvent(
       weightBeforePenalty,
       recentPenaltyApplied,
       finalWeight,
+      ...(event.kind === 'operative'
+        ? { operativeEligibility: getOperativeEventEligibility(state, event) }
+        : {}),
     },
   };
 }
 
 function getContextModifiers(
+  state: GameState,
   event: EventDefinition,
   context: EventWeightContext,
 ): EventWeightModifier[] {
   const modifiers: EventWeightModifier[] = [];
+
+  if (event.kind === 'operative') {
+    const operative = state.operatives.find((candidate) => candidate.id === event.operativeId);
+    modifiers.push({ id: 'operative_eligible', amount: 0 });
+
+    if (operative?.stress !== undefined && operative.stress >= 60) {
+      modifiers.push({ id: 'operative_stress', amount: 2 });
+    }
+
+    if (operative && operative.recentAssignments.length > 0) {
+      modifiers.push({ id: 'operative_recent_assignment', amount: 2 });
+    }
+  }
 
   if (context.recentTargetTags.has('nightlife') && event.id === 'liaison_favor') {
     modifiers.push({ id: 'recent_nightlife', amount: 8 });
@@ -225,6 +253,13 @@ function getContextModifiers(
   }
 
   return modifiers;
+}
+
+function isEligibleOperativeEvent(
+  state: GameState,
+  event: OperativeEventDefinition,
+): boolean {
+  return getOperativeEventEligibility(state, event).eligible;
 }
 
 function createSelection(

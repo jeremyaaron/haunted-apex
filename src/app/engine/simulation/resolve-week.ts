@@ -1,17 +1,18 @@
 import type { GameState, QueuedOrder } from '../model';
-import { applyIdleStressRecovery } from './stress';
+import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
 import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
 import { applyRivalPassiveEffects } from './rival-effects';
-import { resolveQueuedOrder } from './resolve-action';
-import { selectWeeklyEvent, type EventSelection } from './select-weekly-event';
+import { resolveQueuedOrder, type ActionResolution } from './resolve-action';
+import { getWeightedEvents, selectWeeklyEvent, type EventSelection, type WeightedEvent } from './select-weekly-event';
 
 export type AdvanceWeekResult =
   | {
       ok: true;
       state: GameState;
       eventSelection: EventSelection;
+      eventCandidates: WeightedEvent[];
       orderResolutions: OrderResolutionDiagnostic[];
     }
   | {
@@ -23,6 +24,9 @@ export type AdvanceWeekResult =
 export type OrderResolutionDiagnostic = {
   order: QueuedOrder;
   complication: boolean;
+  riskChance: number;
+  resolvedDelta: ActionResolution['resolvedDelta'];
+  stressDelta: number;
 };
 
 export function advanceWeek(state: GameState): AdvanceWeekResult {
@@ -57,19 +61,29 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
         ...(order.target ? { target: { ...order.target } } : {}),
       },
       complication: resolution.complication,
+      riskChance: resolution.riskChance,
+      resolvedDelta: resolution.resolvedDelta,
+      stressDelta: resolution.stressDelta,
     });
   }
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
+  next = pruneRecentAssignments(next);
   next = applyWeeklyDrift(next);
   next = applyLocalDistrictCooling(next);
   next = applyRivalPassiveEffects(next);
   next = pruneRecentActivity(next);
 
+  const eventCandidates = getWeightedEvents(next);
   const selectedEvent = selectWeeklyEvent(next);
+  const seenSignatureEventIds =
+    selectedEvent.definition.kind === 'operative'
+      ? [...next.seenSignatureEventIds, selectedEvent.definition.id]
+      : next.seenSignatureEventIds;
   next = {
     ...next,
     rngCursor: selectedEvent.rng.cursor,
+    seenSignatureEventIds,
     queuedOrders: [],
     pendingEvent: selectedEvent.event,
     phase: 'EVENT_CHOICE',
@@ -90,6 +104,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
     ok: true,
     state: next,
     eventSelection: selectedEvent,
+    eventCandidates,
     orderResolutions,
   };
 }

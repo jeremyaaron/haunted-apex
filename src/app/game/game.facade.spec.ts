@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { getEventDefinition, newGame } from '../engine';
-import { CURRENT_RUN_STORAGE_KEY } from './game-storage.service';
-import { GameFacade } from './game.facade';
+import {
+  CURRENT_GAME_VERSION,
+  CURRENT_RUN_STORAGE_KEY,
+  CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V02_STORAGE_KEY,
+  type StoredRunEnvelope,
+} from './game-storage.service';
+import { GameFacade, SAVE_COMPATIBILITY_NOTICE } from './game.facade';
 
 describe('GameFacade', () => {
   beforeEach(() => {
@@ -18,12 +24,12 @@ describe('GameFacade', () => {
     const state = facade.startNewGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(facade.state()).toEqual(state);
-    expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(state);
+    expect(readStoredState()).toEqual(state);
   });
 
   it('loads a valid current run on construction', () => {
     const saved = newGame({ seed: 'SAVED-SEED' });
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(saved));
+    storeEnvelope(saved);
 
     const facade = TestBed.inject(GameFacade);
 
@@ -38,6 +44,30 @@ describe('GameFacade', () => {
     expect(facade.state().week).toBe(1);
     expect(facade.state().phase).toBe('COMMAND');
     expect(facade.state().pressures.dominion).toBe(12);
+    expect(facade.compatibilityNotice()).toBe(SAVE_COMPATIBILITY_NOTICE);
+    expect(readStoredState()).toEqual(facade.state());
+  });
+
+  it('removes a legacy save, starts fresh, and exposes a compatibility notice', () => {
+    localStorage.setItem(LEGACY_V02_STORAGE_KEY, JSON.stringify(newGame({ seed: 'LEGACY' })));
+
+    const facade = TestBed.inject(GameFacade);
+
+    expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
+    expect(facade.state().week).toBe(1);
+    expect(facade.compatibilityNotice()).toBe(SAVE_COMPATIBILITY_NOTICE);
+    expect(readStoredState()).toEqual(facade.state());
+  });
+
+  it('dismisses the compatibility notice without changing game state', () => {
+    localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.state();
+
+    facade.dismissCompatibilityNotice();
+
+    expect(facade.compatibilityNotice()).toBeUndefined();
+    expect(facade.state()).toBe(state);
   });
 
   it('queues and removes an order through the engine', () => {
@@ -85,9 +115,7 @@ describe('GameFacade', () => {
       id: 'venue_zero_mercy',
     });
     expect(facade.queuedOrders()[0].targetLabel).toBe('Zero Mercy');
-    expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(
-      facade.state(),
-    );
+    expect(readStoredState()).toEqual(facade.state());
   });
 
   it('exposes legal targets, target previews, districts, and rivals', () => {
@@ -129,9 +157,7 @@ describe('GameFacade', () => {
     expect(facade.state().phase).toBe('EVENT_CHOICE');
     expect(facade.state().pendingEvent).toBeDefined();
     expect(facade.pendingEventDefinition()?.id).toBe(facade.state().pendingEvent?.definitionId);
-    expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(
-      facade.state(),
-    );
+    expect(readStoredState()).toEqual(facade.state());
   });
 
   it('resolves an event choice and returns to command phase or game over', () => {
@@ -173,7 +199,7 @@ describe('GameFacade', () => {
     const facade = TestBed.inject(GameFacade);
     facade.startNewGame({ seed: 'FIRST' });
     const saved = newGame({ seed: 'SECOND' });
-    localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(saved));
+    storeEnvelope(saved);
 
     expect(facade.loadCurrentRun()).toBeTrue();
     expect(facade.state()).toEqual(saved);
@@ -195,6 +221,47 @@ describe('GameFacade', () => {
     expect(facade.state().recentActivity).toEqual([]);
     expect(facade.districts().every((district) => district.heat === district.baseHeat)).toBeTrue();
     expect(facade.rivals().every((rival) => rival.pressure === 0)).toBeTrue();
-    expect(JSON.parse(localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null')).toEqual(reset);
+    expect(readStoredState()).toEqual(reset);
+  });
+
+  it('exposes roster, hire-pool, detail, and assignment views', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startNewGame({ seed: 'VIOLET-ASH-1047' });
+
+    expect(facade.roster().length).toBe(3);
+    expect(facade.roster()[0].signatureTrait.name.length).toBeGreaterThan(0);
+    expect(facade.hirePool().length).toBe(4);
+    expect(facade.hirePool()[0].recruitCost).toBe(1600);
+    expect(facade.getAssignmentOptions('gather_intel').length).toBe(3);
+
+    const activeId = facade.roster()[0].id;
+    facade.selectOperative(activeId);
+    expect(facade.selectedOperativeDetail()?.id).toBe(activeId);
+    expect(facade.selectedOperativeDetail()?.candidate).toBeFalse();
+
+    const candidateId = facade.hirePool()[0].id;
+    facade.selectOperative(candidateId);
+    expect(facade.selectedOperativeDetail()?.id).toBe(candidateId);
+    expect(facade.selectedOperativeDetail()?.candidate).toBeTrue();
+
+    facade.selectOperative(undefined);
+    expect(facade.selectedOperativeDetail()).toBeUndefined();
   });
 });
+
+function storeEnvelope(state: ReturnType<typeof newGame>): void {
+  const envelope: StoredRunEnvelope = {
+    schemaVersion: CURRENT_SAVE_SCHEMA_VERSION,
+    gameVersion: CURRENT_GAME_VERSION,
+    savedAt: '2026-06-07T00:00:00.000Z',
+    state,
+  };
+  localStorage.setItem(CURRENT_RUN_STORAGE_KEY, JSON.stringify(envelope));
+}
+
+function readStoredState() {
+  const envelope = JSON.parse(
+    localStorage.getItem(CURRENT_RUN_STORAGE_KEY) ?? 'null',
+  ) as StoredRunEnvelope;
+  return envelope.state;
+}

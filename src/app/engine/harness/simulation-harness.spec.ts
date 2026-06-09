@@ -1,12 +1,18 @@
 import {
   AGGRESSIVE_BOT,
+  CAUTIOUS_BOT,
+  GREEDY_BOT,
+  OPERATOR_BOT,
   STRATEGY_AGENTS,
+  type AgentDecisionContext,
   formatBatchReport,
   getLegalOrderOptions,
+  getRosterCompositionKey,
   simulateBatch,
   simulateRun,
 } from './index';
-import { newGame } from '../simulation';
+import { materializeOperativeState } from '../roster';
+import { newGame, queueOrder } from '../simulation';
 
 describe('simulation harness', () => {
   it('simulates a deterministic agent run without the Angular UI', () => {
@@ -26,7 +32,48 @@ describe('simulation harness', () => {
     expect(first.actionUsage).toEqual(second.actionUsage);
     expect(first.targetUsage).toEqual(second.targetUsage);
     expect(first.contextualEvents).toEqual(second.contextualEvents);
+    expect(first.startingRosterIds).toEqual(second.startingRosterIds);
+    expect(first.initialHirePoolIds).toEqual(second.initialHirePoolIds);
+    expect(first.operativeStats).toEqual(second.operativeStats);
+    expect(first.operativeEventStats).toEqual(second.operativeEventStats);
     expect(first.trace.length).toBeGreaterThan(0);
+  });
+
+  it('normalizes roster composition keys independent of generation order', () => {
+    expect(getRosterCompositionKey(['op_juno_hex', 'op_mara_voss', 'op_iris_vale'])).toBe(
+      getRosterCompositionKey(['op_mara_voss', 'op_iris_vale', 'op_juno_hex']),
+    );
+  });
+
+  it('records operative run stats for starting, recruited, and event-triggered operatives', () => {
+    const run = simulateRun({
+      agent: OPERATOR_BOT,
+      seed: 'HARNESS-ROSTER-TELEMETRY',
+    });
+    const startingIds = new Set(run.startingRosterIds);
+    const hirePoolIds = new Set(run.initialHirePoolIds);
+    const stats = Object.values(run.operativeStats);
+
+    expect(stats.length).toBeGreaterThanOrEqual(run.startingRosterIds.length + run.initialHirePoolIds.length);
+    expect(stats.filter((operative) => operative.started).map((operative) => operative.operativeId).sort()).toEqual(
+      [...startingIds].sort(),
+    );
+    expect(
+      stats
+        .filter((operative) => operative.hirePoolPresent)
+        .map((operative) => operative.operativeId)
+        .sort(),
+    ).toEqual([...hirePoolIds].sort());
+    expect(
+      stats
+        .filter((operative) => startingIds.has(operative.operativeId))
+        .every((operative) => operative.finalStress !== undefined && operative.highestStress !== undefined),
+    ).toBeTrue();
+    expect(
+      Object.values(run.operativeEventStats).every(
+        (event) => event.selectedCount <= event.eligibleCount,
+      ),
+    ).toBeTrue();
   });
 
   it('provides agents with engine-validated action-operative-target combinations', () => {
@@ -48,6 +95,160 @@ describe('simulation harness', () => {
     ).toBeTrue();
   });
 
+  it('generates complete legal operative and recruit combinations', () => {
+    const state = newGame({ seed: 'HARNESS-COMPLETE-OPTIONS' });
+    const options = getLegalOrderOptions(state);
+    const gatherOptions = options.filter(
+      (option) => option.actionId === 'gather_intel' && !option.target,
+    );
+    const recruitOptions = options.filter((option) => option.actionId === 'recruit_operative');
+
+    expect(gatherOptions.length).toBe(state.operatives.length + 1);
+    expect(recruitOptions.map((option) => option.target?.id)).toEqual(state.hirePool);
+    expect(recruitOptions.every((option) => !option.assignedOperativeId)).toBeTrue();
+
+    for (const option of options) {
+      expect(
+        queueOrder(state, {
+          actionId: option.actionId,
+          assignedOperativeId: option.assignedOperativeId,
+          target: option.target,
+        }).ok,
+      ).toBeTrue();
+    }
+  });
+
+  it('every agent chooses legal first orders across varied rosters', () => {
+    const seeds = Array.from({ length: 24 }, (_value, index) => `HARNESS-VARIED-${index + 1}`);
+
+    for (const seed of seeds) {
+      const state = newGame({ seed });
+      const options = getLegalOrderOptions(state);
+
+      for (const agent of STRATEGY_AGENTS) {
+        const choice = agent.chooseOrder(state, options, createTestContext(seed, agent.id));
+
+        expect(choice).withContext(`${agent.id} should choose for ${seed}`).toBeDefined();
+        if (!choice) {
+          fail(`${agent.id} did not choose for ${seed}`);
+          continue;
+        }
+
+        expect(options).toContain(choice);
+        expect(
+          queueOrder(state, {
+            actionId: choice.actionId,
+            assignedOperativeId: choice.assignedOperativeId,
+            target: choice.target,
+          }).ok,
+        )
+          .withContext(`${agent.id} should choose a queueable order for ${seed}`)
+          .toBeTrue();
+      }
+    }
+  });
+
+  it('does not let agents target absent candidates or exceed the roster cap', () => {
+    for (const agent of STRATEGY_AGENTS) {
+      for (let index = 0; index < 12; index += 1) {
+        const run = simulateRun({
+          agent,
+          seed: `HARNESS-RECRUIT-LEGAL-${agent.id}-${index + 1}`,
+        });
+        const initialHirePool = new Set(newGame({ seed: run.seed }).hirePool);
+        const recruitedTargets = Object.values(run.targetUsage).filter(
+          (target) => target.targetType === 'recruit',
+        );
+
+        expect(run.reason).not.toBe('agent_stalled');
+        expect(run.finalState.operatives.length).toBeLessThanOrEqual(5);
+        expect(
+          recruitedTargets.every((target) => initialHirePool.has(target.targetId as never)),
+        ).toBeTrue();
+      }
+    }
+  });
+
+  it('keeps Breaking operatives available to legal option generation', () => {
+    const state = newGame({ seed: 'HARNESS-BREAKING-LEGAL' });
+    state.operatives[0].stress = 85;
+    const options = getLegalOrderOptions(state);
+
+    expect(
+      options.some(
+        (option) =>
+          option.assignedOperativeId === state.operatives[0].id &&
+          option.preview.selectedOperative?.stressTier === 'breaking',
+      ),
+    ).toBeTrue();
+  });
+
+  it('makes CautiousBot avoid unnecessary Breaking assignments', () => {
+    const state = newGame({ seed: 'HARNESS-CAUTIOUS-BREAKING' });
+    state.operatives = [
+      { ...materializeOperativeState('op_vant_black'), stress: 85 },
+      materializeOperativeState('op_mara_voss'),
+      materializeOperativeState('op_juno_hex'),
+    ];
+    const options = getLegalOrderOptions(state).filter(
+      (option) =>
+        option.actionId === 'gather_intel' && !option.target && option.assignedOperativeId,
+    );
+    const choice = CAUTIOUS_BOT.chooseOrder(state, options, createTestContext('CAUTIOUS', 'bot'));
+
+    expect(choice?.assignedOperativeId).not.toBe('op_vant_black');
+  });
+
+  it('lets AggressiveBot accept justified Breaking Stress for Dominion progress', () => {
+    const state = newGame({ seed: 'HARNESS-AGGRESSIVE-BREAKING' });
+    state.pressures.dominion = 80;
+    state.operatives = [
+      { ...materializeOperativeState('op_knox_riven'), stress: 85 },
+      materializeOperativeState('op_rook_vale'),
+      materializeOperativeState('op_echo_saint'),
+    ];
+    const options = getLegalOrderOptions(state).filter(
+      (option) =>
+        option.actionId === 'run_small_job' &&
+        option.target?.type === 'district' &&
+        option.target.id === 'district_violet_ward' &&
+        option.assignedOperativeId,
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'bot'));
+
+    expect(choice?.assignedOperativeId).toBe('op_knox_riven');
+    expect(choice?.preview.selectedOperative?.projectedStressTier).toBe('breaking');
+  });
+
+  it('makes GreedyBot prefer cash recovery over thin-reserve recruitment', () => {
+    const state = newGame({ seed: 'HARNESS-GREEDY-RESERVE' });
+    state.pressures.resources = 2000;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'recruit_operative' || option.actionId === 'run_small_job',
+    );
+    const choice = GREEDY_BOT.chooseOrder(state, options, createTestContext('GREEDY', 'bot'));
+
+    expect(choice?.actionId).toBe('run_small_job');
+  });
+
+  it('makes OperatorBot recruit for a missing role when the roster is stressed', () => {
+    const state = newGame({ seed: 'HARNESS-OPERATOR-RECRUIT' });
+    state.pressures.heat = 78;
+    state.operatives = [
+      { ...materializeOperativeState('op_mara_voss'), stress: 72 },
+      { ...materializeOperativeState('op_knox_riven'), stress: 76 },
+      { ...materializeOperativeState('op_juno_hex'), stress: 68 },
+    ];
+    state.hirePool = ['op_vant_black'];
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'recruit_operative' || option.actionId === 'run_small_job',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'bot'));
+
+    expect(choice?.actionId).toBe('recruit_operative');
+    expect(choice?.target).toEqual({ type: 'recruit', id: 'op_vant_black' });
+  });
+
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {
     const report = simulateBatch({
       agents: STRATEGY_AGENTS,
@@ -67,9 +268,20 @@ describe('simulation harness', () => {
     expect(output).toContain('district_state');
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
+    expect(output).toContain('roster_compositions');
+    expect(output).toContain('operative_presence');
+    expect(output).toContain('operative_recruitment');
+    expect(output).toContain('operative_usage');
+    expect(output).toContain('operative_stress');
+    expect(output).toContain('operative_danger');
+    expect(output).toContain('operative_events');
+    expect(output).toContain('hire_pool_selection');
 
     for (const summary of report.summaries) {
-      const actionCount = Object.values(summary.actionUsage).reduce((total, count) => total + count, 0);
+      const actionCount = Object.values(summary.actionUsage).reduce(
+        (total, count) => total + count,
+        0,
+      );
       const targetCount = summary.targetReports.reduce(
         (total, target) => total + target.selections,
         0,
@@ -88,6 +300,13 @@ describe('simulation harness', () => {
       expect(summary.averageFinalDistricts.district_violet_ward.control).toBeGreaterThanOrEqual(0);
       expect(summary.averageFinalDistricts.district_violet_ward.heat).toBeGreaterThanOrEqual(0);
       expect(summary.contextualEvents.influencedSelections).toBeGreaterThanOrEqual(0);
+      expect(summary.rosterCompositionReports.length).toBeGreaterThan(0);
+      expect(summary.operativePresenceReports.length).toBeGreaterThan(0);
+      expect(summary.operativeRecruitmentReports.length).toBeGreaterThan(0);
+      expect(summary.operativeUsageReports.length).toBeGreaterThan(0);
+      expect(summary.operativeStressReports.length).toBeGreaterThan(0);
+      expect(summary.operativeDangerReports.length).toBeGreaterThan(0);
+      expect(summary.hirePoolSelectionReports.length).toBeGreaterThan(0);
     }
 
     expect(
@@ -114,3 +333,25 @@ describe('simulation harness', () => {
     expect(simulateBatch(options)).toEqual(simulateBatch(options));
   });
 });
+
+function createTestContext(seed: string, agentId: string): AgentDecisionContext {
+  let cursor = seed.length + agentId.length;
+
+  return {
+    nextInt: (minInclusive, maxInclusive) => {
+      const span = maxInclusive - minInclusive + 1;
+      const value = minInclusive + (cursor % span);
+      cursor += 1;
+      return value;
+    },
+    pick: (items) => {
+      if (items.length === 0) {
+        throw new Error('Cannot pick from an empty list.');
+      }
+
+      const value = items[cursor % items.length];
+      cursor += 1;
+      return value;
+    },
+  };
+}

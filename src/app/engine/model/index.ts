@@ -24,14 +24,36 @@ export type {
   TurnPhase,
 } from './game-state';
 export type {
+  CityEventDefinition,
   EventChoiceDefinition,
   EventDefinition,
+  EventId,
   EventTag,
   EventWeightRule,
   GameEventInstance,
+  OperativeEventDefinition,
+  OperativeEventPredicate,
+  OperativeEventTrigger,
+  OperativeEventTriggerCondition,
   SpecialCost,
 } from './events';
-export type { Operative, OperativeSkill, OperativeStatus, RecruitCandidate } from './operatives';
+export type {
+  OperativeAffinity,
+  OperativeDefinition,
+  GeneratedRoster,
+  OperativeId,
+  OperativeRarity,
+  OperativeRoleTag,
+  OperativeSkill,
+  OperativeState,
+  OperativeStateDelta,
+  OperativeStats,
+  OperativeStatus,
+  RecentAssignment,
+  RosterGenerationConfig,
+  StressProfile,
+  StressTier,
+} from './operatives';
 export { PRESSURE_IDS } from './pressures';
 export type { PressureDelta, PressureId, Pressures } from './pressures';
 export type {
@@ -42,3 +64,10 @@ export type {
   RivalState,
 } from './rivals';
 export type { VenueArchetype, VenueDefinition, VenueId } from './venues';
+export type {
+  ModifierCondition,
+  TraitDefinition,
+  TraitId,
+  TraitKind,
+  TraitModifier,
+} from './traits';

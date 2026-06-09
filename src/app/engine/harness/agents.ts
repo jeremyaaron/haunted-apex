@@ -1,11 +1,19 @@
-import { DISTRICT_ZERO_ACTIONS, DISTRICT_ZERO_WIN_LOSS_THRESHOLDS } from '../content';
+import {
+  DISTRICT_ZERO_ACTIONS,
+  DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
+  getOperativeDefinition,
+} from '../content';
 import type {
   ActionId,
+  ActionTarget,
   EventChoiceDefinition,
   GameState,
+  OperativeId,
+  OperativeRoleTag,
   PressureDelta,
   Pressures,
   QueuedOrder,
+  StressTier,
 } from '../model';
 import type { ActionPreview, QueueOrderRequest } from '../selectors';
 
@@ -45,7 +53,8 @@ const ACTION_ORDER = DISTRICT_ZERO_ACTIONS.map((action) => action.id);
 export const RANDOM_BOT: StrategyAgent = {
   id: 'random',
   label: 'RandomBot',
-  chooseOrder: (_state, options, context) => (options.length > 0 ? context.pick(options) : undefined),
+  chooseOrder: (_state, options, context) =>
+    options.length > 0 ? context.pick(options) : undefined,
   chooseEventChoice: (_state, options, context) =>
     options.length > 0 ? context.pick(options) : undefined,
 };
@@ -79,7 +88,7 @@ export const CAUTIOUS_BOT: StrategyAgent = {
         risk: -0.85,
         resourceCost: -0.0014,
       },
-      (option) => scoreCautiousTarget(state, option),
+      (option) => scoreCautiousTarget(state, option) + scoreCautiousRoster(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, cautiousWeights(state)),
@@ -95,7 +104,7 @@ export const GREEDY_BOT: StrategyAgent = {
       context,
       greedyWeights(state),
       {},
-      (option) => scoreGreedyTarget(state, option),
+      (option) => scoreGreedyTarget(state, option) + scoreGreedyRoster(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(state, options, context, greedyWeights(state)),
@@ -113,7 +122,9 @@ export const OPERATOR_BOT: StrategyAgent = {
           state.pressures,
           getOrderNetDelta(option),
           option.preview.riskChance,
-        ) + scoreOperatorTarget(state, option),
+        ) +
+        scoreOperatorTarget(state, option) +
+        scoreOperatorRoster(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
@@ -129,7 +140,9 @@ export const STRATEGY_AGENTS = [
   OPERATOR_BOT,
 ] as const;
 
-export function getQueuedActionUsage(queuedOrders: readonly QueuedOrder[]): Record<ActionId, number> {
+export function getQueuedActionUsage(
+  queuedOrders: readonly QueuedOrder[],
+): Record<ActionId, number> {
   return queuedOrders.reduce(
     (usage, order) => ({
       ...usage,
@@ -164,14 +177,23 @@ function chooseHighestScoringOrder(
     const pressureBias =
       state.pressures.resources < 2200 && option.actionId === 'run_small_job' ? 18 : 0;
 
-    return pressureScore + riskPenalty + costPenalty + pressureBias + scoreTarget(option);
+    return (
+      pressureScore +
+      riskPenalty +
+      costPenalty +
+      pressureBias +
+      scoreVisibleModifiers(option, weights) +
+      scoreBasicOperativeFit(option) +
+      scoreTarget(option)
+    );
   });
 }
 
 function scoreAggressiveTarget(option: LegalOrderOption): number {
   return (
     (option.preview.localImpact?.controlGain ?? 0) * 1.5 +
-    (option.preview.rivalAttention ? 2 : 0)
+    (option.preview.rivalAttention ? 2 : 0) +
+    scoreAggressiveRoster(option)
   );
 }
 
@@ -179,8 +201,7 @@ function scoreCautiousTarget(state: GameState, option: LegalOrderOption): number
   const target = option.preview.selectedTarget;
   const districtId = option.preview.localImpact?.districtId;
   const localHeat = districtId ? state.districts[districtId].heat : 0;
-  const paleCircuitBias =
-    target?.type === 'venue' && target.id === 'venue_pale_circuit' ? 18 : 0;
+  const paleCircuitBias = target?.type === 'venue' && target.id === 'venue_pale_circuit' ? 18 : 0;
   const uncontrolledBias = target && !option.preview.rivalAttention ? 8 : 0;
   const rivalPenalty = option.preview.rivalAttention ? -18 : 0;
   const resourceRecoveryBias =
@@ -202,6 +223,50 @@ function scoreCautiousTarget(state: GameState, option: LegalOrderOption): number
     unaffordableUpkeepPenalty -
     localHeat * 0.35
   );
+}
+
+function scoreCautiousRoster(state: GameState, option: LegalOrderOption): number {
+  if (option.actionId === 'recruit_operative') {
+    const candidateScore = scoreCandidate(
+      state,
+      option,
+      {
+        heat_control: 34,
+        stability: 24,
+        social: 7,
+        intel: 5,
+      },
+      {
+        missingRoleMultiplier: 1.4,
+        stressRelief: getHighStressShare(state) * 42,
+        reserveFloor: 2100,
+      },
+    );
+
+    const lacksHeatControl = getRoleCount(state, 'heat_control') === 0;
+    const highStressRoster = getHighStressShare(state) >= 0.5;
+
+    return candidateScore + (lacksHeatControl || highStressRoster ? 38 : -12);
+  }
+
+  const selected = option.preview.selectedOperative;
+
+  if (!selected) {
+    return option.actionId === 'lay_low' && state.pressures.heat >= 65 ? 14 : 0;
+  }
+
+  const tierPenalty = stressTierValue(selected.projectedStressTier, {
+    stable: 8,
+    strained: 1,
+    unstable: -26,
+    breaking: -80,
+  });
+  const heatRoleBias = hasRole(selected.operativeId, 'heat_control') ? 12 : 0;
+  const stabilityBias = hasRole(selected.operativeId, 'stability') ? 8 : 0;
+  const layLowStressBias =
+    option.actionId === 'lay_low' ? selected.stress * 1.2 + stressReductionValue(selected) * 2 : 0;
+
+  return tierPenalty + heatRoleBias + stabilityBias + layLowStressBias;
 }
 
 function scoreGreedyTarget(state: GameState, option: LegalOrderOption): number {
@@ -246,6 +311,65 @@ function scoreGreedyTarget(state: GameState, option: LegalOrderOption): number {
   );
 }
 
+function scoreGreedyRoster(state: GameState, option: LegalOrderOption): number {
+  if (option.actionId === 'recruit_operative') {
+    return scoreCandidate(
+      state,
+      option,
+      {
+        money: 42,
+        intel: 18,
+        tech: 14,
+        violence: 9,
+      },
+      {
+        missingRoleMultiplier: 0.9,
+        reserveFloor: 2600,
+      },
+    );
+  }
+
+  const selected = option.preview.selectedOperative;
+  const roleBias = selected
+    ? scoreRoles(getRoleTags(selected.operativeId), {
+        money: 14,
+        intel: 10,
+        tech: 8,
+        violence: option.actionId === 'run_small_job' ? 8 : 0,
+      })
+    : 0;
+  const stressPenalty = selected ? stressAssignmentPenalty(selected.projectedStressTier) * 0.45 : 0;
+
+  return roleBias + stressPenalty;
+}
+
+function scoreAggressiveRoster(option: LegalOrderOption): number {
+  if (option.actionId === 'recruit_operative') {
+    return scoreCandidateRoles(option, {
+      violence: 36,
+      money: 22,
+      rival_pressure: 12,
+      social: 7,
+    });
+  }
+
+  const selected = option.preview.selectedOperative;
+  const victoryMove =
+    (option.preview.adjustedEffects.dominion ?? 0) >= 8 || option.actionId === 'expand_influence';
+  const projectedBreakingPenalty =
+    selected?.projectedStressTier === 'breaking' && !victoryMove ? -24 : 0;
+  const roleBias = selected
+    ? scoreRoles(getRoleTags(selected.operativeId), {
+        violence: 16,
+        money: 10,
+        rival_pressure: 6,
+        social: 5,
+      })
+    : 0;
+
+  return roleBias + projectedBreakingPenalty;
+}
+
 function scoreOperatorTarget(state: GameState, option: LegalOrderOption): number {
   const rivalAttention = option.preview.rivalAttention;
   const winsImmediately =
@@ -259,6 +383,33 @@ function scoreOperatorTarget(state: GameState, option: LegalOrderOption): number
   const controlValue = (option.preview.localImpact?.controlGain ?? 0) * 0.6;
 
   return highPressurePenalty + heatAwarePenalty + controlValue;
+}
+
+function scoreOperatorRoster(state: GameState, option: LegalOrderOption): number {
+  if (option.actionId === 'recruit_operative') {
+    return scoreCandidate(state, option, operatorRoleValues(state), {
+      missingRoleMultiplier: 1.7,
+      stressRelief: getHighStressShare(state) * 46,
+      reserveFloor: state.pressures.resources <= 2200 ? 2400 : 1700,
+    });
+  }
+
+  const selected = option.preview.selectedOperative;
+
+  if (!selected) {
+    return 0;
+  }
+
+  const skillScore = selected.relevantSkillValue ? selected.relevantSkillValue * 0.55 : 0;
+  const currentStressPenalty = selected.stress * -0.18;
+  const projectedStressPenalty = stressAssignmentPenalty(selected.projectedStressTier);
+  const roleScore = scoreRoles(getRoleTags(selected.operativeId), operatorRoleValues(state));
+  const recoveryBias =
+    option.actionId === 'lay_low'
+      ? stressReductionValue(selected) * 3.5 + selected.stress * 0.5
+      : 0;
+
+  return skillScore + currentStressPenalty + projectedStressPenalty + roleScore + recoveryBias;
 }
 
 function chooseHighestScoringChoice(
@@ -349,7 +500,8 @@ function scoreDelta(delta: PressureDelta, weights: PressureWeights): number {
 function getOrderNetDelta(option: LegalOrderOption): PressureDelta {
   return {
     ...option.preview.adjustedEffects,
-    resources: (option.preview.adjustedEffects.resources ?? 0) - option.preview.adjustedResourceCost,
+    resources:
+      (option.preview.adjustedEffects.resources ?? 0) - option.preview.adjustedResourceCost,
   };
 }
 
@@ -385,6 +537,157 @@ function scoreOperatorPressureMove(
   );
 }
 
+function scoreVisibleModifiers(option: LegalOrderOption, weights: PressureWeights): number {
+  const selected = option.preview.selectedOperative;
+
+  if (!selected) {
+    return 0;
+  }
+
+  return selected.appliedSources.reduce((score, source) => {
+    const effectScore = source.effects ? scoreDelta(source.effects, weights) : 0;
+    const riskScore = (source.riskModifier ?? 0) * -0.8;
+    const stressScore = (source.stressModifier ?? 0) * -0.6;
+    const costScore = (source.resourceCostModifier ?? 0) * -0.001;
+    const territoryScore = (source.districtControlModifier ?? 0) * 0.8;
+    const rivalScore = (source.rivalPressureModifier ?? 0) * -0.5;
+
+    return score + effectScore + riskScore + stressScore + costScore + territoryScore + rivalScore;
+  }, 0);
+}
+
+function scoreBasicOperativeFit(option: LegalOrderOption): number {
+  const selected = option.preview.selectedOperative;
+
+  if (!selected) {
+    return 0;
+  }
+
+  const skillScore = selected.relevantSkillValue ? selected.relevantSkillValue * 0.12 : 0;
+  const stressScore = stressAssignmentPenalty(selected.projectedStressTier) * 0.25;
+
+  return skillScore + stressScore;
+}
+
+function scoreCandidate(
+  state: GameState,
+  option: LegalOrderOption,
+  roleValues: Partial<Record<OperativeRoleTag, number>>,
+  config: {
+    missingRoleMultiplier: number;
+    reserveFloor: number;
+    stressRelief?: number;
+  },
+): number {
+  if (option.actionId !== 'recruit_operative' || option.target?.type !== 'recruit') {
+    return 0;
+  }
+
+  const next = applyDeltaForScoring(state.pressures, getOrderNetDelta(option));
+
+  if (isLosingProjection(next)) {
+    return -10_000;
+  }
+
+  const reservePenalty =
+    next.resources < config.reserveFloor ? (config.reserveFloor - next.resources) * -0.035 : 0;
+  const targetDefinition = getOperativeDefinition(option.target.id);
+  const missingRoleScore = targetDefinition
+    ? targetDefinition.roleTags.reduce((score, role) => {
+        const base = roleValues[role] ?? 0;
+        const missingMultiplier =
+          getRoleCount(state, role) === 0 ? config.missingRoleMultiplier : 1;
+        return score + base * missingMultiplier;
+      }, 0)
+    : 0;
+  const candidateStressValue =
+    option.preview.selectedOperative?.projectedStressTier === 'stable' ? 8 : 0;
+
+  return missingRoleScore + (config.stressRelief ?? 0) + candidateStressValue + reservePenalty;
+}
+
+function scoreCandidateRoles(
+  option: LegalOrderOption,
+  roleValues: Partial<Record<OperativeRoleTag, number>>,
+): number {
+  if (option.actionId !== 'recruit_operative' || option.target?.type !== 'recruit') {
+    return 0;
+  }
+
+  return scoreRoles(getRoleTags(option.target.id), roleValues);
+}
+
+function operatorRoleValues(state: GameState): Partial<Record<OperativeRoleTag, number>> {
+  const heatDanger = highBandDanger(
+    state.pressures.heat,
+    60,
+    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss,
+  );
+  const loyaltyDanger = lowBandDanger(state.pressures.loyalty, 45);
+  const resourceDanger = lowBandDanger(state.pressures.resources, 1800);
+  const intelNeed = state.pressures.intel < 25 ? 1 : 0;
+  const ruinDanger = state.pressures.ruin >= 18 ? 1 : 0;
+
+  return {
+    heat_control: 12 + heatDanger * 44,
+    stability: 10 + Math.max(heatDanger, loyaltyDanger, ruinDanger) * 30,
+    money: 8 + resourceDanger * 34,
+    intel: 7 + intelNeed * 22,
+    tech: 5 + intelNeed * 10,
+    social: 8 + loyaltyDanger * 15,
+    violence: state.pressures.dominion < 60 ? 10 : 4,
+    rival_pressure: 4,
+    ruin: ruinDanger ? 18 : 4,
+    recruitment: getHighStressShare(state) >= 0.5 ? 16 : 5,
+  };
+}
+
+function scoreRoles(
+  roles: readonly OperativeRoleTag[],
+  roleValues: Partial<Record<OperativeRoleTag, number>>,
+): number {
+  return roles.reduce((score, role) => score + (roleValues[role] ?? 0), 0);
+}
+
+function getRoleTags(operativeId: OperativeId): readonly OperativeRoleTag[] {
+  return getOperativeDefinition(operativeId)?.roleTags ?? [];
+}
+
+function hasRole(operativeId: OperativeId, role: OperativeRoleTag): boolean {
+  return getRoleTags(operativeId).includes(role);
+}
+
+function getRoleCount(state: GameState, role: OperativeRoleTag): number {
+  return state.operatives.filter((operative) => hasRole(operative.id, role)).length;
+}
+
+function getHighStressShare(state: GameState): number {
+  if (state.operatives.length === 0) {
+    return 0;
+  }
+
+  return (
+    state.operatives.filter((operative) => operative.stress >= 60).length / state.operatives.length
+  );
+}
+
+function stressAssignmentPenalty(tier: StressTier): number {
+  return stressTierValue(tier, {
+    stable: 4,
+    strained: -4,
+    unstable: -22,
+    breaking: -58,
+  });
+}
+
+function stressReductionValue(selected: NonNullable<ActionPreview['selectedOperative']>): number {
+  return Math.max(0, selected.stress - selected.projectedStress);
+}
+
+function stressTierValue(tier: StressTier, values: Record<StressTier, number>): number {
+  return values[tier];
+}
+
 function operatorWeights(pressures: Pressures): PressureWeights {
   const heatDanger = highBandDanger(pressures.heat, 60, DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss);
   const loyaltyDanger = lowBandDanger(pressures.loyalty, 45);
@@ -412,8 +715,7 @@ function getWorstNormalizedSurvivalMargin(pressures: Pressures): number {
   const heatMargin =
     (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss - pressures.heat) /
     DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss;
-  const loyaltyMargin =
-    (pressures.loyalty - DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.loyaltyLoss) / 60;
+  const loyaltyMargin = (pressures.loyalty - DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.loyaltyLoss) / 60;
   const resourceMargin =
     (pressures.resources - DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.resourceLoss) / 5000;
 

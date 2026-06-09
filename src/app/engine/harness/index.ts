@@ -12,6 +12,7 @@ export {
   formatBatchReport,
   getLegalEventChoiceOptions,
   getLegalOrderOptions,
+  getRosterCompositionKey,
   simulateBatch,
   simulateRun,
 } from './simulation-harness';
