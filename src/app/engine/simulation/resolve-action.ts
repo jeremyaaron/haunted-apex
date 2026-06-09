@@ -3,7 +3,7 @@ import {
   getOperativeDefinition,
   getRivalDefinition,
 } from '../content';
-import { resolveLedgerUse } from '../ledger';
+import { previewSecretDiscovery, resolveLedgerUse, resolveSecretDiscovery } from '../ledger';
 import type {
   ActionDefinition,
   GameLogEntry,
@@ -86,6 +86,7 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     return resolveLedgerUse(state, order.target);
   }
 
+  const secretDiscoveryPreview = previewSecretDiscovery(state, order);
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
     : undefined;
@@ -180,9 +181,12 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     });
   }
 
+  const secretDiscovery = resolveSecretDiscovery(next, order, secretDiscoveryPreview);
+  next = secretDiscovery.state;
+
   return {
     state: next,
-    rng: roll.rng,
+    rng: secretDiscovery.rng,
     complication,
     riskChance,
     resolvedDelta: totalDelta,

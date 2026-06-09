@@ -27,7 +27,13 @@ import type {
   VenueDefinition,
 } from '../model';
 import { PRESSURE_IDS } from '../model';
-import { previewLedgerUse, type LedgerCostRow, type LedgerUsePreview } from '../ledger';
+import {
+  previewLedgerUse,
+  previewSecretDiscovery,
+  type LedgerCostRow,
+  type LedgerUsePreview,
+  type SecretDiscoveryPreview,
+} from '../ledger';
 import {
   calculateActionStressDelta,
   calculateOperativeModifiers,
@@ -129,6 +135,7 @@ export type ActionPreview = {
   ledgerUse?: LedgerUsePreview;
   ledgerCosts?: LedgerCostRow[];
   ledgerConsumesEntry?: boolean;
+  secretDiscovery?: SecretDiscoveryPreview;
 };
 
 export type RivalAttentionPreview = {
@@ -352,6 +359,11 @@ export function getActionPreview(
   const ledgerUse = action.id === 'work_the_ledger'
     ? previewLedgerUse(state, target, baseRiskChance)
     : undefined;
+  const secretDiscovery = previewSecretDiscovery(state, {
+    actionId: action.id,
+    assignedOperativeId,
+    target,
+  });
   const adjustedEffects = ledgerUse?.ok
     ? ledgerUse.effects
     : getAdjustedEffects(
@@ -408,6 +420,7 @@ export function getActionPreview(
     ledgerUse,
     ledgerCosts: ledgerUse?.ok ? ledgerUse.costRows : undefined,
     ledgerConsumesEntry: ledgerUse?.ok ? ledgerUse.consumesEntry : undefined,
+    secretDiscovery,
   };
 }
 

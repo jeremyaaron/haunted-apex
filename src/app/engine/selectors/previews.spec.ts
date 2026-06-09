@@ -75,6 +75,23 @@ describe('action previews', () => {
     );
   });
 
+  it('previews targeted Gather Intel Secret chance', () => {
+    const state = newGame({ seed: 'SECRET-ACTION-PREVIEW' });
+    const untargeted = getActionPreview(state, 'gather_intel');
+    const targeted = getActionPreview(state, 'gather_intel', undefined, {
+      type: 'district',
+      id: 'district_ghostline_market',
+    });
+
+    expect(untargeted?.secretDiscovery?.eligible).toBeFalse();
+    expect(targeted?.secretDiscovery).toEqual(
+      jasmine.objectContaining({
+        eligible: true,
+        chance: 23,
+      }),
+    );
+  });
+
   it('applies Mara Voss Gather Intel modifier', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const preview = getActionPreview(state, 'gather_intel', 'op_mara_voss');

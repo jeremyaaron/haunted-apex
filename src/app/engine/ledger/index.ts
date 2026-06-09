@@ -7,6 +7,12 @@ export type {
   LedgerUseUnavailableReason,
   ResolveLedgerUseResult,
 } from './ledger-use';
+export { previewSecretDiscovery, resolveSecretDiscovery } from './secret-discovery';
+export type {
+  ResolveSecretDiscoveryResult,
+  SecretDiscoveryCandidate,
+  SecretDiscoveryPreview,
+} from './secret-discovery';
 export {
   getLedgerDefinition,
   getLedgerEntry,

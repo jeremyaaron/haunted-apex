@@ -553,6 +553,29 @@ Unit tests:
 - Unique definitions are not rediscovered while active if unique behavior is enabled.
 - Raw Intel gain is not reduced in this phase.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Added shared Secret discovery preview and resolution helpers.
+- Targeted `Gather Intel` now previews exact Secret discovery chance, candidates,
+  duplicate counts, and candidate weights.
+- Untargeted `Gather Intel` remains ineligible for Secret discovery.
+- Secret discovery chance accounts for current Intel, target context, and assigned
+  operative Stress.
+- Resolution uses seeded rolls for discovery chance and weighted candidate
+  selection.
+- Discovered Secrets are added as Ledger entries with action source metadata,
+  related target context, optional operative/rival context, and discovery
+  diagnostics flags.
+- Candidate weighting respects target tags, target identity, rival context, active
+  duplicate penalties, and unique active-entry exclusion.
+- Integrated discovery preview into action previews and discovery resolution into
+  queued order resolution without reducing raw Intel gain.
+- Added coverage for untargeted ineligibility, exact targeted chance, Stress/target
+  modifiers, deterministic discovery, source context, duplicate weighting,
+  unique-entry exclusion, and raw Intel preservation.
+
 ### Review Gate
 
 Review Secret discovery frequency with a small harness smoke test before adding more
