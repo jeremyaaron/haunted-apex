@@ -46,6 +46,13 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Field Guide');
     expect(compiled.textContent).toContain('Risk: Low 10%');
     expect(compiled.textContent).toContain('Gather Intel');
+    expect(compiled.textContent).toContain('Stable');
+    expect(compiled.textContent).toContain('Pleasure District');
+    expect(compiled.textContent).toContain('Failing Lounge');
+    expect(compiled.textContent).toContain('Velvet Tyrant');
+    expect(compiled.textContent).not.toContain('pleasure_district');
+    expect(compiled.textContent).not.toContain('failing_lounge');
+    expect(compiled.textContent).not.toContain('velvet_tyrant');
     expect(compiled.querySelectorAll('.operative-card').length).toBe(3);
     expect(compiled.querySelectorAll('.hire-card').length).toBe(4);
     expect(compiled.textContent).toContain('Available Contacts');
@@ -180,6 +187,11 @@ describe('App', () => {
     expect(summary?.textContent).toContain('Orchid Ghostline');
     expect(summary?.textContent).toContain('+300 Resources');
     expect(summary?.textContent).toContain('Risk');
+    expect(
+      Array.from(summary?.querySelectorAll('.modifier-effects span') ?? []).some(
+        (effect) => effect.textContent?.trim() === '+300 Resources',
+      ),
+    ).toBeTrue();
   });
 
   it('keeps a Breaking operative selectable while showing the danger state', () => {

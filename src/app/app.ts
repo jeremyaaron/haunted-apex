@@ -367,6 +367,10 @@ export class App {
       .join(' ');
   }
 
+  protected displayTokens(values: readonly string[]): string {
+    return values.map((value) => this.displayToken(value)).join(' / ');
+  }
+
   protected unavailableReason(reason: string | undefined): string {
     switch (reason) {
       case 'roster_full':

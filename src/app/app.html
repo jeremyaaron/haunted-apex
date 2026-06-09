@@ -160,7 +160,7 @@
                     <option value="">No operative</option>
                     @for (operative of action.availableOperatives; track operative.id) {
                       <option [value]="operative.id" [disabled]="operative.disabled">
-                        {{ operative.name }} · {{ operative.stressTier }}
+                        {{ operative.name }} · {{ displayToken(operative.stressTier) }}
                       </option>
                     }
                   </select>
@@ -175,7 +175,10 @@
                         <span>Recruit candidate</span>
                         <strong>{{ candidate.name }}</strong>
                       </div>
-                      <p>{{ candidate.rarity }} · {{ candidate.roleTags.join(' / ') }}</p>
+                      <p>
+                        {{ displayToken(candidate.rarity) }} ·
+                        {{ displayTokens(candidate.roleTags) }}
+                      </p>
                       <small>Projected roster: {{ projectedRosterCount() }} / 5</small>
                     </div>
                   }
@@ -189,17 +192,21 @@
                       <strong>{{ selected.name }}</strong>
                     </div>
                     <p>
-                      {{ selected.stressTier }} {{ selected.stress }}
+                      {{ displayToken(selected.stressTier) }} {{ selected.stress }}
                       →
-                      {{ selected.projectedStressTier }} {{ selected.projectedStress }} · Risk
-                      {{ action.riskChance }}%
+                      {{ displayToken(selected.projectedStressTier) }}
+                      {{ selected.projectedStress }} · Risk {{ action.riskChance }}%
                     </p>
                     @if (selected.appliedSources.length > 0) {
                       <ul>
                         @for (source of selected.appliedSources; track source.sourceId) {
                           <li>
                             <strong>{{ source.label }}</strong>
-                            <span>{{ modifierEffects(source).join(' · ') }}</span>
+                            <span class="modifier-effects">
+                              @for (effect of modifierEffects(source); track effect) {
+                                <span>{{ effect }}</span>
+                              }
+                            </span>
                           </li>
                         }
                       </ul>
@@ -216,7 +223,7 @@
                   <strong>Pressure +{{ attention.pressureGain }}</strong>
                   <small
                     >{{ attention.currentPressure }} → {{ attention.projectedPressure }} /
-                    {{ attention.projectedTier }}</small
+                    {{ displayToken(attention.projectedTier) }}</small
                   >
                 </div>
               }
@@ -358,12 +365,12 @@
               </div>
               <div>
                 <h3>{{ operative.name }}</h3>
-                <p>{{ operative.archetype }}</p>
+                <p>{{ displayToken(operative.archetype) }}</p>
               </div>
-              <span class="status-pill">{{ operative.status }}</span>
+              <span class="status-pill">{{ displayToken(operative.status) }}</span>
             </div>
             <div class="identity-tags">
-              <span class="rarity-tag">{{ operative.rarity }}</span>
+              <span class="rarity-tag">{{ displayToken(operative.rarity) }}</span>
               @for (role of operative.roleTags; track role) {
                 <span>{{ displayToken(role) }}</span>
               }
@@ -375,7 +382,7 @@
               </div>
               <div>
                 <dt>Stress</dt>
-                <dd>{{ operative.stress }} · {{ operative.stressTier }}</dd>
+                <dd>{{ operative.stress }} · {{ displayToken(operative.stressTier) }}</dd>
               </div>
             </dl>
             <div class="trait-summary">
@@ -409,12 +416,12 @@
               <div class="hire-heading">
                 <div>
                   <strong>{{ candidate.name }}</strong>
-                  <span>{{ candidate.archetype }}</span>
+                  <span>{{ displayToken(candidate.archetype) }}</span>
                 </div>
                 <b>{{ candidate.recruitCost }} R</b>
               </div>
               <div class="identity-tags">
-                <span class="rarity-tag">{{ candidate.rarity }}</span>
+                <span class="rarity-tag">{{ displayToken(candidate.rarity) }}</span>
                 @for (role of candidate.roleTags; track role) {
                   <span>{{ displayToken(role) }}</span>
                 }
@@ -446,7 +453,7 @@
             <div class="district-heading">
               <div>
                 <h3>{{ district.name }}</h3>
-                <p>{{ district.archetype }}</p>
+                <p>{{ displayToken(district.archetype) }}</p>
               </div>
               @if (district.controllingRivalName) {
                 <span class="controller-label">{{ district.controllingRivalName }}</span>
@@ -472,7 +479,7 @@
                 <div class="venue-row">
                   <div>
                     <strong>{{ venue.name }}</strong>
-                    <span>{{ venue.archetype }}</span>
+                    <span>{{ displayToken(venue.archetype) }}</span>
                   </div>
                   <div class="venue-modifiers">
                     @if (venue.wealthMod) {
@@ -517,9 +524,9 @@
             <div class="rival-heading">
               <div>
                 <h3>{{ rival.name }}</h3>
-                <p>{{ rival.archetype }}</p>
+                <p>{{ displayToken(rival.archetype) }}</p>
               </div>
-              <span class="tier-label">{{ rival.pressureTier }}</span>
+              <span class="tier-label">{{ displayToken(rival.pressureTier) }}</span>
             </div>
 
             <div class="rival-pressure-line">
@@ -848,7 +855,7 @@
               {{ detail.candidate ? 'Hire Candidate' : 'Active Operative' }}
             </p>
             <h2 [id]="'operative-detail-' + detail.id">{{ detail.name }}</h2>
-            <p>{{ detail.archetype }} · {{ detail.rarity }}</p>
+            <p>{{ displayToken(detail.archetype) }} · {{ displayToken(detail.rarity) }}</p>
           </div>
           <button
             type="button"
@@ -868,7 +875,7 @@
         <div class="detail-status" [class]="'detail-status tier-' + detail.stressTier">
           <div>
             <span>Stress</span>
-            <strong>{{ detail.stress }} · {{ detail.stressTier }}</strong>
+            <strong>{{ detail.stress }} · {{ displayToken(detail.stressTier) }}</strong>
           </div>
           <p>{{ stressConsequence(detail.stressTier) }}</p>
         </div>

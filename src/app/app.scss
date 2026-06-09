@@ -535,6 +535,21 @@ dt {
   color: #d7fffb;
 }
 
+.modifier-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.modifier-effects span {
+  white-space: nowrap;
+}
+
+.modifier-effects span:not(:last-child)::after {
+  content: ' ·';
+  color: #71808f;
+}
+
 .assignment-summary.breaking {
   border-color: rgba(255, 113, 113, 0.65);
   background: rgba(255, 113, 113, 0.08);
