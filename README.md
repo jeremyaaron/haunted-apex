@@ -1,6 +1,6 @@
 # Haunted Apex
 
-Haunted Apex is a cyber-noir strategy/sim prototype. The latest release is **v0.2.0: Rival Territory**. The current development target is **v0.3.0: The Roster**.
+Haunted Apex is a cyber-noir strategy/sim prototype. The current playable browser build is published through GitHub Pages, and historical design documents are preserved under `docs/`.
 
 Development documentation is organized under [`docs/`](docs/README.md):
 
@@ -8,6 +8,7 @@ Development documentation is organized under [`docs/`](docs/README.md):
 - [`docs/releases/v0.1-district-zero/`](docs/releases/v0.1-district-zero/) preserves the District Zero specification, TDD, and implementation plan.
 - [`docs/releases/v0.2-rival-territory/`](docs/releases/v0.2-rival-territory/) contains the Rival Territory direction, clarifications, TDD, and implementation plan.
 - [`docs/releases/v0.3-the-roster/`](docs/releases/v0.3-the-roster/) contains The Roster direction, clarifications, TDD, and implementation plan.
+- [`docs/releases/v0.4-the-black-ledger/`](docs/releases/v0.4-the-black-ledger/) contains The Black Ledger direction, clarifications, TDD, and implementation plan.
 
 ## Runtime
 
@@ -61,8 +62,8 @@ Tests:
 npm test
 ```
 
-Verify release references before merging to `main`:
+Verify documentation links:
 
 ```bash
-npm run check:readme
+npm run check:docs
 ```

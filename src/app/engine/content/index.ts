@@ -11,6 +11,10 @@ export {
   getActionDefinition,
 } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './event-registry';
+export {
+  getLedgerEntryDefinition,
+  LEDGER_ENTRY_DEFINITIONS,
+} from './ledger-entries';
 export { ROSTER_EVENTS } from './roster-events';
 export {
   getDistrictDefinition,

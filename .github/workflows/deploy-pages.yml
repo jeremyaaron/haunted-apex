@@ -34,8 +34,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify README release status
-        run: npm run check:readme
+      - name: Verify documentation links
+        run: npm run check:docs
 
       - name: Run tests
         run: npm test -- --watch=false --browsers=ChromeHeadless

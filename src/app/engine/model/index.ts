@@ -24,6 +24,22 @@ export type {
   TurnPhase,
 } from './game-state';
 export type {
+  LedgerConsumptionSource,
+  LedgerDiscoveryProfile,
+  LedgerEntry,
+  LedgerEntryDefinition,
+  LedgerEntryDefinitionId,
+  LedgerEntryId,
+  LedgerEntryKind,
+  LedgerEntryRarity,
+  LedgerEntrySource,
+  LedgerPotency,
+  LedgerPressureCost,
+  LedgerState,
+  LedgerUseOptionDefinition,
+  LedgerUseOptionId,
+} from './ledger';
+export type {
   CityEventDefinition,
   EventChoiceDefinition,
   EventDefinition,

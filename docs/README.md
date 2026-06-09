@@ -24,3 +24,10 @@
 - [`v0.3A.md`](releases/v0.3-the-roster/v0.3A.md): locked mechanical decisions.
 - [`Roster-TDD.md`](releases/v0.3-the-roster/Roster-TDD.md): technical design.
 - [`Roster-ImplementationPlan.md`](releases/v0.3-the-roster/Roster-ImplementationPlan.md): phased implementation plan.
+
+## v0.4.0: The Black Ledger
+
+- [`v0.4.md`](releases/v0.4-the-black-ledger/v0.4.md): release direction and product scope.
+- [`v0.4A.md`](releases/v0.4-the-black-ledger/v0.4A.md): locked mechanical decisions.
+- [`BlackLedger-TDD.md`](releases/v0.4-the-black-ledger/BlackLedger-TDD.md): technical design.
+- [`BlackLedger-ImplementationPlan.md`](releases/v0.4-the-black-ledger/BlackLedger-ImplementationPlan.md): phased implementation plan.
