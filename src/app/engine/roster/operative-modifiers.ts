@@ -29,8 +29,8 @@ const STRESS_TIER_ORDER: Record<StressTier, number> = {
 };
 
 const BASE_STRESS_BY_ACTION_TYPE = {
-  normal: 6,
-  dangerous: 10,
+  normal: 7,
+  dangerous: 12,
   recovery: -8,
   none: 0,
 } as const;

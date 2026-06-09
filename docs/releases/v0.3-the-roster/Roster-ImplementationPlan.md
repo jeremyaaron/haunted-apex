@@ -1209,6 +1209,62 @@ Manual analysis:
 Review whether the roster creates different viable stories rather than one solved crew.
 Do not move to release solely because aggregate win rates look acceptable.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Added run-level roster telemetry to the harness:
+  - original starting roster IDs
+  - initial hire-pool IDs
+  - per-operative starting presence, hire-pool presence, recruitment, assignments,
+    complications, final/highest Stress, final Stress tier, Heat/Ruin contribution,
+    operative-event eligibility, and operative-event selections
+  - per-operative-event eligibility and selection counts
+- Added the requested CSV report sections while preserving the existing summary,
+  target, rival, district, loss-cause, and contextual-event sections:
+  - `roster_compositions`
+  - `operative_presence`
+  - `operative_recruitment`
+  - `operative_usage`
+  - `operative_stress`
+  - `operative_danger`
+  - `operative_events`
+  - `hire_pool_selection`
+- Exposed weekly event candidates from `advanceWeek` as diagnostics only; this does
+  not change event selection behavior.
+- Added deterministic harness coverage for roster telemetry, stable roster composition
+  keys, expanded report sections, and operative event selection/eligibility consistency.
+- First v0.3 balance pass adjusted:
+  - Dominion victory threshold from `85` to `90`
+  - normal assignment Stress from `6` to `7`
+  - dangerous assignment Stress from `10` to `12`
+  - Glass Saint from `+2 Dominion / +2 Heat / +2 Ruin` to
+    `+1 Dominion / +4 Heat / +3 Ruin`
+  - Zero Mercy from `+4 Heat / +1 Ruin` to `+5 Heat / +2 Ruin`
+  - operative signature event base weight from `8` to `22`
+- Updated the Field Guide objective and all affected unit fixtures for the `90`
+  Dominion target.
+- Representative final deterministic batch used seed prefix `HARNESS-PHASE10-FINAL`
+  with 100 runs per agent:
+
+```text
+Random:          1% wins, 0 incomplete
+Aggressive:     37% wins, 0 incomplete
+Cautious:        0% wins, 0 incomplete
+Greedy:         59% wins, 0 incomplete
+Operator / Sane: 71% wins, 0 incomplete
+```
+
+- Operator operative-event selections landed at `41` selections per 100 complete runs
+  in the final sampled batch. Greedy selected more operative events due to repeated
+  Orchid Seven economic routing, which is now visible in the new report and should be
+  watched in later tuning.
+- Validation:
+  - All `252` ChromeHeadless tests passed.
+  - Standard production build passed at `360.96 kB` initial output.
+  - `/haunted-apex/` production build passed at `360.96 kB` initial output.
+  - README status check passed with `v0.2.0 released, v0.3.0 in development`.
+
 ---
 
 ## Phase 11: Usability, Deployment, and v0.3.0 Release

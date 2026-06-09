@@ -142,8 +142,8 @@ describe('resolveQueuedOrder assignment history and Stress', () => {
     const juno = result.state.operatives[0];
 
     expect(result.complication).toBeTrue();
-    expect(result.stressDelta).toBe(14);
-    expect(juno.stress).toBe(46);
+    expect(result.stressDelta).toBe(15);
+    expect(juno.stress).toBe(47);
     expect(juno.status).toBe('available');
     expect(juno.weeksAssigned).toBe(1);
     expect(juno.recentAssignments).toEqual([
@@ -164,7 +164,7 @@ describe('resolveQueuedOrder assignment history and Stress', () => {
           'seduction',
         ],
         complication: true,
-        stressDelta: 14,
+        stressDelta: 15,
       },
     ]);
   });

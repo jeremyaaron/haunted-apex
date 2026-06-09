@@ -8,7 +8,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'Ghost Debt',
     text: 'Mara arrives late, coat wet, eyes too calm. Someone from her old life has found the edge of your network and is asking whether you intend to pay what she owes.',
     tags: ['OPERATIVE', 'RESOURCE', 'HEAT'],
-    baseWeight: 8,
+    baseWeight: 22,
     severeAtBreaking: true,
     trigger: {
       mode: 'any',
@@ -50,7 +50,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'Static in Her Voice',
     text: 'Juno keeps repeating part of a sentence you never said. The channel logs show no intrusion, but the waveform has a second heartbeat.',
     tags: ['OPERATIVE', 'INTEL', 'RUIN'],
-    baseWeight: 8,
+    baseWeight: 22,
     severeAtBreaking: true,
     trigger: {
       mode: 'all',
@@ -95,7 +95,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'The Lie Comes Due',
     text: 'Saint finally tells you the person he has been paying was not an official. Not exactly. Not anymore.',
     tags: ['OPERATIVE', 'RESOURCE', 'INTEL'],
-    baseWeight: 8,
+    baseWeight: 22,
     trigger: {
       mode: 'any',
       predicates: [
@@ -134,7 +134,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'Blood Applause',
     text: "The crowd chants Knox's name before the job is done. That is the problem.",
     tags: ['OPERATIVE', 'VIOLENCE', 'HEAT'],
-    baseWeight: 8,
+    baseWeight: 22,
     severeAtBreaking: true,
     trigger: {
       mode: 'any',
@@ -169,7 +169,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'Velvet Access',
     text: 'Iris can get you into a room Nyx believes is hers. The invitation is real. That is what makes it dangerous.',
     tags: ['OPERATIVE', 'LIAISON', 'RIVAL'],
-    baseWeight: 8,
+    baseWeight: 22,
     trigger: {
       mode: 'all',
       predicates: [
@@ -215,7 +215,7 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
     title: 'Route Memory',
     text: 'Orchid knows a route that is not on any map you own. When asked who taught it to them, they say your name.',
     tags: ['OPERATIVE', 'RESOURCE', 'INTEL'],
-    baseWeight: 8,
+    baseWeight: 22,
     trigger: {
       mode: 'any',
       predicates: [

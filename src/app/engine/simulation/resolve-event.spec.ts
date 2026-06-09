@@ -80,7 +80,7 @@ describe('resolveEventChoice', () => {
       week: 8,
       pressures: {
         ...withPendingEvent('rival_tests_border').pressures,
-        dominion: 80,
+        dominion: 85,
       },
     };
     const result = resolveEventChoice(state, 'event_1_1', 'answer_publicly');

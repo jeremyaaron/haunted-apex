@@ -73,6 +73,6 @@ function assignment(week: number): RecentAssignment {
     actionId: 'gather_intel',
     targetTags: [],
     complication: false,
-    stressDelta: 6,
+    stressDelta: 7,
   };
 }

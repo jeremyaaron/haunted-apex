@@ -131,9 +131,9 @@ describe('action previews', () => {
     );
 
     expect(preview?.adjustedEffects).toEqual({
-      heat: 5,
+      heat: 7,
       intel: 22,
-      ruin: 5,
+      ruin: 6,
     });
   });
 
@@ -169,8 +169,8 @@ describe('action previews', () => {
 
     expect(paleCircuit?.adjustedEffects.dominion).toBe(7);
     expect(paleCircuit?.adjustedEffects.heat).toBe(8);
-    expect(glassSaint?.adjustedEffects.dominion).toBe(11);
-    expect(glassSaint?.adjustedEffects.heat).toBe(11);
+    expect(glassSaint?.adjustedEffects.dominion).toBe(10);
+    expect(glassSaint?.adjustedEffects.heat).toBe(13);
   });
 
   it('normalizes a venue modifier that cancels an existing effect', () => {
@@ -367,7 +367,7 @@ describe('action previews', () => {
         relevantSkillValue: 82,
         stress: 85,
         stressTier: 'breaking',
-        projectedStress: 91,
+        projectedStress: 92,
         projectedStressTier: 'breaking',
       }),
     );

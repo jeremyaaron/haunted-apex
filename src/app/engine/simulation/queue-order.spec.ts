@@ -491,7 +491,7 @@ describe('queueOrder', () => {
         targetLabel: 'Zero Mercy',
         adjustedEffects: {
           dominion: 6,
-          heat: 14,
+          heat: 15,
           loyalty: -1,
           resources: 1950,
         },

@@ -5,13 +5,14 @@ import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
 import { applyRivalPassiveEffects } from './rival-effects';
 import { resolveQueuedOrder, type ActionResolution } from './resolve-action';
-import { selectWeeklyEvent, type EventSelection } from './select-weekly-event';
+import { getWeightedEvents, selectWeeklyEvent, type EventSelection, type WeightedEvent } from './select-weekly-event';
 
 export type AdvanceWeekResult =
   | {
       ok: true;
       state: GameState;
       eventSelection: EventSelection;
+      eventCandidates: WeightedEvent[];
       orderResolutions: OrderResolutionDiagnostic[];
     }
   | {
@@ -73,6 +74,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
   next = applyRivalPassiveEffects(next);
   next = pruneRecentActivity(next);
 
+  const eventCandidates = getWeightedEvents(next);
   const selectedEvent = selectWeeklyEvent(next);
   const seenSignatureEventIds =
     selectedEvent.definition.kind === 'operative'
@@ -102,6 +104,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
     ok: true,
     state: next,
     eventSelection: selectedEvent,
+    eventCandidates,
     orderResolutions,
   };
 }

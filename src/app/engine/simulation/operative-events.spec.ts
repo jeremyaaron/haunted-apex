@@ -202,7 +202,7 @@ function assignment(
     actionId,
     targetTags,
     complication: false,
-    stressDelta: 6,
+    stressDelta: 7,
   };
 }
 

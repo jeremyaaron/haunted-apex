@@ -7,6 +7,7 @@ import {
   type AgentDecisionContext,
   formatBatchReport,
   getLegalOrderOptions,
+  getRosterCompositionKey,
   simulateBatch,
   simulateRun,
 } from './index';
@@ -31,7 +32,48 @@ describe('simulation harness', () => {
     expect(first.actionUsage).toEqual(second.actionUsage);
     expect(first.targetUsage).toEqual(second.targetUsage);
     expect(first.contextualEvents).toEqual(second.contextualEvents);
+    expect(first.startingRosterIds).toEqual(second.startingRosterIds);
+    expect(first.initialHirePoolIds).toEqual(second.initialHirePoolIds);
+    expect(first.operativeStats).toEqual(second.operativeStats);
+    expect(first.operativeEventStats).toEqual(second.operativeEventStats);
     expect(first.trace.length).toBeGreaterThan(0);
+  });
+
+  it('normalizes roster composition keys independent of generation order', () => {
+    expect(getRosterCompositionKey(['op_juno_hex', 'op_mara_voss', 'op_iris_vale'])).toBe(
+      getRosterCompositionKey(['op_mara_voss', 'op_iris_vale', 'op_juno_hex']),
+    );
+  });
+
+  it('records operative run stats for starting, recruited, and event-triggered operatives', () => {
+    const run = simulateRun({
+      agent: OPERATOR_BOT,
+      seed: 'HARNESS-ROSTER-TELEMETRY',
+    });
+    const startingIds = new Set(run.startingRosterIds);
+    const hirePoolIds = new Set(run.initialHirePoolIds);
+    const stats = Object.values(run.operativeStats);
+
+    expect(stats.length).toBeGreaterThanOrEqual(run.startingRosterIds.length + run.initialHirePoolIds.length);
+    expect(stats.filter((operative) => operative.started).map((operative) => operative.operativeId).sort()).toEqual(
+      [...startingIds].sort(),
+    );
+    expect(
+      stats
+        .filter((operative) => operative.hirePoolPresent)
+        .map((operative) => operative.operativeId)
+        .sort(),
+    ).toEqual([...hirePoolIds].sort());
+    expect(
+      stats
+        .filter((operative) => startingIds.has(operative.operativeId))
+        .every((operative) => operative.finalStress !== undefined && operative.highestStress !== undefined),
+    ).toBeTrue();
+    expect(
+      Object.values(run.operativeEventStats).every(
+        (event) => event.selectedCount <= event.eligibleCount,
+      ),
+    ).toBeTrue();
   });
 
   it('provides agents with engine-validated action-operative-target combinations', () => {
@@ -226,6 +268,14 @@ describe('simulation harness', () => {
     expect(output).toContain('district_state');
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
+    expect(output).toContain('roster_compositions');
+    expect(output).toContain('operative_presence');
+    expect(output).toContain('operative_recruitment');
+    expect(output).toContain('operative_usage');
+    expect(output).toContain('operative_stress');
+    expect(output).toContain('operative_danger');
+    expect(output).toContain('operative_events');
+    expect(output).toContain('hire_pool_selection');
 
     for (const summary of report.summaries) {
       const actionCount = Object.values(summary.actionUsage).reduce(
@@ -250,6 +300,13 @@ describe('simulation harness', () => {
       expect(summary.averageFinalDistricts.district_violet_ward.control).toBeGreaterThanOrEqual(0);
       expect(summary.averageFinalDistricts.district_violet_ward.heat).toBeGreaterThanOrEqual(0);
       expect(summary.contextualEvents.influencedSelections).toBeGreaterThanOrEqual(0);
+      expect(summary.rosterCompositionReports.length).toBeGreaterThan(0);
+      expect(summary.operativePresenceReports.length).toBeGreaterThan(0);
+      expect(summary.operativeRecruitmentReports.length).toBeGreaterThan(0);
+      expect(summary.operativeUsageReports.length).toBeGreaterThan(0);
+      expect(summary.operativeStressReports.length).toBeGreaterThan(0);
+      expect(summary.operativeDangerReports.length).toBeGreaterThan(0);
+      expect(summary.hirePoolSelectionReports.length).toBeGreaterThan(0);
     }
 
     expect(

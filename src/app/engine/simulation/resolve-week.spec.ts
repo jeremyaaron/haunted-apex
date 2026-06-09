@@ -41,7 +41,7 @@ describe('advanceWeek', () => {
       ruin: 0,
     });
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
-      24,
+      25,
     );
     expect(result.state.operatives.find((operative) => operative.id === 'op_juno_hex')?.stress).toBe(
       30,
@@ -63,7 +63,7 @@ describe('advanceWeek', () => {
           intel: 10,
           resources: -400,
         },
-        stressDelta: 6,
+        stressDelta: 7,
       }),
     );
   });
@@ -85,11 +85,11 @@ describe('advanceWeek', () => {
     }
 
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
-      28,
+      30,
     );
     expect(result.state.pressures.resources).toBe(6450);
     expect(result.state.pressures.dominion).toBe(18);
-    expect(result.state.pressures.heat).toBe(30);
+    expect(result.state.pressures.heat).toBe(31);
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
       control: 11,
@@ -104,7 +104,7 @@ describe('advanceWeek', () => {
           id: 'venue_zero_mercy',
         },
         rivalId: 'rival_knox_marrow',
-        heatDelta: 14,
+        heatDelta: 15,
         dominionDelta: 6,
       }),
     ]);
@@ -272,7 +272,7 @@ describe('advanceWeek', () => {
                 actionId: 'gather_intel' as const,
                 targetTags: [],
                 complication: false,
-                stressDelta: 6,
+                stressDelta: 7,
               })),
             }
           : operative,
@@ -471,14 +471,14 @@ describe('clamps and win/loss', () => {
   });
 
   it('detects dominion victory', () => {
-    expect(getGameOverState(withPressures({ dominion: 85 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 90 }))).toEqual({
       result: 'victory',
       reason: 'dominion_victory',
     });
   });
 
   it('detects loss before victory when fail and win thresholds are both crossed', () => {
-    expect(getGameOverState(withPressures({ dominion: 85, heat: 100 }))).toEqual({
+    expect(getGameOverState(withPressures({ dominion: 90, heat: 100 }))).toEqual({
       result: 'loss',
       reason: 'heat_lockdown',
     });

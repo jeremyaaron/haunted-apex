@@ -49,8 +49,8 @@ describe('App', () => {
     expect(compiled.querySelectorAll('.operative-card').length).toBe(3);
     expect(compiled.querySelectorAll('.hire-card').length).toBe(4);
     expect(compiled.textContent).toContain('Available Contacts');
-    expect(compiled.textContent).toContain('Dominion target 85');
-    expect(compiled.textContent).toContain('Win at 85');
+    expect(compiled.textContent).toContain('Dominion target 90');
+    expect(compiled.textContent).toContain('Win at 90');
     expect(compiled.textContent).toContain('Warning at 25');
     expect(compiled.textContent).not.toContain('Debug Panel');
     expect(compiled.textContent).toContain('Each week begins on the Command Board');
