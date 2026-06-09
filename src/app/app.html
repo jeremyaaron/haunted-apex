@@ -106,7 +106,16 @@
 
               <div class="cost-line">
                 <span>{{ action.commandCost }} Command</span>
-                <span>{{ action.adjustedResourceCost }} Resources</span>
+                @if (action.ledgerCosts?.length) {
+                  @for (cost of action.ledgerCosts; track cost.id) {
+                    <span>{{ cost.value }} {{ pressureLabel(cost.id) }}</span>
+                  }
+                  @if (action.ledgerConsumesEntry) {
+                    <span>Consumes Entry</span>
+                  }
+                } @else {
+                  <span>{{ action.adjustedResourceCost }} Resources</span>
+                }
               </div>
 
               <div class="delta-list">

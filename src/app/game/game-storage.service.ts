@@ -664,7 +664,21 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 function parseActionTarget(value: unknown): ActionTarget | undefined {
-  if (!isRecord(value) || typeof value['type'] !== 'string' || typeof value['id'] !== 'string') {
+  if (!isRecord(value) || typeof value['type'] !== 'string') {
+    return undefined;
+  }
+
+  if (value['type'] === 'ledger') {
+    return typeof value['entryId'] === 'string' && typeof value['useOptionId'] === 'string'
+      ? {
+          type: 'ledger',
+          entryId: value['entryId'],
+          useOptionId: value['useOptionId'],
+        }
+      : undefined;
+  }
+
+  if (typeof value['id'] !== 'string') {
     return undefined;
   }
 
@@ -697,14 +711,6 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
         ? {
             type: 'recruit',
             id: id as OperativeId,
-          }
-        : undefined;
-    case 'ledger':
-      return typeof value['entryId'] === 'string' && typeof value['useOptionId'] === 'string'
-        ? {
-            type: 'ledger',
-            entryId: value['entryId'],
-            useOptionId: value['useOptionId'],
           }
         : undefined;
     default:

@@ -1,4 +1,5 @@
 import { getActionDefinition } from '../content';
+import { addLedgerEntry } from '../ledger';
 import { getResolvedActionDelta, newGame } from '../simulation';
 import { materializeOperativeState } from '../roster';
 import {
@@ -31,6 +32,44 @@ describe('action previews', () => {
         adjustedEffects: {
           intel: 10,
           heat: 2,
+        },
+      }),
+    );
+  });
+
+  it('previews Ledger costs, effects, consumption, and risk on Work the Ledger', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-ACTION-PREVIEW' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+      },
+    });
+    const preview = getActionPreview(state, 'work_the_ledger', undefined, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'burn_patrol_window',
+    });
+
+    expect(preview).toEqual(
+      jasmine.objectContaining({
+        adjustedResourceCost: 0,
+        adjustedEffects: {
+          heat: -12,
+        },
+        riskChance: 3,
+        riskLabel: 'Very Low',
+        ledgerCosts: [{ id: 'intel', value: 2 }],
+        ledgerConsumesEntry: true,
+      }),
+    );
+    expect(preview?.ledgerUse).toEqual(
+      jasmine.objectContaining({
+        ok: true,
+        targetLabel: 'Patrol Schedule - Burn Patrol Window',
+        resolvedDelta: {
+          heat: -12,
+          intel: -2,
         },
       }),
     );

@@ -3,6 +3,7 @@ import {
   getOperativeDefinition,
   getRivalDefinition,
 } from '../content';
+import { resolveLedgerUse } from '../ledger';
 import type {
   ActionDefinition,
   GameLogEntry,
@@ -79,6 +80,10 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
       resolvedDelta: {},
       stressDelta: 0,
     };
+  }
+
+  if (action.id === 'work_the_ledger') {
+    return resolveLedgerUse(state, order.target);
   }
 
   const operative = order.assignedOperativeId

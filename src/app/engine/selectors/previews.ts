@@ -27,6 +27,7 @@ import type {
   VenueDefinition,
 } from '../model';
 import { PRESSURE_IDS } from '../model';
+import { previewLedgerUse, type LedgerCostRow, type LedgerUsePreview } from '../ledger';
 import {
   calculateActionStressDelta,
   calculateOperativeModifiers,
@@ -125,6 +126,9 @@ export type ActionPreview = {
   riskLabel: RiskLabel;
   rivalAttention?: RivalAttentionPreview;
   localImpact?: LocalImpactPreview;
+  ledgerUse?: LedgerUsePreview;
+  ledgerCosts?: LedgerCostRow[];
+  ledgerConsumesEntry?: boolean;
 };
 
 export type RivalAttentionPreview = {
@@ -306,30 +310,20 @@ function getLedgerTargetAvailability(
   state: GameState,
   target: Extract<ActionTarget, { type: 'ledger' }>,
 ): OrderAvailability {
-  const entry = state.ledger.entries.find((candidate) => candidate.id === target.entryId);
+  const preview = previewLedgerUse(state, target);
 
-  if (!entry) {
-    return unavailable('target_not_found');
-  }
-
-  if (entry.consumed) {
-    return unavailable('ledger_entry_consumed');
-  }
-
-  const useOption = getLedgerUseOption(state, target);
-
-  if (!useOption) {
-    return unavailable('ledger_use_option_not_found');
+  if (!preview.ok) {
+    return unavailable(preview.reason);
   }
 
   if (
     state.pressures.resources - getQueuedResourceCost(state) <
-    (useOption.cost?.resources ?? 0)
+    preview.cost.resources
   ) {
     return unavailable('not_enough_resources');
   }
 
-  if (state.pressures.intel - getQueuedIntelCost(state) < (useOption.cost?.intel ?? 0)) {
+  if (state.pressures.intel - getQueuedIntelCost(state) < preview.cost.intel) {
     return unavailable('not_enough_intel');
   }
 
@@ -354,14 +348,20 @@ export function getActionPreview(
     ? state.operatives.find((candidate) => candidate.id === assignedOperativeId)
     : undefined;
   const modifiers = getOperativeModifiers(state, action, operative, target);
-  const adjustedEffects = getAdjustedEffects(
-    action,
-    assignedOperativeId,
-    state,
-    target,
-    modifiers,
-  );
-  const riskChance = calculateRiskChance(action, operative, state, target, modifiers);
+  const baseRiskChance = calculateRiskChance(action, operative, state, target, modifiers);
+  const ledgerUse = action.id === 'work_the_ledger'
+    ? previewLedgerUse(state, target, baseRiskChance)
+    : undefined;
+  const adjustedEffects = ledgerUse?.ok
+    ? ledgerUse.effects
+    : getAdjustedEffects(
+        action,
+        assignedOperativeId,
+        state,
+        target,
+        modifiers,
+      );
+  const riskChance = ledgerUse?.riskChance ?? baseRiskChance;
 
   return {
     actionId: action.id,
@@ -369,13 +369,15 @@ export function getActionPreview(
     requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
-    adjustedResourceCost: getAdjustedResourceCost(
-      action,
-      assignedOperativeId,
-      state,
-      target,
-      modifiers,
-    ),
+    adjustedResourceCost: ledgerUse?.ok
+      ? ledgerUse.cost.resources
+      : getAdjustedResourceCost(
+          action,
+          assignedOperativeId,
+          state,
+          target,
+          modifiers,
+        ),
     baseEffects: { ...action.effects },
     adjustedEffects,
     selectedOperativeId: assignedOperativeId,
@@ -403,6 +405,9 @@ export function getActionPreview(
       target,
       modifiers.districtControlModifier,
     ),
+    ledgerUse,
+    ledgerCosts: ledgerUse?.ok ? ledgerUse.costRows : undefined,
+    ledgerConsumesEntry: ledgerUse?.ok ? ledgerUse.consumesEntry : undefined,
   };
 }
 

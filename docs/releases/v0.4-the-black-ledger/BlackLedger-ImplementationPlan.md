@@ -484,6 +484,24 @@ Unit tests:
 - Unaffordable entries do not resolve.
 - Preview and resolution stay consistent for representative entries.
 
+### Completion Record
+
+Completed June 8, 2026:
+
+- Added shared Ledger use preview and resolution helpers.
+- Preview now reports Ledger Resource/Intel costs, effects, affordability,
+  consumption, resolved deltas, and risk.
+- Resolution calls the shared preview path, applies the previewed delta, preserves
+  consumption metadata, increments consumed counts, and writes action logs.
+- Integrated `work_the_ledger` order resolution into the normal queued-order
+  resolver.
+- Extended command previews and the command board UI to show Ledger costs,
+  effects, consumption, and risk distinctly.
+- Updated saved target parsing so queued Ledger targets round-trip through
+  storage.
+- Added unit coverage for Debt, Secret, Favor, consumed-entry blocking,
+  unaffordable-entry blocking, risk modifiers, and preview/resolution parity.
+
 ### Review Gate
 
 Confirm preview/resolution parity before adding discovery and event creation paths.
