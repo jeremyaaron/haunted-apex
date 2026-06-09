@@ -11,6 +11,7 @@ import {
   simulateBatch,
   simulateRun,
 } from './index';
+import { addLedgerEntry } from '../ledger';
 import { materializeOperativeState } from '../roster';
 import type { ActionTarget } from '../model';
 import { newGame, queueOrder } from '../simulation';
@@ -256,6 +257,166 @@ describe('simulation harness', () => {
     expect(choice?.target).toEqual({ type: 'recruit', id: 'op_vant_black' });
   });
 
+  it('includes engine-validated Ledger use options when active entries exist', () => {
+    const state = addLedgerEntry(newGame({ seed: 'HARNESS-LEDGER-OPTIONS' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+        target: { type: 'district', id: 'district_chrome_narrows' },
+      },
+    });
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'work_the_ledger',
+    );
+
+    expect(options.length).toBeGreaterThan(0);
+    expect(
+      options.every((option) => option.target?.type === 'ledger' && option.preview.ledgerUse?.ok),
+    ).toBeTrue();
+
+    for (const option of options) {
+      expect(
+        queueOrder(state, {
+          actionId: option.actionId,
+          target: option.target,
+        }).ok,
+      ).toBeTrue();
+    }
+  });
+
+  it('does not let agents select consumed or unaffordable Ledger uses', () => {
+    const withSecret = addLedgerEntry(newGame({ seed: 'HARNESS-LEDGER-ILLEGAL' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+        target: { type: 'district', id: 'district_chrome_narrows' },
+      },
+    });
+    const consumed = {
+      ...withSecret,
+      pressures: {
+        ...withSecret.pressures,
+        resources: 100,
+        intel: 0,
+      },
+      ledger: {
+        ...withSecret.ledger,
+        entries: withSecret.ledger.entries.map((entry) => ({
+          ...entry,
+          consumed: true,
+          consumedWeek: withSecret.week,
+        })),
+        consumedCount: withSecret.ledger.entries.length,
+      },
+    };
+    const state = addLedgerEntry(consumed, {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const options = getLegalOrderOptions(state);
+
+    expect(options.some((option) => option.actionId === 'work_the_ledger')).toBeFalse();
+
+    for (const agent of STRATEGY_AGENTS) {
+      const choice = agent.chooseOrder(state, options, createTestContext('LEDGER-LEGAL', agent.id));
+
+      expect(choice?.target?.type).not.toBe('ledger');
+    }
+  });
+
+  it('makes OperatorBot use Heat-saving Ledger entries under high Heat', () => {
+    const withSecret = addLedgerEntry(newGame({ seed: 'HARNESS-OPERATOR-LEDGER' }), {
+      definitionId: 'secret_patrol_schedule',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+        target: { type: 'district', id: 'district_chrome_narrows' },
+      },
+    });
+    const state = {
+      ...withSecret,
+      pressures: {
+        ...withSecret.pressures,
+        heat: 84,
+        intel: 12,
+      },
+    };
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'work_the_ledger',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'bot'));
+
+    expect(choice?.actionId).toBe('work_the_ledger');
+    expect(choice?.preview.ledgerUse?.ok ? choice.preview.ledgerUse.definition.kind : undefined).toBe(
+      'secret',
+    );
+    expect(choice?.preview.ledgerUse?.ok ? choice.preview.ledgerUse.effects.heat : undefined).toBeLessThan(
+      0,
+    );
+  });
+
+  it('makes CautiousBot settle affordable old Debts', () => {
+    const withDebt = addLedgerEntry(newGame({ seed: 'HARNESS-CAUTIOUS-LEDGER' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const state = {
+      ...withDebt,
+      week: 5,
+      pressures: {
+        ...withDebt.pressures,
+        resources: 4000,
+        intel: 12,
+      },
+    };
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'work_the_ledger',
+    );
+    const choice = CAUTIOUS_BOT.chooseOrder(state, options, createTestContext('CAUTIOUS', 'bot'));
+
+    expect(choice?.actionId).toBe('work_the_ledger');
+    expect(choice?.preview.ledgerUse?.ok ? choice.preview.ledgerUse.definition.kind : undefined).toBe(
+      'debt',
+    );
+  });
+
+  it('makes AggressiveBot exploit Dominion-positive Secrets', () => {
+    const withSecret = addLedgerEntry(newGame({ seed: 'HARNESS-AGGRESSIVE-LEDGER' }), {
+      definitionId: 'secret_nyx_velvet_ledger',
+      source: {
+        type: 'action',
+        actionId: 'gather_intel',
+        target: { type: 'district', id: 'district_violet_ward' },
+      },
+    });
+    const state = {
+      ...withSecret,
+      pressures: {
+        ...withSecret.pressures,
+        dominion: 42,
+      },
+    };
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'work_the_ledger',
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'bot'));
+
+    expect(choice?.actionId).toBe('work_the_ledger');
+    expect(
+      choice?.preview.ledgerUse?.ok ? choice.preview.ledgerUse.effects.dominion : undefined,
+    ).toBeGreaterThan(0);
+  });
+
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {
     const report = simulateBatch({
       agents: STRATEGY_AGENTS,
@@ -275,6 +436,11 @@ describe('simulation harness', () => {
     expect(output).toContain('district_state');
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
+    expect(output).toContain('ledger_summary');
+    expect(output).toContain('ledger_usage');
+    expect(output).toContain('ledger_outcomes');
+    expect(output).toContain('secret_discovery');
+    expect(output).toContain('ledger_events');
     expect(output).toContain('roster_compositions');
     expect(output).toContain('operative_presence');
     expect(output).toContain('operative_recruitment');
@@ -314,6 +480,9 @@ describe('simulation harness', () => {
       expect(summary.operativeStressReports.length).toBeGreaterThan(0);
       expect(summary.operativeDangerReports.length).toBeGreaterThan(0);
       expect(summary.hirePoolSelectionReports.length).toBeGreaterThan(0);
+      expect(summary.ledgerSummary.averageEntriesCreated).toBeGreaterThanOrEqual(0);
+      expect(summary.ledgerOutcomeReports.length).toBeGreaterThan(0);
+      expect(summary.secretDiscoveryReport.targetedGatherIntelOrders).toBeGreaterThanOrEqual(0);
     }
 
     expect(

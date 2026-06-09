@@ -253,6 +253,11 @@ describe('App', () => {
     expect(output).toContain('district_state');
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
+    expect(output).toContain('ledger_summary');
+    expect(output).toContain('ledger_usage');
+    expect(output).toContain('ledger_outcomes');
+    expect(output).toContain('secret_discovery');
+    expect(output).toContain('ledger_events');
     expect(output).toContain('Operator / Sane');
   });
 

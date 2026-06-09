@@ -1,13 +1,16 @@
 import {
   DISTRICT_ZERO_ACTIONS,
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
 } from '../content';
 import type {
   ActionId,
   ActionTarget,
   EventChoiceDefinition,
+  EventChoiceLedgerEffect,
   GameState,
+  LedgerEntryDefinitionId,
   OperativeId,
   OperativeRoleTag,
   PressureDelta,
@@ -69,10 +72,17 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
       context,
       aggressiveWeights(state),
       {},
-      scoreAggressiveTarget,
+      (option) => scoreAggressiveTarget(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
-    chooseHighestScoringChoice(state, options, context, aggressiveWeights(state)),
+    chooseHighestScoringChoice(
+      state,
+      options,
+      context,
+      aggressiveWeights(state),
+      true,
+      scoreAggressiveEventChoice,
+    ),
 };
 
 export const CAUTIOUS_BOT: StrategyAgent = {
@@ -88,10 +98,20 @@ export const CAUTIOUS_BOT: StrategyAgent = {
         risk: -0.85,
         resourceCost: -0.0014,
       },
-      (option) => scoreCautiousTarget(state, option) + scoreCautiousRoster(state, option),
+      (option) =>
+        scoreCautiousTarget(state, option) +
+        scoreCautiousRoster(state, option) +
+        scoreCautiousLedgerOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
-    chooseHighestScoringChoice(state, options, context, cautiousWeights(state)),
+    chooseHighestScoringChoice(
+      state,
+      options,
+      context,
+      cautiousWeights(state),
+      true,
+      scoreCautiousEventChoice,
+    ),
 };
 
 export const GREEDY_BOT: StrategyAgent = {
@@ -104,10 +124,20 @@ export const GREEDY_BOT: StrategyAgent = {
       context,
       greedyWeights(state),
       {},
-      (option) => scoreGreedyTarget(state, option) + scoreGreedyRoster(state, option),
+      (option) =>
+        scoreGreedyTarget(state, option) +
+        scoreGreedyRoster(state, option) +
+        scoreGreedyLedgerOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
-    chooseHighestScoringChoice(state, options, context, greedyWeights(state)),
+    chooseHighestScoringChoice(
+      state,
+      options,
+      context,
+      greedyWeights(state),
+      true,
+      scoreGreedyEventChoice,
+    ),
 };
 
 export const OPERATOR_BOT: StrategyAgent = {
@@ -124,11 +154,13 @@ export const OPERATOR_BOT: StrategyAgent = {
           option.preview.riskChance,
         ) +
         scoreOperatorTarget(state, option) +
-        scoreOperatorRoster(state, option),
+        scoreOperatorRoster(state, option) +
+        scoreOperatorLedgerOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
-      scoreOperatorPressureMove(state.pressures, mergeChoiceDelta(option.choice), 0),
+      scoreOperatorPressureMove(state.pressures, mergeChoiceDelta(option.choice), 0) +
+      scoreOperatorEventChoice(option.choice),
     ),
 };
 
@@ -189,11 +221,12 @@ function chooseHighestScoringOrder(
   });
 }
 
-function scoreAggressiveTarget(option: LegalOrderOption): number {
+function scoreAggressiveTarget(state: GameState, option: LegalOrderOption): number {
   return (
     (option.preview.localImpact?.controlGain ?? 0) * 1.5 +
     (option.preview.rivalAttention ? 2 : 0) +
-    scoreAggressiveRoster(option)
+    scoreAggressiveRoster(option) +
+    scoreAggressiveLedgerOrder(state, option)
   );
 }
 
@@ -418,13 +451,14 @@ function chooseHighestScoringChoice(
   context: AgentDecisionContext,
   weights: PressureWeights,
   includeSurvivalBias = true,
+  scoreChoice: (choice: EventChoiceDefinition) => number = () => 0,
 ): LegalEventChoiceOption | undefined {
   return chooseHighestScoring(options, context, (option) => {
     const delta = mergeChoiceDelta(option.choice);
     const pressureScore = scoreDelta(delta, weights);
     const survivalBias = includeSurvivalBias ? getSurvivalBias(state, delta) : 0;
 
-    return pressureScore + survivalBias;
+    return pressureScore + survivalBias + scoreChoice(option.choice);
   });
 }
 
@@ -498,11 +532,240 @@ function scoreDelta(delta: PressureDelta, weights: PressureWeights): number {
 }
 
 function getOrderNetDelta(option: LegalOrderOption): PressureDelta {
+  if (option.preview.ledgerUse?.ok) {
+    return option.preview.ledgerUse.resolvedDelta;
+  }
+
   return {
     ...option.preview.adjustedEffects,
     resources:
       (option.preview.adjustedEffects.resources ?? 0) - option.preview.adjustedResourceCost,
   };
+}
+
+function scoreAggressiveLedgerOrder(state: GameState, option: LegalOrderOption): number {
+  const ledger = option.preview.ledgerUse;
+
+  if (!ledger?.ok) {
+    return 0;
+  }
+
+  const delta = ledger.resolvedDelta;
+  const kind = ledger.definition.kind;
+  const debtAge = state.week - ledger.entry.createdWeek;
+  const behindSchedule =
+    state.pressures.dominion <
+    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / 8) * Math.max(1, state.week);
+  const dominionBias =
+    kind === 'secret' && (delta.dominion ?? 0) > 0
+      ? 72 + (delta.dominion ?? 0) * 9
+      : 0;
+  const heatSurvivalBias =
+    state.pressures.heat >= 88 && (delta.heat ?? 0) < 0 ? Math.abs(delta.heat ?? 0) * 7 : 0;
+  const debtPenalty = kind === 'debt' && debtAge < 3 ? -20 : 0;
+  const lateDebtBias = kind === 'debt' && debtAge >= 3 ? 22 + debtAge * 4 : 0;
+  const scheduleBias = behindSchedule && (delta.dominion ?? 0) > 0 ? 24 : 0;
+
+  return dominionBias + heatSurvivalBias + lateDebtBias + scheduleBias + debtPenalty;
+}
+
+function scoreCautiousLedgerOrder(state: GameState, option: LegalOrderOption): number {
+  const ledger = option.preview.ledgerUse;
+
+  if (!ledger?.ok) {
+    return 0;
+  }
+
+  const delta = ledger.resolvedDelta;
+  const kind = ledger.definition.kind;
+  const debtAge = state.week - ledger.entry.createdWeek;
+  const debtBias = kind === 'debt' ? 82 + debtAge * 18 : 0;
+  const heatBias =
+    (kind === 'secret' || kind === 'favor') && (delta.heat ?? 0) < 0
+      ? Math.abs(delta.heat ?? 0) * (state.pressures.heat >= 65 ? 8 : 3)
+      : 0;
+  const loyaltyBias =
+    (delta.loyalty ?? 0) > 0 && state.pressures.loyalty <= 45
+      ? (delta.loyalty ?? 0) * 10
+      : 0;
+  const reservePenalty =
+    ledger.cost.resources > 0 && state.pressures.resources - ledger.cost.resources < 1800
+      ? -45
+      : 0;
+
+  return debtBias + heatBias + loyaltyBias + reservePenalty;
+}
+
+function scoreGreedyLedgerOrder(state: GameState, option: LegalOrderOption): number {
+  const ledger = option.preview.ledgerUse;
+
+  if (!ledger?.ok) {
+    return 0;
+  }
+
+  const delta = ledger.resolvedDelta;
+  const kind = ledger.definition.kind;
+  const cashBias = (delta.resources ?? 0) > 0 ? 85 + (delta.resources ?? 0) * 0.035 : 0;
+  const intelBias = (delta.intel ?? 0) > 0 ? (delta.intel ?? 0) * 9 : 0;
+  const survivalBias =
+    state.pressures.resources < 1000 && (delta.resources ?? 0) > 0
+      ? Math.min(90, (1200 - state.pressures.resources) * 0.05)
+      : 0;
+  const settlementPenalty =
+    kind === 'debt' ? (state.week - ledger.entry.createdWeek < 4 ? -68 : -18) : 0;
+  const spendPenalty =
+    ledger.cost.resources > 0 && state.pressures.resources > 0
+      ? Math.min(60, ledger.cost.resources * 0.035)
+      : 0;
+
+  return cashBias + intelBias + survivalBias + settlementPenalty - spendPenalty;
+}
+
+function scoreOperatorLedgerOrder(state: GameState, option: LegalOrderOption): number {
+  const ledger = option.preview.ledgerUse;
+
+  if (!ledger?.ok) {
+    return 0;
+  }
+
+  const delta = ledger.resolvedDelta;
+  const kind = ledger.definition.kind;
+  const debtAge = state.week - ledger.entry.createdWeek;
+  const behindSchedule =
+    state.pressures.dominion <
+    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / 8) * Math.max(1, state.week);
+  const heatRelief =
+    state.pressures.heat >= 75 && (delta.heat ?? 0) < 0 ? 150 + Math.abs(delta.heat ?? 0) * 8 : 0;
+  const debtBias = kind === 'debt' && debtAge >= 2 ? 88 + debtAge * 12 : 0;
+  const favorSurvival =
+    kind === 'favor' && getWorstNormalizedSurvivalMargin(state.pressures) < 0.2 ? 54 : 0;
+  const dominionBias =
+    kind === 'secret' && behindSchedule && (delta.dominion ?? 0) > 0
+      ? 70 + (delta.dominion ?? 0) * 7
+      : 0;
+  const riskPenalty =
+    ledger.riskChance >= 12 && getWorstNormalizedSurvivalMargin(state.pressures) >= 0.3
+      ? -18
+      : 0;
+
+  return heatRelief + debtBias + favorSurvival + dominionBias + riskPenalty;
+}
+
+function scoreAggressiveEventChoice(choice: EventChoiceDefinition): number {
+  return scoreLedgerChoiceEffects(choice, {
+    secret: 24,
+    debt: 10,
+    favor: 14,
+    resolveDebt: 2,
+    consumeSecret: 26,
+    consumeFavor: 12,
+    contaminatedMoney: 22,
+  });
+}
+
+function scoreCautiousEventChoice(choice: EventChoiceDefinition): number {
+  return scoreLedgerChoiceEffects(choice, {
+    secret: 14,
+    debt: -58,
+    favor: 26,
+    resolveDebt: 70,
+    consumeSecret: 8,
+    consumeFavor: 24,
+    contaminatedMoney: -72,
+  });
+}
+
+function scoreGreedyEventChoice(choice: EventChoiceDefinition): number {
+  return scoreLedgerChoiceEffects(choice, {
+    secret: 16,
+    debt: 22,
+    favor: 10,
+    resolveDebt: -42,
+    consumeSecret: 10,
+    consumeFavor: 8,
+    contaminatedMoney: 82,
+  });
+}
+
+function scoreOperatorEventChoice(choice: EventChoiceDefinition): number {
+  return scoreLedgerChoiceEffects(choice, {
+    secret: 18,
+    debt: -18,
+    favor: 22,
+    resolveDebt: 44,
+    consumeSecret: 18,
+    consumeFavor: 20,
+    contaminatedMoney: -24,
+  });
+}
+
+function scoreLedgerChoiceEffects(
+  choice: EventChoiceDefinition,
+  weights: {
+    secret: number;
+    debt: number;
+    favor: number;
+    resolveDebt: number;
+    consumeSecret: number;
+    consumeFavor: number;
+    contaminatedMoney: number;
+  },
+): number {
+  return (choice.ledgerEffects ?? []).reduce((score, effect) => {
+    if (effect.type === 'create') {
+      return score + scoreLedgerCreation(effect.definitionId, weights);
+    }
+
+    if (effect.type === 'resolve') {
+      return score + weights.resolveDebt;
+    }
+
+    return score + scoreLedgerConsumption(effect, weights);
+  }, 0);
+}
+
+function scoreLedgerCreation(
+  definitionId: LedgerEntryDefinitionId,
+  weights: Parameters<typeof scoreLedgerChoiceEffects>[1],
+): number {
+  const definition = getLedgerEntryDefinition(definitionId);
+
+  if (!definition) {
+    return 0;
+  }
+
+  const base =
+    definition.kind === 'secret'
+      ? weights.secret
+      : definition.kind === 'debt'
+        ? weights.debt
+        : weights.favor;
+  const dirtyMoneyBias =
+    definition.id === 'debt_contaminated_money' ? weights.contaminatedMoney : 0;
+
+  return base + dirtyMoneyBias;
+}
+
+function scoreLedgerConsumption(
+  effect: EventChoiceLedgerEffect,
+  weights: Parameters<typeof scoreLedgerChoiceEffects>[1],
+): number {
+  if (effect.type === 'create') {
+    return 0;
+  }
+
+  if (effect.entrySelector.type === 'kind') {
+    return effect.entrySelector.kind === 'favor' ? weights.consumeFavor : weights.consumeSecret;
+  }
+
+  if (
+    effect.entrySelector.type === 'definition' &&
+    getLedgerEntryDefinition(effect.entrySelector.definitionId)?.kind === 'favor'
+  ) {
+    return weights.consumeFavor;
+  }
+
+  return weights.consumeSecret;
 }
 
 function scoreOperatorPressureMove(
