@@ -1,5 +1,14 @@
 export { addLedgerEntry } from './add-ledger-entry';
 export type { AddLedgerEntryRequest } from './add-ledger-entry';
+export {
+  applyEventLedgerEffects,
+  eventLedgerEffectsAreAvailable,
+  previewEventLedgerEffects,
+} from './event-ledger-effects';
+export type {
+  EventLedgerEffectApplication,
+  EventLedgerEffectPreviewRow,
+} from './event-ledger-effects';
 export { previewLedgerUse, resolveLedgerUse } from './ledger-use';
 export type {
   LedgerCostRow,

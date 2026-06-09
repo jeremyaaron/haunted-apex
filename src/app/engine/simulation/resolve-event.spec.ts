@@ -1,7 +1,12 @@
 import type { EventId, GameState } from '../model';
 import { materializeOperativeState } from '../roster';
+import { addLedgerEntry } from '../ledger';
 import { newGame } from './new-game';
-import { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
+import {
+  getEventChoiceAvailability,
+  getEventChoicePreview,
+  resolveEventChoice,
+} from './resolve-event';
 
 describe('resolveEventChoice', () => {
   it('applies event costs, effects, flags, and advances to the next week', () => {
@@ -20,10 +25,22 @@ describe('resolveEventChoice', () => {
     expect(result.state.pressures.dominion).toBe(15);
     expect(result.state.pressures.ruin).toBe(2);
     expect(result.state.flags['owes_liaison']).toBeTrue();
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'debt_owes_liaison',
+        kind: 'debt',
+        source: {
+          type: 'event',
+          eventId: 'liaison_favor',
+          choiceId: 'accept_the_favor',
+        },
+      }),
+    );
     expect(result.state.eventLog.at(-1)).toEqual(
       jasmine.objectContaining({
         type: 'event_choice',
         title: 'Accept the favor',
+        body: 'Response to A Favor in Violet Light. Ledger: Creates Debt: Owes the Liaison.',
       }),
     );
   });
@@ -115,6 +132,100 @@ describe('resolveEventChoice', () => {
 
     expect(result.state.flags['ran_small_job_this_week']).toBeUndefined();
     expect(result.state.flags['laid_low_this_week']).toBeUndefined();
+  });
+
+  it('previews exact event Ledger consequences', () => {
+    const createPreview = getEventChoicePreview(
+      withPendingEvent('unexpected_windfall'),
+      'event_1_1',
+      'trace_it_first',
+    );
+    const optionalPreview = getEventChoicePreview(
+      withPendingEvent('operative_wants_more'),
+      'event_1_1',
+      'pay_them',
+    );
+
+    expect(createPreview?.ledgerEffects).toEqual([
+      jasmine.objectContaining({
+        type: 'create',
+        kind: 'secret',
+        entryName: 'Dead Channel Trace',
+        available: true,
+      }),
+    ]);
+    expect(optionalPreview?.ledgerEffects).toEqual([
+      jasmine.objectContaining({
+        type: 'resolve',
+        kind: 'debt',
+        entryName: 'Unfunded Promise',
+        available: false,
+        optional: true,
+      }),
+    ]);
+  });
+
+  it('creates exact Ledger definitions from existing event choices', () => {
+    const blackmail = resolveEventChoice(
+      withPendingEvent('blackmail_lead'),
+      'event_1_1',
+      'save_it_for_later',
+    );
+    const windfall = resolveEventChoice(
+      withPendingEvent('unexpected_windfall'),
+      'event_1_1',
+      'take_it',
+    );
+
+    if (!blackmail.ok || !windfall.ok) {
+      fail('Expected event choices to resolve');
+      return;
+    }
+
+    expect(blackmail.state.ledger.entries[0].definitionId).toBe(
+      'secret_magistrate_glass_room',
+    );
+    expect(windfall.state.ledger.entries[0].definitionId).toBe(
+      'debt_contaminated_money',
+    );
+  });
+
+  it('can resolve an active Ledger entry from an event choice', () => {
+    const withDebt = addLedgerEntry(withPendingEvent('operative_wants_more'), {
+      definitionId: 'debt_unfunded_promise',
+      source: {
+        type: 'event',
+        eventId: 'operative_wants_more',
+        choiceId: 'promise_future_rewards',
+      },
+    });
+    const result = resolveEventChoice(withDebt, 'event_1_1', 'pay_them');
+
+    if (!result.ok) {
+      fail(`Expected event choice resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        consumed: true,
+        consumedWeek: 1,
+        consumedBy: {
+          type: 'event',
+          eventId: 'operative_wants_more',
+          choiceId: 'pay_them',
+        },
+      }),
+    );
+    expect(result.state.ledger.consumedCount).toBe(1);
+  });
+
+  it('leaves optional Ledger resolution choices affordable without a matching entry', () => {
+    const state = withPendingEvent('operative_wants_more');
+
+    expect(getEventChoiceAvailability(state, 'event_1_1', 'pay_them')).toEqual({
+      available: true,
+    });
   });
 
   it('rejects choices outside event choice phase', () => {

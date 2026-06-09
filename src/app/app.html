@@ -298,6 +298,15 @@
                       >
                     }
                   </small>
+                  @if (eventLedgerRows(choice.id).length > 0) {
+                    <small class="choice-ledger-effects">
+                      @for (row of eventLedgerRows(choice.id); track row.type + row.entryName) {
+                        <b [class.unavailable]="!row.available">
+                          {{ formatLedgerEventRow(row) }}
+                        </b>
+                      }
+                    </small>
+                  }
                 </button>
               }
             </div>

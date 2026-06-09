@@ -5,6 +5,7 @@ import {
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
+  getEventChoicePreview,
   getOperativeDefinition,
   getTraitDefinition,
   getOrderAvailability,
@@ -26,6 +27,7 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type EventChoiceAvailability,
+  type EventChoicePreview,
   type GameState,
   type NewGameConfig,
   type OrderAvailability,
@@ -241,6 +243,10 @@ export class GameFacade {
 
   getEventChoiceAvailability(eventId: string, choiceId: string): EventChoiceAvailability {
     return getEventChoiceAvailability(this.stateSignal(), eventId, choiceId);
+  }
+
+  getEventChoicePreview(eventId: string, choiceId: string): EventChoicePreview | undefined {
+    return getEventChoicePreview(this.stateSignal(), eventId, choiceId);
   }
 
   private setAndSave(state: GameState): void {

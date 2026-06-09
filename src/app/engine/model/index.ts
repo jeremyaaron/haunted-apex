@@ -42,11 +42,13 @@ export type {
 export type {
   CityEventDefinition,
   EventChoiceDefinition,
+  EventChoiceLedgerEffect,
   EventDefinition,
   EventId,
   EventTag,
   EventWeightRule,
   GameEventInstance,
+  LedgerEntrySelector,
   OperativeEventDefinition,
   OperativeEventPredicate,
   OperativeEventTrigger,

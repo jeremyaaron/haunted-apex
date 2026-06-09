@@ -1,4 +1,10 @@
 import { getEventDefinition } from '../content';
+import {
+  applyEventLedgerEffects,
+  eventLedgerEffectsAreAvailable,
+  previewEventLedgerEffects,
+  type EventLedgerEffectPreviewRow,
+} from '../ledger';
 import type {
   EventChoiceDefinition,
   EventDefinition,
@@ -20,11 +26,18 @@ export type EventChoiceUnavailableReason =
   | 'pending_event_missing'
   | 'event_mismatch'
   | 'choice_not_found'
-  | 'not_enough_cost';
+  | 'not_enough_cost'
+  | 'ledger_entry_not_found';
 
 export type EventChoiceAvailability = {
   available: boolean;
   reason?: EventChoiceUnavailableReason;
+};
+
+export type EventChoicePreview = {
+  choiceId: string;
+  label: string;
+  ledgerEffects: EventLedgerEffectPreviewRow[];
 };
 
 export type ResolveEventChoiceResult =
@@ -88,10 +101,12 @@ export function resolveEventChoice(
     ...next,
     flags,
   };
+  const ledgerApplication = applyEventLedgerEffects(next, definition, choice);
+  next = ledgerApplication.state;
   next = appendLog(next, {
     type: 'event_choice',
     title: choice.label,
-    body: `Response to ${definition.title}.`,
+    body: createEventChoiceLogBody(definition, ledgerApplication.appliedRows),
     pressureDelta,
     tags: definition.tags,
   });
@@ -205,7 +220,7 @@ export function getEventChoiceAvailability(
   const definition = getEventDefinition(pendingEvent.definitionId);
   const choice = definition?.choices.find((candidate) => candidate.id === choiceId);
 
-  if (!choice) {
+  if (!definition || !choice) {
     return unavailable('choice_not_found');
   }
 
@@ -213,8 +228,37 @@ export function getEventChoiceAvailability(
     return unavailable('not_enough_cost');
   }
 
+  if (!eventLedgerEffectsAreAvailable(state, definition, choice)) {
+    return unavailable('ledger_entry_not_found');
+  }
+
   return {
     available: true,
+  };
+}
+
+export function getEventChoicePreview(
+  state: GameState,
+  eventId: string,
+  choiceId: string,
+): EventChoicePreview | undefined {
+  const pendingEvent = state.pendingEvent;
+
+  if (!pendingEvent || (pendingEvent.id !== eventId && pendingEvent.definitionId !== eventId)) {
+    return undefined;
+  }
+
+  const definition = getEventDefinition(pendingEvent.definitionId);
+  const choice = definition?.choices.find((candidate) => candidate.id === choiceId);
+
+  if (!definition || !choice) {
+    return undefined;
+  }
+
+  return {
+    choiceId: choice.id,
+    label: choice.label,
+    ledgerEffects: previewEventLedgerEffects(state, definition, choice),
   };
 }
 
@@ -272,6 +316,36 @@ function applyEventFlags(
     }),
     flags,
   );
+}
+
+function createEventChoiceLogBody(
+  definition: EventDefinition,
+  ledgerRows: readonly EventLedgerEffectPreviewRow[],
+): string {
+  const ledger = ledgerRows.length > 0
+    ? ` Ledger: ${ledgerRows.map(formatLedgerEffectRow).join('; ')}.`
+    : '';
+
+  return `Response to ${definition.title}.${ledger}`;
+}
+
+function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
+  const kind = capitalize(row.kind);
+
+  switch (row.type) {
+    case 'create':
+      return `Creates ${kind}: ${row.entryName}`;
+    case 'consume':
+      return `Consumes ${kind}: ${row.entryName}`;
+    case 'resolve':
+      return `Resolves ${kind}: ${row.entryName}`;
+  }
+
+  return row.entryName;
+}
+
+function capitalize(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
 function clearTransientFlags(

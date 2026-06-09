@@ -19,7 +19,7 @@ export {
   getWeightedEvents,
   selectWeeklyEvent,
 } from './select-weekly-event';
-export { getEventChoiceAvailability, resolveEventChoice } from './resolve-event';
+export { getEventChoiceAvailability, getEventChoicePreview, resolveEventChoice } from './resolve-event';
 export {
   evaluateOperativeEventPredicate,
   evaluateOperativeEventTrigger,
@@ -39,6 +39,7 @@ export type {
 } from './select-weekly-event';
 export type {
   EventChoiceAvailability,
+  EventChoicePreview,
   EventChoiceUnavailableReason,
   ResolveEventChoiceResult,
 } from './resolve-event';

@@ -1,4 +1,10 @@
-import type { ActionId } from './actions';
+import type { ActionId, ActionTarget } from './actions';
+import type {
+  LedgerEntryDefinitionId,
+  LedgerEntryId,
+  LedgerEntryKind,
+  LedgerPotency,
+} from './ledger';
 import type { OperativeId, OperativeStateDelta } from './operatives';
 import type { PressureDelta, PressureId } from './pressures';
 import type { RivalId } from './rivals';
@@ -49,6 +55,27 @@ export type SpecialCost = {
   amount: number;
 };
 
+export type LedgerEntrySelector =
+  | { type: 'selected_entry' }
+  | { type: 'kind'; kind: LedgerEntryKind }
+  | { type: 'definition'; definitionId: LedgerEntryDefinitionId }
+  | { type: 'entry'; entryId: LedgerEntryId };
+
+export type EventChoiceLedgerEffect =
+  | {
+      type: 'create';
+      definitionId: LedgerEntryDefinitionId;
+      potency?: LedgerPotency;
+      relatedTarget?: ActionTarget;
+      relatedOperativeId?: OperativeId;
+      relatedRivalId?: RivalId;
+    }
+  | {
+      type: 'consume' | 'resolve';
+      entrySelector: LedgerEntrySelector;
+      optional?: boolean;
+    };
+
 export type EventChoiceDefinition = {
   id: string;
   label: string;
@@ -57,6 +84,7 @@ export type EventChoiceDefinition = {
   flags?: string[];
   operativeEffects?: OperativeStateDelta;
   rivalPressure?: Partial<Record<RivalId, number>>;
+  ledgerEffects?: readonly EventChoiceLedgerEffect[];
 };
 
 export type OperativeEventPredicate =

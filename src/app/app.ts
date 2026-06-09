@@ -15,6 +15,7 @@ import {
   type ActionTargetOption,
   type AppliedModifierSource,
   type EventChoiceDefinition,
+  type EventLedgerEffectPreviewRow,
   type HireCandidateView,
   type OperativeId,
   type PressureDelta,
@@ -294,6 +295,31 @@ export class App {
       : 'No cost';
   }
 
+  protected eventLedgerRows(choiceId: string): EventLedgerEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.ledgerEffects ?? [];
+  }
+
+  protected formatLedgerEventRow(row: EventLedgerEffectPreviewRow): string {
+    const kind = this.capitalize(row.kind);
+
+    switch (row.type) {
+      case 'create':
+        return `Creates ${kind}: ${row.entryName}`;
+      case 'consume':
+        return `Consumes ${kind}: ${row.entryName}`;
+      case 'resolve':
+        return `Resolves ${kind}: ${row.entryName}`;
+    }
+
+    return row.entryName;
+  }
+
   protected pressureLabel(id: PressureId): string {
     switch (id) {
       case 'dominion':
@@ -313,6 +339,10 @@ export class App {
 
   protected signed(value: number): string {
     return value > 0 ? `+${value}` : `${value}`;
+  }
+
+  private capitalize(value: string): string {
+    return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
   }
 
   protected modifierEffects(source: AppliedModifierSource): string[] {

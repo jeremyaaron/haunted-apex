@@ -669,8 +669,23 @@ dt {
   gap: 6px;
 }
 
+.choice-ledger-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .choice-effects b {
   font-weight: 700;
+}
+
+.choice-ledger-effects b {
+  color: #81d8d0;
+  font-weight: 700;
+}
+
+.choice-ledger-effects b.unavailable {
+  color: #71808f;
 }
 
 .operative-topline {

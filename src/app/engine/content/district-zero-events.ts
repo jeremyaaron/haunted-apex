@@ -24,6 +24,12 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         label: 'Feed them a rival name',
         cost: { intel: 6 },
         effects: { heat: -5, dominion: 2, ruin: 2 },
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'secret_patrol_schedule',
+          },
+        ],
       },
       {
         id: 'let_the_sweep_pass',
@@ -73,6 +79,12 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         label: 'Accept the favor',
         effects: { intel: 10, dominion: 3, ruin: 2 },
         flags: ['owes_liaison'],
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'debt_owes_liaison',
+          },
+        ],
       },
       {
         id: 'pay_instead_of_owing',
@@ -104,12 +116,28 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         label: 'Pay them',
         cost: { resources: 900 },
         effects: { loyalty: 8 },
+        ledgerEffects: [
+          {
+            type: 'resolve',
+            entrySelector: {
+              type: 'definition',
+              definitionId: 'debt_unfunded_promise',
+            },
+            optional: true,
+          },
+        ],
       },
       {
         id: 'promise_future_rewards',
         label: 'Promise future rewards',
         effects: { loyalty: 3, heat: 1 },
         flags: ['made_unfunded_promise'],
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'debt_unfunded_promise',
+          },
+        ],
       },
       {
         id: 'remind_them_who_built_this',
@@ -137,6 +165,12 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         label: 'Save it for later',
         effects: { intel: 5 },
         flags: ['stored_blackmail'],
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'secret_magistrate_glass_room',
+          },
+        ],
       },
       {
         id: 'trade_it_quietly',
@@ -250,12 +284,24 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         id: 'take_it',
         label: 'Take it',
         effects: { resources: 1800, ruin: 2 },
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'debt_contaminated_money',
+          },
+        ],
       },
       {
         id: 'trace_it_first',
         label: 'Trace it first',
         cost: { intel: 4 },
         effects: { resources: 1200, intel: 3 },
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'secret_dead_channel_trace',
+          },
+        ],
       },
       {
         id: 'refuse_contaminated_money',

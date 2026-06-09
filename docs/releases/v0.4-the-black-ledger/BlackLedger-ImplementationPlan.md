@@ -635,6 +635,35 @@ Unit tests:
 - Event choice affordability behavior is unchanged unless Ledger effects explicitly add
   new constraints.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Extended event choice definitions with exact Ledger effects for creating,
+  consuming, and resolving entries.
+- Added Ledger entry selectors for selected entry, kind, definition, and exact entry
+  id.
+- Added shared event Ledger preview/application helpers used by availability,
+  resolution, and UI previews.
+- Event choice availability now blocks required missing Ledger entries while
+  preserving existing behavior for optional Ledger resolution.
+- Event choice resolution can create Ledger entries with `event` source metadata and
+  consume/resolve active entries with event consumption metadata.
+- Event choice logs now summarize applied Ledger consequences with exact entry names.
+- Updated event choice cards to show exact Ledger rows such as `Creates Debt: Owes
+  the Liaison`.
+- Integrated initial city events:
+  - `Accept the favor` creates `Debt: Owes the Liaison`.
+  - `Feed them a rival name` creates `Secret: Patrol Schedule`.
+  - `Promise future rewards` creates `Debt: Unfunded Promise`.
+  - `Pay them` optionally resolves `Debt: Unfunded Promise`.
+  - `Save it for later` creates `Secret: Magistrate in the Glass Room`.
+  - `Take it` creates `Debt: Contaminated Money`.
+  - `Trace it first` creates `Secret: Dead Channel Trace`.
+- Added tests for exact event-created definitions, source metadata, optional
+  resolution, preview rows, preserved pressure effects, and unchanged affordability
+  where Ledger effects are optional.
+
 ### Review Gate
 
 Play one UI run or inspect event previews before adding Ledger-specific event pressure.
