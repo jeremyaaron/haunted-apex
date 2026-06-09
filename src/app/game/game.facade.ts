@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   advanceWeek,
+  buildRunSummary,
   getActionPreview,
   getCommandPointsRemaining,
   getEventDefinition,
@@ -39,6 +40,7 @@ import {
   type QueueOrderResult,
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
+  type RunSummaryReport,
 } from '../engine';
 import {
   GameStorageService,
@@ -70,6 +72,11 @@ export class GameFacade {
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
+  readonly runSummary = computed<RunSummaryReport | undefined>(() => {
+    const state = this.stateSignal();
+
+    return state.gameOver ? buildRunSummary(state) : undefined;
+  });
   readonly districts = computed(() => selectDistrictTerritoryViews(this.stateSignal()));
   readonly rivals = computed(() => selectRivalTerritoryViews(this.stateSignal()));
   readonly roster = computed(() => selectRosterViews(this.stateSignal()));

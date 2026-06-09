@@ -887,6 +887,23 @@ Unit/UI tests:
 - Copy button calls the clipboard path when available.
 - Copy failure state is handled without crashing.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Added a pure `buildRunSummary` / `formatRunSummary` report module.
+- Included result, reason, ended week, seed, final pressures, starting roster,
+  final roster, most assigned operative, MVP operative, most dangerous rival,
+  Ledger counts, unresolved debts, major events, and deterministic epitaph.
+- Added deterministic formatted report text for sharing.
+- Exposed `runSummary()` from `GameFacade` only after game over.
+- Replaced the minimal game-over panel with a Ledger-aware run report.
+- Added `Copy Run Report` using browser clipboard with textarea fallback.
+- Added copy success and failure status copy.
+- Added pure report tests for deterministic victory/loss summaries and Ledger
+  stats.
+- Added UI tests for victory/loss rendering and clipboard success/failure paths.
+
 ### Review Gate
 
 Review copied report text for shareability and tone before harness expansion.

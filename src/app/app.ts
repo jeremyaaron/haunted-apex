@@ -25,6 +25,7 @@ import {
   type PressureDelta,
   type PressureDeltaView,
   type PressureId,
+  type RunSummaryOperative,
   type SpecialCost,
   type StressTier,
 } from './engine';
@@ -46,6 +47,7 @@ export class App {
   protected readonly selectedTargets = signal<Partial<Record<ActionId, ActionTarget>>>({});
   protected readonly harnessOutput = signal('');
   protected readonly debugVisible = signal(false);
+  protected readonly copyReportStatus = signal<'idle' | 'success' | 'failure'>('idle');
   protected seedInput = 'VIOLET-ASH-1047';
 
   protected readonly actionViews = computed(() =>
@@ -146,11 +148,13 @@ export class App {
 
   protected startNewRun(): void {
     this.clearTransientSelections();
+    this.copyReportStatus.set('idle');
     this.game.startNewGame(this.seedInput.trim() ? { seed: this.seedInput } : {});
   }
 
   protected resetRun(): void {
     this.clearTransientSelections();
+    this.copyReportStatus.set('idle');
     this.game.resetCurrentRun(this.seedInput.trim() ? { seed: this.seedInput } : {});
   }
 
@@ -221,6 +225,22 @@ export class App {
     }
 
     this.game.resolveEventChoice(pendingEvent.id, choiceId);
+  }
+
+  protected async copyRunReport(): Promise<void> {
+    const report = this.game.runSummary();
+
+    if (!report) {
+      this.copyReportStatus.set('failure');
+      return;
+    }
+
+    try {
+      await this.writeClipboardText(report.text);
+      this.copyReportStatus.set('success');
+    } catch {
+      this.copyReportStatus.set('failure');
+    }
   }
 
   protected runHarnessBatch(): void {
@@ -369,6 +389,10 @@ export class App {
       default:
         return option.unavailableReason ? this.displayToken(option.unavailableReason) : '';
     }
+  }
+
+  protected runOperativeNames(operatives: readonly RunSummaryOperative[]): string {
+    return operatives.map((operative) => operative.name).join(', ') || 'None';
   }
 
   protected actionUnavailableReason(reason: string | undefined): string {
@@ -631,5 +655,32 @@ export class App {
 
   private isSpecialCost(cost: EventChoiceDefinition['cost']): cost is SpecialCost {
     return typeof cost === 'object' && cost !== null && 'type' in cost;
+  }
+
+  private async writeClipboardText(text: string): Promise<void> {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    if (!this.fallbackCopyText(text)) {
+      throw new Error('Clipboard unavailable');
+    }
+  }
+
+  private fallbackCopyText(text: string): boolean {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    try {
+      return document.execCommand('copy');
+    } finally {
+      document.body.removeChild(textarea);
+    }
   }
 }

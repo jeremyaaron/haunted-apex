@@ -349,10 +349,101 @@
         </div>
       } @else if (game.state().phase === 'GAME_OVER') {
         <div class="game-over-panel">
-          <p class="panel-label">Run Closed</p>
-          <h3>{{ game.state().gameOver?.result }}</h3>
-          <p>{{ game.state().gameOver?.reason }}</p>
-          <button type="button" (click)="startNewRun()">New Run</button>
+          @if (game.runSummary(); as report) {
+            <div class="run-report-header">
+              <div>
+                <p class="panel-label">Run Closed</p>
+                <h3>{{ displayToken(report.result) }}</h3>
+                <p>{{ report.epitaph }}</p>
+              </div>
+              <button type="button" (click)="startNewRun()">New Run</button>
+            </div>
+
+            <div class="run-report-grid">
+              <section>
+                <h4>Outcome</h4>
+                <dl>
+                  <div>
+                    <dt>Reason</dt>
+                    <dd>{{ displayToken(report.reason) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Week</dt>
+                    <dd>{{ report.endedWeek }}</dd>
+                  </div>
+                  <div>
+                    <dt>Seed</dt>
+                    <dd>{{ report.seed }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section>
+                <h4>Final Pressures</h4>
+                <div class="delta-list run-pressure-list">
+                  @for (delta of deltaRows(report.finalPressures); track delta.id) {
+                    <span [class.negative]="delta.value < 0">
+                      {{ pressureLabel(delta.id) }} {{ delta.value }}
+                    </span>
+                  }
+                </div>
+              </section>
+
+              <section>
+                <h4>Roster</h4>
+                <p>Start: {{ runOperativeNames(report.startingRoster) }}</p>
+                <p>Final: {{ runOperativeNames(report.finalRoster) }}</p>
+                <p>Most Assigned: {{ report.mostAssignedOperative?.name || 'None' }}</p>
+                <p>MVP: {{ report.mvpOperative?.name || 'None' }}</p>
+              </section>
+
+              <section>
+                <h4>Ledger</h4>
+                <dl>
+                  <div>
+                    <dt>Gained</dt>
+                    <dd>{{ report.ledger.created }}</dd>
+                  </div>
+                  <div>
+                    <dt>Consumed</dt>
+                    <dd>{{ report.ledger.consumed }}</dd>
+                  </div>
+                  <div>
+                    <dt>Debts</dt>
+                    <dd>{{ report.ledger.unresolvedDebts }}</dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+
+            <div class="run-report-events">
+              <h4>Major Events</h4>
+              @if (report.majorEvents.length > 0) {
+                <ul>
+                  @for (event of report.majorEvents; track event) {
+                    <li>{{ event }}</li>
+                  }
+                </ul>
+              } @else {
+                <p class="muted">No major events recorded.</p>
+              }
+            </div>
+
+            <div class="run-report-copy">
+              <button type="button" (click)="copyRunReport()">Copy Run Report</button>
+              @if (copyReportStatus() === 'success') {
+                <span>Report copied</span>
+              } @else if (copyReportStatus() === 'failure') {
+                <span class="inline-warning">Copy failed</span>
+              }
+            </div>
+            <pre class="run-report-text">{{ report.text }}</pre>
+          } @else {
+            <p class="panel-label">Run Closed</p>
+            <h3>{{ game.state().gameOver?.result }}</h3>
+            <p>{{ game.state().gameOver?.reason }}</p>
+            <button type="button" (click)="startNewRun()">New Run</button>
+          }
         </div>
       } @else {
         <div class="event-choice-panel">

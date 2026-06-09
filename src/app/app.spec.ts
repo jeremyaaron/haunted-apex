@@ -16,6 +16,7 @@ import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
+    TestBed.resetTestingModule();
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [App],
@@ -24,6 +25,7 @@ describe('App', () => {
 
   afterEach(() => {
     localStorage.clear();
+    TestBed.resetTestingModule();
   });
 
   it('should create the app', () => {
@@ -324,6 +326,77 @@ describe('App', () => {
 
     expect(compiled.textContent).not.toContain('EVENT_CHOICE');
     expect(compiled.textContent).toContain('Week 2 / 8');
+  });
+
+  it('renders a victory run summary on the game-over panel', () => {
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gameOverPanel = compiled.querySelector<HTMLElement>('.game-over-panel');
+
+    expect(gameOverPanel?.textContent).toContain('Run Closed');
+    expect(gameOverPanel?.textContent).toContain('Victory');
+    expect(gameOverPanel?.textContent).toContain('Outcome');
+    expect(gameOverPanel?.textContent).toContain('Final Pressures');
+    expect(gameOverPanel?.textContent).toContain('Roster');
+    expect(gameOverPanel?.textContent).toContain('Ledger');
+    expect(gameOverPanel?.textContent).toContain('Copy Run Report');
+    expect(gameOverPanel?.textContent).toContain('Seed: UI-RUN-SUMMARY-VICTORY');
+  });
+
+  it('renders a loss run summary on the game-over panel', () => {
+    storeState(buildGameOverState('loss'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gameOverPanel = compiled.querySelector<HTMLElement>('.game-over-panel');
+
+    expect(gameOverPanel?.textContent).toContain('Loss');
+    expect(gameOverPanel?.textContent).toContain('Heat Lockdown');
+    expect(gameOverPanel?.textContent).toContain('The city looked back');
+  });
+
+  it('copies the run report through the clipboard path', async () => {
+    const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    clickButton(compiled, 'Copy Run Report');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(writeText).toHaveBeenCalledWith(
+      jasmine.stringContaining('Seed: UI-RUN-SUMMARY-VICTORY'),
+    );
+    expect(compiled.querySelector('.run-report-copy')?.textContent).toContain('Report copied');
+  });
+
+  it('shows copy failure state without crashing', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: jasmine
+          .createSpy('writeText')
+          .and.returnValue(Promise.reject(new Error('denied'))),
+      },
+    });
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    clickButton(compiled, 'Copy Run Report');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.run-report-copy')?.textContent).toContain('Copy failed');
   });
 
   it('renders target options with district, venue, and rival labels', () => {
@@ -673,5 +746,70 @@ function consumeLedgerEntry(state: GameState, entryId: string): GameState {
       ),
       consumedCount: state.ledger.consumedCount + 1,
     },
+  };
+}
+
+function buildGameOverState(result: 'victory' | 'loss'): GameState {
+  const withLedger = addLedgerEntry(newGame({ seed: `UI-RUN-SUMMARY-${result.toUpperCase()}` }), {
+    definitionId: 'debt_owes_liaison',
+    source: {
+      type: 'event',
+      eventId: 'liaison_favor',
+      choiceId: 'accept_the_favor',
+    },
+  });
+
+  return {
+    ...withLedger,
+    week: result === 'victory' ? 7 : 5,
+    phase: 'GAME_OVER',
+    gameOver:
+      result === 'victory'
+        ? {
+            result: 'victory',
+            reason: 'dominion_victory',
+          }
+        : {
+            result: 'loss',
+            reason: 'heat_lockdown',
+          },
+    pressures:
+      result === 'victory'
+        ? {
+            dominion: 92,
+            heat: 62,
+            loyalty: 48,
+            resources: 1700,
+            intel: 18,
+            ruin: 16,
+          }
+        : {
+            dominion: 58,
+            heat: 100,
+            loyalty: 39,
+            resources: 900,
+            intel: 12,
+            ruin: 22,
+          },
+    operatives: withLedger.operatives.map((operative, index) => ({
+      ...operative,
+      weeksAssigned: index === 0 ? 4 : operative.weeksAssigned,
+    })),
+    rivals: {
+      ...withLedger.rivals,
+      rival_nyx_ardent: {
+        ...withLedger.rivals.rival_nyx_ardent,
+        pressure: 55,
+      },
+    },
+    eventLog: [
+      ...withLedger.eventLog,
+      {
+        id: 'ui_report_major_event',
+        week: 4,
+        type: 'event_presented',
+        title: 'Debt Comes Due: Owes the Liaison',
+      },
+    ],
   };
 }

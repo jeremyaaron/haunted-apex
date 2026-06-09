@@ -632,6 +632,62 @@ dt {
     linear-gradient(90deg, rgba(129, 216, 208, 0.08), transparent), rgba(129, 216, 208, 0.045);
 }
 
+.run-report-header,
+.run-report-copy {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.run-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.run-report-grid section,
+.run-report-events {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(232, 237, 242, 0.1);
+  background: rgba(4, 7, 11, 0.42);
+}
+
+.run-report-grid h4,
+.run-report-events h4 {
+  margin: 0 0 8px;
+  color: #d7fffb;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.run-report-grid p,
+.run-report-events li {
+  color: #a9b4c0;
+  font-size: 0.76rem;
+}
+
+.run-report-events ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.run-report-copy {
+  align-items: center;
+  margin: 12px 0 8px;
+}
+
+.run-report-copy span {
+  color: #81d8d0;
+  font-size: 0.76rem;
+}
+
+.run-report-text {
+  max-height: 240px;
+}
+
 .event-layout {
   display: grid;
   grid-template-columns: 104px minmax(0, 1fr);
@@ -1699,6 +1755,15 @@ pre {
   .ledger-section-grid,
   .spent-ledger-grid {
     grid-template-columns: 1fr;
+  }
+
+  .run-report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .run-report-header,
+  .run-report-copy {
+    flex-direction: column;
   }
 
   .debug-block.wide {
