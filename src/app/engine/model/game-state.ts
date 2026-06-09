@@ -2,6 +2,7 @@ import type { QueuedOrder } from './actions';
 import type { RecentActivityEntry } from './activity';
 import type { DistrictId, DistrictState } from './districts';
 import type { EventId, GameEventInstance } from './events';
+import type { LedgerState } from './ledger';
 import type { OperativeId, OperativeState } from './operatives';
 import type { PressureDelta, Pressures } from './pressures';
 import type { RivalId, RivalState } from './rivals';
@@ -35,6 +36,7 @@ export type GameOverState = {
 export type GameLogEntryType =
   | 'order_queued'
   | 'order_resolved'
+  | 'ledger'
   | 'operative_condition'
   | 'complication'
   | 'drift'
@@ -54,7 +56,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   id: string;
   seed: string;
   rngCursor: number;
@@ -66,6 +68,7 @@ export type GameState = {
   operatives: OperativeState[];
   hirePool: OperativeId[];
   seenSignatureEventIds: EventId[];
+  ledger: LedgerState;
   queuedOrders: QueuedOrder[];
   districts: Record<DistrictId, DistrictState>;
   rivals: Record<RivalId, RivalState>;

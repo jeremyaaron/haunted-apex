@@ -4,7 +4,7 @@ import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
-  LEGACY_V02_STORAGE_KEY,
+  LEGACY_V03_STORAGE_KEY,
 } from './game';
 import { App } from './app';
 
@@ -214,7 +214,7 @@ describe('App', () => {
   });
 
   it('renders and dismisses the legacy-save compatibility notice', () => {
-    localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
+    localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;

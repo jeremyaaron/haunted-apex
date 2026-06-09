@@ -21,7 +21,7 @@ export function newGame(config: NewGameConfig = {}): GameState {
   const roster = generateRoster(seed);
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: createRunId(seed),
     seed,
     rngCursor: roster.rngCursor,
@@ -33,6 +33,11 @@ export function newGame(config: NewGameConfig = {}): GameState {
     operatives: roster.startingOperativeIds.map(materializeOperativeState),
     hirePool: [...roster.hirePoolIds],
     seenSignatureEventIds: [],
+    ledger: {
+      entries: [],
+      discoveredCount: 0,
+      consumedCount: 0,
+    },
     queuedOrders: [],
     districts: initializeDistricts(),
     rivals: initializeRivals(),

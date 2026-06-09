@@ -13,7 +13,7 @@ describe('newGame', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(3);
+    expect(state.schemaVersion).toBe(4);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
@@ -22,6 +22,11 @@ describe('newGame', () => {
     expect(state.pressures).toEqual(DISTRICT_ZERO_INITIAL_PRESSURES);
     expect(state.queuedOrders).toEqual([]);
     expect(state.recentActivity).toEqual([]);
+    expect(state.ledger).toEqual({
+      entries: [],
+      discoveredCount: 0,
+      consumedCount: 0,
+    });
     expect(state.eventLog).toEqual([]);
     expect(state.flags).toEqual({});
     expect(state.seenSignatureEventIds).toEqual([]);

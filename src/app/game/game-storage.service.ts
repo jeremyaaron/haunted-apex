@@ -3,6 +3,7 @@ import {
   getActionDefinition,
   getDistrictDefinition,
   getEventDefinition,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getTraitDefinition,
@@ -13,6 +14,9 @@ import {
   type ActionTarget,
   type DistrictId,
   type GameState,
+  type LedgerEntryDefinitionId,
+  type LedgerEntryKind,
+  type LedgerPotency,
   type OperativeId,
   type Pressures,
   type RivalId,
@@ -21,9 +25,10 @@ import {
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 3;
-export const CURRENT_GAME_VERSION = '0.3.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 4;
+export const CURRENT_GAME_VERSION = '0.4.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
+export const LEGACY_V03_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
 export const LEGACY_V02_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
 
 export type StoredRunEnvelope = {
@@ -76,6 +81,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
       storage.removeItem(LEGACY_V02_STORAGE_KEY);
 
       try {
@@ -106,6 +112,15 @@ export class GameStorageService implements GameStorage {
       }
     }
 
+    if (storage.getItem(LEGACY_V03_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 3,
+      };
+    }
+
     if (storage.getItem(LEGACY_V02_STORAGE_KEY) !== null) {
       storage.removeItem(LEGACY_V02_STORAGE_KEY);
       return {
@@ -120,6 +135,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V03_STORAGE_KEY);
     storage?.removeItem(LEGACY_V02_STORAGE_KEY);
   }
 }
@@ -138,7 +154,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 3 &&
+    value['schemaVersion'] === 4 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -150,6 +166,7 @@ function isGameState(value: unknown): value is GameState {
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
     isSeenSignatureEventIds(value['seenSignatureEventIds']) &&
+    isLedgerState(value['ledger']) &&
     isQueuedOrders(value['queuedOrders'], value['operatives'], value['hirePool']) &&
     isDistrictOverlays(value['districts']) &&
     isRivalOverlays(value['rivals']) &&
@@ -443,6 +460,133 @@ function isSeenSignatureEventIds(value: unknown): boolean {
   return value.every((eventId) => getEventDefinition(eventId)?.kind === 'operative');
 }
 
+function isLedgerState(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value['entries']) ||
+    !isNonNegativeInteger(value['discoveredCount']) ||
+    !isNonNegativeInteger(value['consumedCount'])
+  ) {
+    return false;
+  }
+
+  const ids = new Set<string>();
+  let consumedCount = 0;
+
+  const entriesValid = value['entries'].every((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry['id'] !== 'string' ||
+      ids.has(entry['id']) ||
+      typeof entry['definitionId'] !== 'string' ||
+      typeof entry['kind'] !== 'string' ||
+      !isPositiveInteger(entry['createdWeek']) ||
+      !isLedgerSource(entry['source']) ||
+      !isLedgerPotency(entry['potency']) ||
+      typeof entry['revealed'] !== 'boolean' ||
+      typeof entry['consumed'] !== 'boolean' ||
+      (entry['consumedWeek'] !== undefined && !isPositiveInteger(entry['consumedWeek'])) ||
+      (entry['consumedBy'] !== undefined && !isLedgerConsumptionSource(entry['consumedBy'])) ||
+      (entry['relatedTarget'] !== undefined && !parseActionTarget(entry['relatedTarget'])) ||
+      (entry['relatedOperativeId'] !== undefined &&
+        (typeof entry['relatedOperativeId'] !== 'string' ||
+          !getOperativeDefinition(entry['relatedOperativeId'] as OperativeId))) ||
+      (entry['relatedRivalId'] !== undefined &&
+        (typeof entry['relatedRivalId'] !== 'string' ||
+          !getRivalDefinition(entry['relatedRivalId'] as RivalId))) ||
+      (entry['flags'] !== undefined && !isFlags(entry['flags']))
+    ) {
+      return false;
+    }
+
+    const definition = getLedgerEntryDefinition(
+      entry['definitionId'] as LedgerEntryDefinitionId,
+    );
+
+    if (!definition || definition.kind !== entry['kind']) {
+      return false;
+    }
+
+    if (!isLedgerEntryKind(entry['kind'])) {
+      return false;
+    }
+
+    if (entry['consumed']) {
+      consumedCount += 1;
+    }
+
+    ids.add(entry['id']);
+    return true;
+  });
+
+  return (
+    entriesValid &&
+    value['discoveredCount'] === value['entries'].length &&
+    value['consumedCount'] === consumedCount
+  );
+}
+
+function isLedgerSource(value: unknown): boolean {
+  if (!isRecord(value) || typeof value['type'] !== 'string') {
+    return false;
+  }
+
+  switch (value['type']) {
+    case 'event':
+      return (
+        typeof value['eventId'] === 'string' &&
+        getEventDefinition(value['eventId']) !== undefined &&
+        typeof value['choiceId'] === 'string'
+      );
+    case 'action':
+      return (
+        typeof value['actionId'] === 'string' &&
+        getActionDefinition(value['actionId'] as ActionId) !== undefined &&
+        (value['target'] === undefined || parseActionTarget(value['target']) !== undefined)
+      );
+    case 'operative_event':
+      return (
+        typeof value['operativeId'] === 'string' &&
+        getOperativeDefinition(value['operativeId'] as OperativeId) !== undefined &&
+        typeof value['eventId'] === 'string' &&
+        getEventDefinition(value['eventId'])?.kind === 'operative'
+      );
+    default:
+      return false;
+  }
+}
+
+function isLedgerConsumptionSource(value: unknown): boolean {
+  if (!isRecord(value) || typeof value['type'] !== 'string') {
+    return false;
+  }
+
+  switch (value['type']) {
+    case 'action':
+      return (
+        value['actionId'] === 'work_the_ledger' &&
+        typeof value['useOptionId'] === 'string' &&
+        value['useOptionId'].length > 0
+      );
+    case 'event':
+      return (
+        typeof value['eventId'] === 'string' &&
+        getEventDefinition(value['eventId']) !== undefined &&
+        typeof value['choiceId'] === 'string'
+      );
+    default:
+      return false;
+  }
+}
+
+function isLedgerEntryKind(value: unknown): value is LedgerEntryKind {
+  return value === 'secret' || value === 'debt' || value === 'favor';
+}
+
+function isLedgerPotency(value: unknown): value is LedgerPotency {
+  return value === 1 || value === 2 || value === 3;
+}
+
 function isPendingEvent(value: unknown): boolean {
   if (value === undefined) {
     return true;
@@ -488,6 +632,7 @@ function isGameLogEntryType(value: unknown): boolean {
   return (
     value === 'order_queued' ||
     value === 'order_resolved' ||
+    value === 'ledger' ||
     value === 'operative_condition' ||
     value === 'complication' ||
     value === 'drift' ||

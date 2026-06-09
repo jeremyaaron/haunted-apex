@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { newGame, queueOrder, type GameState } from '../engine';
+import { addLedgerEntry, newGame, queueOrder, type GameState } from '../engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V03_STORAGE_KEY,
   LEGACY_V02_STORAGE_KEY,
   GameStorageService,
   type StoredRunEnvelope,
@@ -22,7 +23,7 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips a complete v0.3 envelope through localStorage', () => {
+  it('round-trips a complete v0.4 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
@@ -40,11 +41,13 @@ describe('GameStorageService', () => {
 
   it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
 
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
     expect(service.loadCurrentRun()).toEqual({ status: 'empty' });
   });
@@ -64,6 +67,19 @@ describe('GameStorageService', () => {
       foundVersion: 2,
     });
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.3 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V03_STORAGE_KEY,
+      JSON.stringify(newGame({ seed: 'LEGACY' })),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 3,
+    });
+    expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
   });
 
   it('removes the v0.2 key and reports it incompatible', () => {
@@ -156,6 +172,46 @@ describe('GameStorageService', () => {
         },
       ],
       seenSignatureEventIds: ['event_mara_ghost_debt'],
+    };
+
+    service.saveCurrentRun(state);
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
+  });
+
+  it('round-trips Ledger entries with source, related context, and consumption metadata', () => {
+    const withEntry = addLedgerEntry(newGame({ seed: 'LEDGER-STORAGE' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+      relatedTarget: {
+        type: 'district',
+        id: 'district_violet_ward',
+      },
+      relatedRivalId: 'rival_nyx_ardent',
+    });
+    const state: GameState = {
+      ...withEntry,
+      ledger: {
+        ...withEntry.ledger,
+        entries: withEntry.ledger.entries.map((entry) => ({
+          ...entry,
+          consumed: true,
+          consumedWeek: withEntry.week,
+          consumedBy: {
+            type: 'action',
+            actionId: 'work_the_ledger',
+            useOptionId: 'pay_in_credits',
+          },
+        })),
+        consumedCount: 1,
+      },
     };
 
     service.saveCurrentRun(state);
@@ -281,6 +337,116 @@ describe('GameStorageService', () => {
 
     expectLoadInvalid(invalid);
     expectLoadInvalid(duplicate);
+  });
+
+  it('rejects malformed Ledger entries', () => {
+    const missingLedger = structuredClone(newGame()) as Partial<GameState>;
+    const unknownDefinition = structuredClone(newGame());
+    const mismatchedKind = structuredClone(newGame());
+    const malformedSource = structuredClone(newGame());
+    const invalidRelatedTarget = structuredClone(newGame());
+    const badConsumedCount = structuredClone(newGame());
+    delete missingLedger.ledger;
+    unknownDefinition.ledger.entries = [
+      {
+        id: 'ledger_missing',
+        definitionId: 'secret_missing',
+        kind: 'secret',
+        createdWeek: 1,
+        source: {
+          type: 'action',
+          actionId: 'gather_intel',
+        },
+        potency: 1,
+        revealed: true,
+        consumed: false,
+      },
+    ] as unknown as typeof unknownDefinition.ledger.entries;
+    unknownDefinition.ledger.discoveredCount = 1;
+    mismatchedKind.ledger.entries = [
+      {
+        id: 'ledger_bad_kind',
+        definitionId: 'secret_patrol_schedule',
+        kind: 'debt',
+        createdWeek: 1,
+        source: {
+          type: 'action',
+          actionId: 'gather_intel',
+        },
+        potency: 1,
+        revealed: true,
+        consumed: false,
+      },
+    ];
+    mismatchedKind.ledger.discoveredCount = 1;
+    malformedSource.ledger.entries = [
+      {
+        id: 'ledger_bad_source',
+        definitionId: 'secret_patrol_schedule',
+        kind: 'secret',
+        createdWeek: 1,
+        source: {
+          type: 'event',
+          eventId: 'missing_event',
+          choiceId: 'choice',
+        },
+        potency: 1,
+        revealed: true,
+        consumed: false,
+      },
+    ] as unknown as typeof malformedSource.ledger.entries;
+    malformedSource.ledger.discoveredCount = 1;
+    invalidRelatedTarget.ledger.entries = [
+      {
+        id: 'ledger_bad_target',
+        definitionId: 'secret_patrol_schedule',
+        kind: 'secret',
+        createdWeek: 1,
+        source: {
+          type: 'action',
+          actionId: 'gather_intel',
+        },
+        potency: 1,
+        revealed: true,
+        consumed: false,
+        relatedTarget: {
+          type: 'venue',
+          id: 'venue_missing',
+        },
+      },
+    ] as unknown as typeof invalidRelatedTarget.ledger.entries;
+    invalidRelatedTarget.ledger.discoveredCount = 1;
+    badConsumedCount.ledger.entries = [
+      {
+        id: 'ledger_bad_count',
+        definitionId: 'favor_hidden_route',
+        kind: 'favor',
+        createdWeek: 1,
+        source: {
+          type: 'event',
+          eventId: 'blackmail_lead',
+          choiceId: 'save_it_for_later',
+        },
+        potency: 1,
+        revealed: true,
+        consumed: true,
+        consumedWeek: 1,
+        consumedBy: {
+          type: 'event',
+          eventId: 'blackmail_lead',
+          choiceId: 'save_it_for_later',
+        },
+      },
+    ];
+    badConsumedCount.ledger.discoveredCount = 1;
+    badConsumedCount.ledger.consumedCount = 0;
+
+    expectLoadInvalid(missingLedger as GameState);
+    expectLoadInvalid(unknownDefinition);
+    expectLoadInvalid(mismatchedKind);
+    expectLoadInvalid(malformedSource);
+    expectLoadInvalid(invalidRelatedTarget);
+    expectLoadInvalid(badConsumedCount);
   });
 
   function expectLoadInvalid(state: GameState): void {

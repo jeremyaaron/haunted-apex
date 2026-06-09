@@ -4,7 +4,7 @@ import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
-  LEGACY_V02_STORAGE_KEY,
+  LEGACY_V03_STORAGE_KEY,
   type StoredRunEnvelope,
 } from './game-storage.service';
 import { GameFacade, SAVE_COMPATIBILITY_NOTICE } from './game.facade';
@@ -49,18 +49,18 @@ describe('GameFacade', () => {
   });
 
   it('removes a legacy save, starts fresh, and exposes a compatibility notice', () => {
-    localStorage.setItem(LEGACY_V02_STORAGE_KEY, JSON.stringify(newGame({ seed: 'LEGACY' })));
+    localStorage.setItem(LEGACY_V03_STORAGE_KEY, JSON.stringify(newGame({ seed: 'LEGACY' })));
 
     const facade = TestBed.inject(GameFacade);
 
-    expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
     expect(facade.state().week).toBe(1);
     expect(facade.compatibilityNotice()).toBe(SAVE_COMPATIBILITY_NOTICE);
     expect(readStoredState()).toEqual(facade.state());
   });
 
   it('dismisses the compatibility notice without changing game state', () => {
-    localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
+    localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
     const facade = TestBed.inject(GameFacade);
     const state = facade.state();
 

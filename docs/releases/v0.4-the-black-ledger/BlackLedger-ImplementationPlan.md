@@ -159,8 +159,8 @@ Operator:   18 bankrupt, 10 Heat lockdown, 2 out of time
 
 - Current package metadata remains `0.0.0`; version `0.4.0` is reserved for the release
   readiness phase.
-- The current persistence key remains `haunted-apex:v0.3:current-run`; Phase 2 will
-  replace this with the v0.4 schema and storage key.
+- The current persistence key remained `haunted-apex:v0.3:current-run` at Phase 0;
+  Phase 2 replaces this with the v0.4 schema and storage key.
 - All 252 existing tests passed in ChromeHeadless.
 - Both application and specification TypeScript projects passed `--noEmit` checks.
 - The standard production build passed.
@@ -318,6 +318,28 @@ Unit tests:
 - v0.3 saves are invalidated.
 - v0.4 storage validation rejects unknown definitions, mismatched kinds, malformed sources,
   and invalid related ids.
+
+### Completion Record
+
+Completed June 8, 2026:
+
+- Bumped `GameState.schemaVersion` and the local save envelope schema to `4`.
+- Moved current run storage to `haunted-apex:v0.4:current-run`.
+- Added `LEGACY_V03_STORAGE_KEY` handling so v0.3 saves are cleared and reported
+  incompatible with a v0.4-specific compatibility notice.
+- Initialized empty Ledger state in `newGame`.
+- Added `addLedgerEntry` with deterministic runtime ids, source metadata preservation,
+  optional related context, and Ledger event-log entries.
+- Added Ledger selectors and panel view models for active Secrets, Debts, Favors,
+  consumed entries, use-option affordability, source labels, related context labels, and
+  summary counts.
+- Added storage validation for Ledger entries, including unknown definition rejection,
+  definition-kind mismatch rejection, source validation, related target validation,
+  related operative/rival validation, duplicate id rejection, and discovered/consumed
+  count consistency.
+- Updated schema and compatibility tests for v0.4 saves.
+- Added lifecycle and selector tests for duplicate runtime entries, consumed history,
+  active grouping, panel shape, and affordability metadata.
 
 ### Review Gate
 

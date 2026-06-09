@@ -41,7 +41,7 @@ import {
 } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'This save was created with an older prototype version and is not compatible with v0.3.0 - The Roster. A new run has been started with the updated roster system.';
+  'Detected save from v0.3.x. v0.4.0 - The Black Ledger changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',
