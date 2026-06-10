@@ -810,6 +810,25 @@ Manual checks:
 - No clipped effect labels in compact cards.
 - No debug-only state is visible by default.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Exposed the engine-backed Ledger panel through `GameFacade`.
+- Added a visible Black Ledger panel with active Secrets, Debts, Favors, and a
+  collapsed Spent / Resolved section.
+- Rendered Ledger entry cards with kind, name, description, created week,
+  source/context, potency, tags, status, and primary use preview.
+- Kept `Work the Ledger` in the existing target dropdown flow and added action-card
+  previews for selected Ledger use costs, effects, risk, and consumption.
+- Rendered Ledger costs as negative pressure movement in command-card previews.
+- Added clear unavailable copy for unaffordable Ledger uses.
+- Added targeted `Gather Intel` `Secret Chance` previews.
+- Kept event-choice Ledger consequence chips visible next to pressure effects.
+- Added responsive Ledger panel styling for desktop, tablet, and mobile layouts.
+- Added UI tests for empty, active, consumed, dropdown, selected-use,
+  unaffordable-use, Secret Chance, and event-choice Ledger effect states.
+
 ### Review Gate
 
 Do a usability pass before adding run-end summary and harness metrics.
@@ -867,6 +886,23 @@ Unit/UI tests:
 - Victory and loss summaries both render.
 - Copy button calls the clipboard path when available.
 - Copy failure state is handled without crashing.
+
+### Completion Record
+
+Completed June 9, 2026:
+
+- Added a pure `buildRunSummary` / `formatRunSummary` report module.
+- Included result, reason, ended week, seed, final pressures, starting roster,
+  final roster, most assigned operative, MVP operative, most dangerous rival,
+  Ledger counts, unresolved debts, major events, and deterministic epitaph.
+- Added deterministic formatted report text for sharing.
+- Exposed `runSummary()` from `GameFacade` only after game over.
+- Replaced the minimal game-over panel with a Ledger-aware run report.
+- Added `Copy Run Report` using browser clipboard with textarea fallback.
+- Added copy success and failure status copy.
+- Added pure report tests for deterministic victory/loss summaries and Ledger
+  stats.
+- Added UI tests for victory/loss rendering and clipboard success/failure paths.
 
 ### Review Gate
 
@@ -935,6 +971,21 @@ Unit/harness tests:
 ### Review Gate
 
 Run an initial 100-runs-per-agent report and inspect Ledger frequency before balance.
+
+### Completion Record
+
+Completed June 9, 2026:
+
+- Extended legal harness order enumeration to include engine-validated Ledger targets.
+- Added Ledger-aware scoring to RandomBot, AggressiveBot, CautiousBot, GreedyBot, and
+  OperatorBot while preserving their existing strategic personalities.
+- Counted per-run Ledger entries, created Secrets/Debts/Favors, consumed entries,
+  unresolved Debts, targeted Gather Intel attempts, Secret discoveries, and Ledger event
+  eligibility/selection.
+- Added `ledger_summary`, `ledger_usage`, `ledger_outcomes`, `secret_discovery`, and
+  `ledger_events` CSV sections.
+- Added tests for legal Ledger option generation, invalid Ledger exclusion, personality
+  Ledger use, report sections, and UI harness report visibility.
 
 ## Phase 11: Balance, Tuning, and Release Readiness
 
@@ -1038,4 +1089,30 @@ Run-end summary and Copy Run Report work.
 Harness reports expose Ledger behavior.
 Balance remains recognizable from v0.3.
 Production and Pages builds pass.
+```
+
+### Completion Record
+
+Completed June 9, 2026:
+
+- Ran repeated 100-runs-per-agent harness batches through a temporary command-line runner.
+- Tuned Favor generation by adding defensive Favor creation to Rival Sends Flowers and
+  Orchid's Route Memory.
+- Raised Debt Comes Due contextual weighting so active Debts surface more often without
+  becoming automatic losses.
+- Added Field Guide copy for Secrets, Debts, Favors, Work the Ledger, and event Ledger
+  consequences.
+- Confirmed README/release docs follow the simplified release-status policy.
+- Added `BlackLedger-ReleaseNotes.md`.
+- Added tests for Favor creation through city and operative event choices.
+
+Final 100-runs-per-agent snapshot, seed prefix `PHASE11-TUNED-2`:
+
+```text
+agent      winRate  avgEntries  avgSecrets  avgDebts  avgFavors  avgConsumed
+random     0.000    2.17        1.27        0.79      0.11       0.41
+aggressive 0.380    2.20        0.63        1.13      0.44       0.74
+cautious   0.000    2.95        2.46        0.00      0.49       1.20
+greedy     0.470    4.71        2.34        1.72      0.65       0.90
+operator   0.710    1.80        0.95        0.26      0.59       0.80
 ```

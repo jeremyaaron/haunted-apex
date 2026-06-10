@@ -5,6 +5,7 @@ import {
   RIVAL_TERRITORY_RIVALS,
   getDistrictDefinition,
   getEventDefinition,
+  getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
@@ -17,6 +18,8 @@ import type {
   EventId,
   GameOverReason,
   GameState,
+  LedgerEntryDefinitionId,
+  LedgerEntryKind,
   OperativeId,
   PressureId,
   Pressures,
@@ -80,6 +83,7 @@ export type HarnessRunResult = {
   initialHirePoolIds: OperativeId[];
   operativeStats: Record<OperativeId, OperativeRunStats>;
   operativeEventStats: Partial<Record<EventId, OperativeEventRunStats>>;
+  ledgerStats: LedgerRunStats;
   trace: HarnessTraceEntry[];
 };
 
@@ -116,6 +120,11 @@ export type AgentBatchSummary = {
   operativeDangerReports: OperativeDangerReport[];
   operativeEventReports: OperativeEventReport[];
   hirePoolSelectionReports: HirePoolSelectionReport[];
+  ledgerSummary: LedgerSummaryReport;
+  ledgerUsageReports: LedgerUsageReport[];
+  ledgerOutcomeReports: LedgerOutcomeReport[];
+  secretDiscoveryReport: SecretDiscoveryReport;
+  ledgerEventReports: LedgerEventReport[];
 };
 
 export type HarnessBatchReport = {
@@ -245,6 +254,69 @@ export type HirePoolSelectionReport = {
   selectionRate: number;
 };
 
+export type LedgerRunStats = {
+  entriesCreated: number;
+  secretsCreated: number;
+  debtsCreated: number;
+  favorsCreated: number;
+  entriesConsumed: number;
+  unresolvedDebts: number;
+  targetedGatherIntelOrders: number;
+  secretDiscoveries: number;
+  secretDefinitionsCreated: Partial<Record<LedgerEntryDefinitionId, number>>;
+  usage: Record<string, LedgerUsageRunStats>;
+  ledgerEventEligibility: Partial<Record<EventId, number>>;
+  ledgerEventSelections: Partial<Record<EventId, number>>;
+};
+
+export type LedgerUsageRunStats = {
+  kind: LedgerEntryKind;
+  definitionId: LedgerEntryDefinitionId;
+  name: string;
+  created: number;
+  consumed: number;
+  activeAtEnd: number;
+};
+
+export type LedgerSummaryReport = {
+  averageEntriesCreated: number;
+  averageSecretsCreated: number;
+  averageDebtsCreated: number;
+  averageFavorsCreated: number;
+  averageEntriesConsumed: number;
+  averageUnresolvedDebts: number;
+};
+
+export type LedgerUsageReport = LedgerUsageRunStats & {
+  wins: number;
+  losses: number;
+};
+
+export type LedgerOutcomeReport = {
+  debtCount: number;
+  runs: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageWeeksPlayed: number;
+  averageFinalPressures: Pick<Pressures, 'dominion' | 'heat' | 'loyalty' | 'ruin'>;
+};
+
+export type SecretDiscoveryReport = {
+  targetedGatherIntelOrders: number;
+  discoveries: number;
+  discoveryRate: number;
+  mostCommonSecret: string;
+};
+
+export type LedgerEventReport = {
+  eventId: EventId;
+  eventTitle: string;
+  eligibleRuns: number;
+  selections: number;
+  selectionRate: number;
+};
+
 const MAX_HARNESS_STEPS = 64;
 const DANGEROUS_TARGET_MINIMUM_SELECTIONS = 5;
 const TARGET_TAG_MODIFIERS = new Set([
@@ -265,6 +337,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const targetUsage: Record<string, TargetRunStats> = {};
   const eventChoiceUsage: Record<string, number> = {};
   const contextualEvents = createEmptyContextualEventCounts();
+  const ledgerStats = createEmptyLedgerRunStats();
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   let stalled = false;
@@ -277,6 +350,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         context,
         actionUsage,
         targetUsage,
+        ledgerStats,
         trace,
         options.collectTrace,
       );
@@ -305,6 +379,11 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
       recordOperativeEventSelection(
         operativeStats,
         operativeEventStats,
+        advanced.eventSelection,
+      );
+      recordLedgerEventStats(
+        ledgerStats,
+        advanced.eventCandidates,
         advanced.eventSelection,
       );
       recordContextualEvent(contextualEvents, advanced.eventSelection);
@@ -338,6 +417,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   }
 
   finalizeOperativeStats(operativeStats, state);
+  finalizeLedgerRunStats(ledgerStats, state);
 
   return {
     agentId: options.agent.id,
@@ -355,6 +435,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     initialHirePoolIds,
     operativeStats,
     operativeEventStats,
+    ledgerStats,
     trace,
   };
 }
@@ -517,6 +598,112 @@ export function formatBatchReport(report: HarnessBatchReport): string {
         summary.contextualEvents.localHeatInfluenced,
       ].join(','),
     );
+  }
+
+  lines.push(
+    '',
+    'ledger_summary',
+    'agent,avgEntriesCreated,avgSecretsCreated,avgDebtsCreated,avgFavorsCreated,avgEntriesConsumed,avgUnresolvedDebts',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.ledgerSummary.averageEntriesCreated.toFixed(2),
+        summary.ledgerSummary.averageSecretsCreated.toFixed(2),
+        summary.ledgerSummary.averageDebtsCreated.toFixed(2),
+        summary.ledgerSummary.averageFavorsCreated.toFixed(2),
+        summary.ledgerSummary.averageEntriesConsumed.toFixed(2),
+        summary.ledgerSummary.averageUnresolvedDebts.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'ledger_usage',
+    'agent,kind,definitionId,name,created,consumed,activeAtEnd,wins,losses',
+  );
+
+  for (const summary of report.summaries) {
+    for (const ledger of summary.ledgerUsageReports) {
+      lines.push(
+        [
+          summary.agentId,
+          ledger.kind,
+          ledger.definitionId,
+          csvCell(ledger.name),
+          ledger.created,
+          ledger.consumed,
+          ledger.activeAtEnd,
+          ledger.wins,
+          ledger.losses,
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'ledger_outcomes',
+    'agent,debtCount,winRate,avgWeeks,avgDominion,avgHeat,avgLoyalty,avgRuin',
+  );
+
+  for (const summary of report.summaries) {
+    for (const outcome of summary.ledgerOutcomeReports) {
+      lines.push(
+        [
+          summary.agentId,
+          outcome.debtCount,
+          outcome.winRate.toFixed(3),
+          outcome.averageWeeksPlayed.toFixed(2),
+          outcome.averageFinalPressures.dominion.toFixed(2),
+          outcome.averageFinalPressures.heat.toFixed(2),
+          outcome.averageFinalPressures.loyalty.toFixed(2),
+          outcome.averageFinalPressures.ruin.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'secret_discovery',
+    'agent,targetedGatherIntelOrders,discoveries,discoveryRate,mostCommonSecret',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.secretDiscoveryReport.targetedGatherIntelOrders,
+        summary.secretDiscoveryReport.discoveries,
+        summary.secretDiscoveryReport.discoveryRate.toFixed(3),
+        csvCell(summary.secretDiscoveryReport.mostCommonSecret),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'ledger_events',
+    'agent,eventId,eventTitle,eligibleRuns,selections,selectionRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const event of summary.ledgerEventReports) {
+      lines.push(
+        [
+          summary.agentId,
+          event.eventId,
+          csvCell(event.eventTitle),
+          event.eligibleRuns,
+          event.selections,
+          event.selectionRate.toFixed(3),
+        ].join(','),
+      );
+    }
   }
 
   lines.push(
@@ -765,6 +952,7 @@ function queueAgentOrders(
   context: AgentDecisionContext,
   actionUsage: Record<ActionId, number>,
   targetUsage: Record<string, TargetRunStats>,
+  ledgerStats: LedgerRunStats,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
 ): GameState {
@@ -792,6 +980,7 @@ function queueAgentOrders(
     next = queued.state;
     actionUsage[decision.actionId] += 1;
     recordTargetSelection(targetUsage, decision.target);
+    recordLedgerOrderStats(ledgerStats, decision);
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
@@ -867,6 +1056,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
   const operativeDangerReports = new Map<OperativeId, OperativeDangerReport>();
   const operativeEventReports = new Map<string, OperativeEventReport>();
   const hirePoolSelectionReports = new Map<OperativeId, HirePoolSelectionReport>();
+  const ledgerSummaryTotals = createEmptyLedgerSummaryTotals();
+  const ledgerUsageReports = new Map<LedgerEntryDefinitionId, LedgerUsageReport>();
+  const ledgerOutcomeReports = new Map<number, LedgerOutcomeReport & { pressureTotals: Pressures }>();
+  const secretDiscoveryTotals = createEmptySecretDiscoveryTotals();
+  const ledgerEventReports = new Map<EventId, LedgerEventReport>();
   let weeksTotal = 0;
   let wins = 0;
   let losses = 0;
@@ -940,6 +1134,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     addOperativeDangerReports(operativeDangerReports, run, runs.length);
     addOperativeEventReports(operativeEventReports, run);
     addHirePoolSelectionReports(hirePoolSelectionReports, run);
+    addLedgerSummaryTotals(ledgerSummaryTotals, run.ledgerStats);
+    addLedgerUsageReports(ledgerUsageReports, run);
+    addLedgerOutcomeReports(ledgerOutcomeReports, run);
+    addSecretDiscoveryTotals(secretDiscoveryTotals, run.ledgerStats);
+    addLedgerEventReports(ledgerEventReports, run.ledgerStats);
   }
 
   const targetReports = [...targetReportsByKey.values()]
@@ -977,6 +1176,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     operativeDangerReports: sortByOperativeName([...operativeDangerReports.values()]),
     operativeEventReports: sortOperativeEventReports([...operativeEventReports.values()]),
     hirePoolSelectionReports: sortByOperativeName([...hirePoolSelectionReports.values()]),
+    ledgerSummary: finalizeLedgerSummaryReport(ledgerSummaryTotals, runs.length),
+    ledgerUsageReports: sortLedgerUsageReports([...ledgerUsageReports.values()]),
+    ledgerOutcomeReports: finalizeLedgerOutcomeReports(ledgerOutcomeReports),
+    secretDiscoveryReport: finalizeSecretDiscoveryReport(secretDiscoveryTotals),
+    ledgerEventReports: sortLedgerEventReports([...ledgerEventReports.values()]),
   };
 }
 
@@ -1155,6 +1359,298 @@ function getEventChoicePressureDelta(choice: EventChoiceDefinition): Partial<Pre
   }
 
   return delta;
+}
+
+function createEmptyLedgerRunStats(): LedgerRunStats {
+  return {
+    entriesCreated: 0,
+    secretsCreated: 0,
+    debtsCreated: 0,
+    favorsCreated: 0,
+    entriesConsumed: 0,
+    unresolvedDebts: 0,
+    targetedGatherIntelOrders: 0,
+    secretDiscoveries: 0,
+    secretDefinitionsCreated: {},
+    usage: {},
+    ledgerEventEligibility: {},
+    ledgerEventSelections: {},
+  };
+}
+
+function recordLedgerOrderStats(stats: LedgerRunStats, decision: LegalOrderOption): void {
+  if (
+    decision.actionId === 'gather_intel' &&
+    decision.target &&
+    decision.target.type !== 'ledger' &&
+    decision.target.type !== 'recruit'
+  ) {
+    stats.targetedGatherIntelOrders += 1;
+  }
+}
+
+function recordLedgerEventStats(
+  stats: LedgerRunStats,
+  candidates: readonly WeightedEvent[],
+  selection: EventSelection,
+): void {
+  for (const candidate of candidates) {
+    if (!candidate.event.tags.includes('LEDGER')) {
+      continue;
+    }
+
+    stats.ledgerEventEligibility[candidate.event.id] =
+      (stats.ledgerEventEligibility[candidate.event.id] ?? 0) + 1;
+  }
+
+  if (selection.definition.tags.includes('LEDGER')) {
+    stats.ledgerEventSelections[selection.definition.id] =
+      (stats.ledgerEventSelections[selection.definition.id] ?? 0) + 1;
+  }
+}
+
+function finalizeLedgerRunStats(stats: LedgerRunStats, state: GameState): void {
+  for (const entry of state.ledger.entries) {
+    const definition = getLedgerEntryDefinition(entry.definitionId);
+
+    if (!definition) {
+      continue;
+    }
+
+    stats.entriesCreated += 1;
+    stats.entriesConsumed += entry.consumed ? 1 : 0;
+    stats.unresolvedDebts += entry.kind === 'debt' && !entry.consumed ? 1 : 0;
+
+    if (entry.kind === 'secret') {
+      stats.secretsCreated += 1;
+      stats.secretDefinitionsCreated[entry.definitionId] =
+        (stats.secretDefinitionsCreated[entry.definitionId] ?? 0) + 1;
+
+      if (entry.source.type === 'action' && entry.source.actionId === 'gather_intel') {
+        stats.secretDiscoveries += 1;
+      }
+    } else if (entry.kind === 'debt') {
+      stats.debtsCreated += 1;
+    } else {
+      stats.favorsCreated += 1;
+    }
+
+    const usage = stats.usage[entry.definitionId] ?? {
+      kind: entry.kind,
+      definitionId: entry.definitionId,
+      name: definition.name,
+      created: 0,
+      consumed: 0,
+      activeAtEnd: 0,
+    };
+    usage.created += 1;
+    usage.consumed += entry.consumed ? 1 : 0;
+    usage.activeAtEnd += entry.consumed ? 0 : 1;
+    stats.usage[entry.definitionId] = usage;
+  }
+}
+
+function createEmptyLedgerSummaryTotals(): LedgerSummaryReport {
+  return {
+    averageEntriesCreated: 0,
+    averageSecretsCreated: 0,
+    averageDebtsCreated: 0,
+    averageFavorsCreated: 0,
+    averageEntriesConsumed: 0,
+    averageUnresolvedDebts: 0,
+  };
+}
+
+function addLedgerSummaryTotals(totals: LedgerSummaryReport, stats: LedgerRunStats): void {
+  totals.averageEntriesCreated += stats.entriesCreated;
+  totals.averageSecretsCreated += stats.secretsCreated;
+  totals.averageDebtsCreated += stats.debtsCreated;
+  totals.averageFavorsCreated += stats.favorsCreated;
+  totals.averageEntriesConsumed += stats.entriesConsumed;
+  totals.averageUnresolvedDebts += stats.unresolvedDebts;
+}
+
+function finalizeLedgerSummaryReport(
+  totals: LedgerSummaryReport,
+  runs: number,
+): LedgerSummaryReport {
+  if (runs === 0) {
+    return totals;
+  }
+
+  return {
+    averageEntriesCreated: totals.averageEntriesCreated / runs,
+    averageSecretsCreated: totals.averageSecretsCreated / runs,
+    averageDebtsCreated: totals.averageDebtsCreated / runs,
+    averageFavorsCreated: totals.averageFavorsCreated / runs,
+    averageEntriesConsumed: totals.averageEntriesConsumed / runs,
+    averageUnresolvedDebts: totals.averageUnresolvedDebts / runs,
+  };
+}
+
+function addLedgerUsageReports(
+  reports: Map<LedgerEntryDefinitionId, LedgerUsageReport>,
+  run: HarnessRunResult,
+): void {
+  for (const usage of Object.values(run.ledgerStats.usage)) {
+    const report = reports.get(usage.definitionId) ?? {
+      ...usage,
+      created: 0,
+      consumed: 0,
+      activeAtEnd: 0,
+      wins: 0,
+      losses: 0,
+    };
+    report.created += usage.created;
+    report.consumed += usage.consumed;
+    report.activeAtEnd += usage.activeAtEnd;
+    report.wins += run.outcome === 'victory' ? 1 : 0;
+    report.losses += run.outcome === 'loss' ? 1 : 0;
+    reports.set(usage.definitionId, report);
+  }
+}
+
+function addLedgerOutcomeReports(
+  reports: Map<number, LedgerOutcomeReport & { pressureTotals: Pressures }>,
+  run: HarnessRunResult,
+): void {
+  const debtCount = run.ledgerStats.unresolvedDebts;
+  const report = reports.get(debtCount) ?? {
+    debtCount,
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageWeeksPlayed: 0,
+    averageFinalPressures: {
+      dominion: 0,
+      heat: 0,
+      loyalty: 0,
+      ruin: 0,
+    },
+    pressureTotals: createEmptyPressureTotals(),
+  };
+  report.runs += 1;
+  report.wins += run.outcome === 'victory' ? 1 : 0;
+  report.losses += run.outcome === 'loss' ? 1 : 0;
+  report.averageWeeksPlayed += run.weeksPlayed;
+
+  for (const pressure of PRESSURE_IDS) {
+    report.pressureTotals[pressure] += run.finalState.pressures[pressure];
+  }
+
+  reports.set(debtCount, report);
+}
+
+function finalizeLedgerOutcomeReports(
+  reports: Map<number, LedgerOutcomeReport & { pressureTotals: Pressures }>,
+): LedgerOutcomeReport[] {
+  return [...reports.values()]
+    .map((report) => ({
+      debtCount: report.debtCount,
+      runs: report.runs,
+      wins: report.wins,
+      losses: report.losses,
+      winRate: report.runs > 0 ? report.wins / report.runs : 0,
+      averageWeeksPlayed: report.runs > 0 ? report.averageWeeksPlayed / report.runs : 0,
+      averageFinalPressures: {
+        dominion: report.runs > 0 ? report.pressureTotals.dominion / report.runs : 0,
+        heat: report.runs > 0 ? report.pressureTotals.heat / report.runs : 0,
+        loyalty: report.runs > 0 ? report.pressureTotals.loyalty / report.runs : 0,
+        ruin: report.runs > 0 ? report.pressureTotals.ruin / report.runs : 0,
+      },
+    }))
+    .sort((left, right) => left.debtCount - right.debtCount);
+}
+
+function createEmptySecretDiscoveryTotals(): SecretDiscoveryReport & {
+  secretCounts: Partial<Record<LedgerEntryDefinitionId, number>>;
+} {
+  return {
+    targetedGatherIntelOrders: 0,
+    discoveries: 0,
+    discoveryRate: 0,
+    mostCommonSecret: '',
+    secretCounts: {},
+  };
+}
+
+function addSecretDiscoveryTotals(
+  totals: SecretDiscoveryReport & {
+    secretCounts: Partial<Record<LedgerEntryDefinitionId, number>>;
+  },
+  stats: LedgerRunStats,
+): void {
+  totals.targetedGatherIntelOrders += stats.targetedGatherIntelOrders;
+  totals.discoveries += stats.secretDiscoveries;
+
+  for (const [definitionId, count] of Object.entries(stats.secretDefinitionsCreated)) {
+    const id = definitionId as LedgerEntryDefinitionId;
+    totals.secretCounts[id] = (totals.secretCounts[id] ?? 0) + count;
+  }
+}
+
+function finalizeSecretDiscoveryReport(
+  totals: SecretDiscoveryReport & {
+    secretCounts: Partial<Record<LedgerEntryDefinitionId, number>>;
+  },
+): SecretDiscoveryReport {
+  const mostCommonSecretId = Object.entries(totals.secretCounts).sort(
+    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+  )[0]?.[0] as LedgerEntryDefinitionId | undefined;
+
+  return {
+    targetedGatherIntelOrders: totals.targetedGatherIntelOrders,
+    discoveries: totals.discoveries,
+    discoveryRate:
+      totals.targetedGatherIntelOrders > 0
+        ? totals.discoveries / totals.targetedGatherIntelOrders
+        : 0,
+    mostCommonSecret: mostCommonSecretId
+      ? getLedgerEntryDefinition(mostCommonSecretId)?.name ?? mostCommonSecretId
+      : '',
+  };
+}
+
+function addLedgerEventReports(
+  reports: Map<EventId, LedgerEventReport>,
+  stats: LedgerRunStats,
+): void {
+  const eventIds = new Set<EventId>([
+    ...Object.keys(stats.ledgerEventEligibility),
+    ...Object.keys(stats.ledgerEventSelections),
+  ] as EventId[]);
+
+  for (const eventId of eventIds) {
+    const report = reports.get(eventId) ?? {
+      eventId,
+      eventTitle: getEventTitle(eventId),
+      eligibleRuns: 0,
+      selections: 0,
+      selectionRate: 0,
+    };
+    report.eligibleRuns += stats.ledgerEventEligibility[eventId] ?? 0;
+    report.selections += stats.ledgerEventSelections[eventId] ?? 0;
+    reports.set(eventId, report);
+  }
+}
+
+function sortLedgerUsageReports(reports: LedgerUsageReport[]): LedgerUsageReport[] {
+  return reports.sort(
+    (left, right) =>
+      left.kind.localeCompare(right.kind) ||
+      left.name.localeCompare(right.name) ||
+      left.definitionId.localeCompare(right.definitionId),
+  );
+}
+
+function sortLedgerEventReports(reports: LedgerEventReport[]): LedgerEventReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      selectionRate: report.eligibleRuns > 0 ? report.selections / report.eligibleRuns : 0,
+    }))
+    .sort((left, right) => left.eventTitle.localeCompare(right.eventTitle));
 }
 
 function addRosterCompositionReport(
@@ -1618,6 +2114,16 @@ function addContextualEventCounts(
   totals.localHeatInfluenced += counts.localHeatInfluenced;
 }
 
+function createEmptyPressureTotals(): Pressures {
+  return PRESSURE_IDS.reduce(
+    (totals, pressure) => ({
+      ...totals,
+      [pressure]: 0,
+    }),
+    {} as Pressures,
+  );
+}
+
 function averageRivalPressures(
   totals: Record<RivalId, number>,
   runs: number,
@@ -1680,6 +2186,10 @@ function createAgentDecisionContext(seed: string): AgentDecisionContext {
       return items[index.value];
     },
   };
+}
+
+function csvCell(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
 }
 
 function appendTrace(

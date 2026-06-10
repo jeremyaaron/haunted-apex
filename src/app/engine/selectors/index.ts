@@ -49,6 +49,13 @@ export type {
   VenueTerritoryView,
 } from './territory';
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
+export { buildRunSummary, formatRunSummary } from './run-summary';
+export type {
+  RunSummaryLedgerEntry,
+  RunSummaryOperative,
+  RunSummaryReport,
+  RunSummaryRival,
+} from './run-summary';
 export {
   selectHirePoolViews,
   selectOperativeDetail,

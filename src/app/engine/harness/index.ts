@@ -31,6 +31,13 @@ export type {
   HarnessRunOptions,
   HarnessRunResult,
   HarnessTraceEntry,
+  LedgerEventReport,
+  LedgerOutcomeReport,
+  LedgerRunStats,
+  LedgerSummaryReport,
+  LedgerUsageReport,
+  LedgerUsageRunStats,
+  SecretDiscoveryReport,
   TargetReport,
   TargetRunStats,
 } from './simulation-harness';

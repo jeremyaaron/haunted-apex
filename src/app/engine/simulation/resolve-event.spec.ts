@@ -190,6 +190,37 @@ describe('resolveEventChoice', () => {
     );
   });
 
+  it('creates Favors from defensive city and operative event choices', () => {
+    const flowers = resolveEventChoice(
+      withPendingEvent('rival_sends_flowers'),
+      'event_1_1',
+      'display_them',
+    );
+    const route = resolveEventChoice(
+      withPendingEvent('event_orchid_route_memory'),
+      'event_1_1',
+      'map_it_first',
+    );
+
+    if (!flowers.ok || !route.ok) {
+      fail('Expected event choices to resolve');
+      return;
+    }
+
+    expect(flowers.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'favor_checkpoint_captain',
+        kind: 'favor',
+      }),
+    );
+    expect(route.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'favor_hidden_route',
+        kind: 'favor',
+      }),
+    );
+  });
+
   it('can resolve an active Ledger entry from an event choice', () => {
     const withDebt = addLedgerEntry(withPendingEvent('operative_wants_more'), {
       definitionId: 'debt_unfunded_promise',

@@ -1,5 +1,11 @@
 import { TestBed } from '@angular/core/testing';
-import { getOperativeDefinition, materializeOperativeState, newGame } from './engine';
+import {
+  addLedgerEntry,
+  getOperativeDefinition,
+  materializeOperativeState,
+  newGame,
+  type GameState,
+} from './engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
@@ -10,6 +16,7 @@ import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
+    TestBed.resetTestingModule();
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [App],
@@ -18,6 +25,7 @@ describe('App', () => {
 
   afterEach(() => {
     localStorage.clear();
+    TestBed.resetTestingModule();
   });
 
   it('should create the app', () => {
@@ -245,6 +253,11 @@ describe('App', () => {
     expect(output).toContain('district_state');
     expect(output).toContain('loss_causes');
     expect(output).toContain('contextual_events');
+    expect(output).toContain('ledger_summary');
+    expect(output).toContain('ledger_usage');
+    expect(output).toContain('ledger_outcomes');
+    expect(output).toContain('secret_discovery');
+    expect(output).toContain('ledger_events');
     expect(output).toContain('Operator / Sane');
   });
 
@@ -320,6 +333,77 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Week 2 / 8');
   });
 
+  it('renders a victory run summary on the game-over panel', () => {
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gameOverPanel = compiled.querySelector<HTMLElement>('.game-over-panel');
+
+    expect(gameOverPanel?.textContent).toContain('Run Closed');
+    expect(gameOverPanel?.textContent).toContain('Victory');
+    expect(gameOverPanel?.textContent).toContain('Outcome');
+    expect(gameOverPanel?.textContent).toContain('Final Pressures');
+    expect(gameOverPanel?.textContent).toContain('Roster');
+    expect(gameOverPanel?.textContent).toContain('Ledger');
+    expect(gameOverPanel?.textContent).toContain('Copy Run Report');
+    expect(gameOverPanel?.textContent).toContain('Seed: UI-RUN-SUMMARY-VICTORY');
+  });
+
+  it('renders a loss run summary on the game-over panel', () => {
+    storeState(buildGameOverState('loss'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gameOverPanel = compiled.querySelector<HTMLElement>('.game-over-panel');
+
+    expect(gameOverPanel?.textContent).toContain('Loss');
+    expect(gameOverPanel?.textContent).toContain('Heat Lockdown');
+    expect(gameOverPanel?.textContent).toContain('The city looked back');
+  });
+
+  it('copies the run report through the clipboard path', async () => {
+    const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    clickButton(compiled, 'Copy Run Report');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(writeText).toHaveBeenCalledWith(
+      jasmine.stringContaining('Seed: UI-RUN-SUMMARY-VICTORY'),
+    );
+    expect(compiled.querySelector('.run-report-copy')?.textContent).toContain('Report copied');
+  });
+
+  it('shows copy failure state without crashing', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: jasmine
+          .createSpy('writeText')
+          .and.returnValue(Promise.reject(new Error('denied'))),
+      },
+    });
+    storeState(buildGameOverState('victory'));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    clickButton(compiled, 'Copy Run Report');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.run-report-copy')?.textContent).toContain('Copy failed');
+  });
+
   it('renders target options with district, venue, and rival labels', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
@@ -333,6 +417,175 @@ describe('App', () => {
     expect(options).toContain('Violet Ward');
     expect(options).toContain('Violet Ward / The Glass Saint');
     expect(options).toContain('Nyx Ardent');
+  });
+
+  it('renders an empty Black Ledger panel cleanly', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const ledgerPanel = compiled.querySelector<HTMLElement>('.black-ledger-panel');
+
+    expect(ledgerPanel?.textContent).toContain('Black Ledger');
+    expect(ledgerPanel?.textContent).toContain('0 Secrets');
+    expect(ledgerPanel?.textContent).toContain('0 Debts');
+    expect(ledgerPanel?.textContent).toContain('0 Favors');
+    expect(ledgerPanel?.textContent).toContain('No active Secrets');
+    expect(ledgerPanel?.textContent).toContain('No spent or resolved entries yet');
+  });
+
+  it('renders active Secrets, Debts, Favors, and spent entries in the Ledger panel', () => {
+    const withEntries = addLedgerEntry(
+      addLedgerEntry(
+        addLedgerEntry(newGame({ seed: 'PHASE-8-LEDGER-PANEL' }), {
+          definitionId: 'secret_patrol_schedule',
+          source: {
+            type: 'action',
+            actionId: 'gather_intel',
+          },
+        }),
+        {
+          definitionId: 'debt_owes_liaison',
+          source: {
+            type: 'event',
+            eventId: 'liaison_favor',
+            choiceId: 'accept_the_favor',
+          },
+        },
+      ),
+      {
+        definitionId: 'favor_hidden_route',
+        source: {
+          type: 'event',
+          eventId: 'blackmail_lead',
+          choiceId: 'save_it_for_later',
+        },
+      },
+    );
+    const state = consumeLedgerEntry(withEntries, withEntries.ledger.entries[0].id);
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const ledgerPanel = compiled.querySelector<HTMLElement>('.black-ledger-panel');
+
+    expect(ledgerPanel?.textContent).toContain('Owes the Liaison');
+    expect(ledgerPanel?.textContent).toContain('Pay in Credits');
+    expect(ledgerPanel?.textContent).toContain('Offer Information');
+    expect(ledgerPanel?.textContent).toContain('-5 Intel');
+    expect(ledgerPanel?.textContent).toContain('Hidden Route');
+    expect(ledgerPanel?.textContent).toContain('Patrol Schedule');
+    expect(ledgerPanel?.textContent).toContain('Resolved');
+    expect(ledgerPanel?.textContent).toContain('Spent / Resolved Ledger Entries');
+    expect(ledgerPanel?.querySelectorAll('.ledger-entry-card.kind-debt')).toHaveSize(1);
+    expect(ledgerPanel?.querySelectorAll('.ledger-entry-card.kind-favor')).toHaveSize(1);
+    expect(ledgerPanel?.querySelectorAll('.ledger-entry-card.consumed')).toHaveSize(1);
+  });
+
+  it('shows Work the Ledger targets and updates use previews when selected', () => {
+    const state = addLedgerEntry(newGame({ seed: 'PHASE-8-WORK-LEDGER' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const entryId = state.ledger.entries[0].id;
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const workCard = findCard(compiled, '.action-card', 'Work the Ledger');
+
+    expect(workCard.textContent).toContain('Select a target to queue this order.');
+    expect(workCard.textContent).toContain('Owes the Liaison - Pay in Credits');
+    expect(workCard.querySelector('.assignment-control')).toBeNull();
+
+    selectValue(workCard, '.target-control select', `ledger:${entryId}:pay_in_credits`);
+    fixture.detectChanges();
+
+    expect(workCard.textContent).toContain('Ledger use');
+    expect(workCard.textContent).toContain('Owes the Liaison');
+    expect(workCard.textContent).toContain('Pay in Credits');
+    expect(workCard.textContent).toContain('-900 Resources');
+    expect(workCard.textContent).toContain('+2 Loyalty');
+    expect(workCard.textContent).toContain('Consumes Entry');
+    expect(findButton(workCard, 'Queue Order').disabled).toBeFalse();
+  });
+
+  it('disables unaffordable Work the Ledger uses with clear copy', () => {
+    const withDebt = addLedgerEntry(newGame({ seed: 'PHASE-8-LEDGER-BROKE' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'event',
+        eventId: 'liaison_favor',
+        choiceId: 'accept_the_favor',
+      },
+    });
+    const state: GameState = {
+      ...withDebt,
+      pressures: {
+        ...withDebt.pressures,
+        resources: 100,
+      },
+    };
+    const entryId = state.ledger.entries[0].id;
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const workCard = findCard(compiled, '.action-card', 'Work the Ledger');
+
+    selectValue(workCard, '.target-control select', `ledger:${entryId}:pay_in_credits`);
+    fixture.detectChanges();
+
+    expect(findButton(workCard, 'Queue Order').disabled).toBeTrue();
+    expect(workCard.textContent).toContain('Insufficient Resources');
+    expect(compiled.querySelector('.black-ledger-panel')?.textContent).toContain(
+      'Insufficient Resources',
+    );
+    expect(compiled.querySelector('.black-ledger-panel')?.textContent).toContain(
+      'Offer Information',
+    );
+  });
+
+  it('shows Secret Chance for targeted Gather Intel only', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gatherCard = findCard(compiled, '.action-card', 'Gather Intel');
+
+    expect(gatherCard.textContent).not.toContain('Secret Chance');
+
+    selectValue(gatherCard, '.target-control select', 'district:district_ghostline_market');
+    fixture.detectChanges();
+
+    expect(gatherCard.textContent).toContain('Secret Chance');
+    expect(gatherCard.querySelector('.secret-preview')?.textContent).toContain(
+      'possible Ledger leads',
+    );
+  });
+
+  it('shows exact Ledger effects on event choices', () => {
+    const state: GameState = {
+      ...newGame({ seed: 'PHASE-8-EVENT-LEDGER' }),
+      phase: 'EVENT_CHOICE',
+      pendingEvent: {
+        id: 'event_1_1',
+        definitionId: 'unexpected_windfall',
+        week: 1,
+      },
+    };
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.textContent).toContain('Intercepted Transmission');
+    expect(compiled.textContent).toContain('Creates Debt: Contaminated Money');
+    expect(compiled.textContent).toContain(
+      'Creates Secret: Dead Channel Trace',
+    );
   });
 
   it('disables required-target actions until a target is selected', () => {
@@ -482,4 +735,93 @@ function storeState(state: ReturnType<typeof newGame>): void {
       state,
     }),
   );
+}
+
+function consumeLedgerEntry(state: GameState, entryId: string): GameState {
+  return {
+    ...state,
+    ledger: {
+      ...state.ledger,
+      entries: state.ledger.entries.map((entry) =>
+        entry.id === entryId
+          ? {
+              ...entry,
+              consumed: true,
+              consumedWeek: state.week,
+              consumedBy: {
+                type: 'action',
+                actionId: 'work_the_ledger',
+                useOptionId: 'test_use',
+              },
+            }
+          : entry,
+      ),
+      consumedCount: state.ledger.consumedCount + 1,
+    },
+  };
+}
+
+function buildGameOverState(result: 'victory' | 'loss'): GameState {
+  const withLedger = addLedgerEntry(newGame({ seed: `UI-RUN-SUMMARY-${result.toUpperCase()}` }), {
+    definitionId: 'debt_owes_liaison',
+    source: {
+      type: 'event',
+      eventId: 'liaison_favor',
+      choiceId: 'accept_the_favor',
+    },
+  });
+
+  return {
+    ...withLedger,
+    week: result === 'victory' ? 7 : 5,
+    phase: 'GAME_OVER',
+    gameOver:
+      result === 'victory'
+        ? {
+            result: 'victory',
+            reason: 'dominion_victory',
+          }
+        : {
+            result: 'loss',
+            reason: 'heat_lockdown',
+          },
+    pressures:
+      result === 'victory'
+        ? {
+            dominion: 92,
+            heat: 62,
+            loyalty: 48,
+            resources: 1700,
+            intel: 18,
+            ruin: 16,
+          }
+        : {
+            dominion: 58,
+            heat: 100,
+            loyalty: 39,
+            resources: 900,
+            intel: 12,
+            ruin: 22,
+          },
+    operatives: withLedger.operatives.map((operative, index) => ({
+      ...operative,
+      weeksAssigned: index === 0 ? 4 : operative.weeksAssigned,
+    })),
+    rivals: {
+      ...withLedger.rivals,
+      rival_nyx_ardent: {
+        ...withLedger.rivals.rival_nyx_ardent,
+        pressure: 55,
+      },
+    },
+    eventLog: [
+      ...withLedger.eventLog,
+      {
+        id: 'ui_report_major_event',
+        week: 4,
+        type: 'event_presented',
+        title: 'Debt Comes Due: Owes the Liaison',
+      },
+    ],
+  };
 }

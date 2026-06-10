@@ -31,3 +31,4 @@
 - [`v0.4A.md`](releases/v0.4-the-black-ledger/v0.4A.md): locked mechanical decisions.
 - [`BlackLedger-TDD.md`](releases/v0.4-the-black-ledger/BlackLedger-TDD.md): technical design.
 - [`BlackLedger-ImplementationPlan.md`](releases/v0.4-the-black-ledger/BlackLedger-ImplementationPlan.md): phased implementation plan.
+- [`BlackLedger-ReleaseNotes.md`](releases/v0.4-the-black-ledger/BlackLedger-ReleaseNotes.md): release notes draft.
