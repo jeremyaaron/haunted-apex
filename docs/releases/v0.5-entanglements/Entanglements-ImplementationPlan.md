@@ -700,6 +700,43 @@ Unit tests:
 
 Review whether Ledger links feel legible and non-magical before adding weekly events.
 
+### Phase 5 Completion Record
+
+- Added `relatedContactId` to runtime `LedgerEntry` and `AddLedgerEntryRequest`.
+- Added `relatedContactEffects` to `LedgerUseOptionDefinition`.
+- Contact service Ledger hooks now create real linked entries:
+  - Veyra Lux `Private Room Access` creates `Owes the Liaison`.
+  - Captain Rafe Hollis `Clean Passage` creates `Checkpoint Captain`.
+  - Ciro Moth `Hidden Route` creates `Dead Channel Trace`.
+  - Mina Glass `Quiet Investor` creates `Contaminated Money`.
+- Selected Ledger use options now declare Contact consequences when used through a linked
+  entry:
+  - `Owes the Liaison`
+  - `Contaminated Money`
+  - `Dead Channel Trace`
+  - `Checkpoint Captain`
+- `Work the Ledger` previews, selector views, UI summaries, and resolution logs expose
+  declared linked Contact effects.
+- Linked Ledger entries with no declared `relatedContactEffects` intentionally leave the
+  Contact unchanged.
+
+Validation:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/simulation/resolve-contact.spec.ts --include=src/app/engine/ledger/ledger-use.spec.ts --include=src/app/engine/ledger/ledger-selectors.spec.ts --include=src/app/engine/content/contact-content.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Phase 5 tests passed: 27 specs.
+Full browser suite passed: 361 specs.
+The production build, documentation link check, and whitespace diff check passed.
+The post-suite Karma process was explicitly terminated after reporting success.
+
 ## Phase 6: Contact Events and Existing Event Hooks
 
 ### Objective

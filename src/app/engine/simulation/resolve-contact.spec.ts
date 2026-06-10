@@ -110,6 +110,45 @@ describe('resolveQueuedOrder Manage Contact', () => {
     expect(result.state.rivals.rival_nyx_ardent.pressure).toBe(
       state.rivals.rival_nyx_ardent.pressure + 6,
     );
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'debt_owes_liaison',
+        relatedContactId: 'contact_veyra_lux',
+        source: {
+          type: 'action',
+          actionId: 'manage_contact',
+          target: {
+            type: 'contact',
+            contactId: 'contact_veyra_lux',
+            optionId: 'private_room_access',
+          },
+        },
+      }),
+    );
+  });
+
+  it('creates Hollis-related checkpoint favors through Contact service hooks', () => {
+    const state = withActiveContacts(newGame({ seed: 'CONTACT-HOLLIS-FAVOR' }), [
+      'contact_captain_hollis',
+      'contact_veyra_lux',
+      'contact_father_static',
+    ]);
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'manage_contact',
+      target: {
+        type: 'contact',
+        contactId: 'contact_captain_hollis',
+        optionId: 'clean_passage',
+      },
+    });
+
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'favor_checkpoint_captain',
+        relatedContactId: 'contact_captain_hollis',
+      }),
+    );
   });
 
   it('records recent contact interactions', () => {

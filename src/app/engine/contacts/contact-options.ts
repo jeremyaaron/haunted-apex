@@ -17,6 +17,7 @@ import type {
   ContactServiceRequirement,
   ContactState,
   GameState,
+  LedgerEntryDefinitionId,
   OperativeId,
   PressureDelta,
   PressureId,
@@ -50,7 +51,7 @@ export type ContactCostRow = {
 
 export type ContactLedgerEffectPreview = {
   type: 'create_entry';
-  definitionId: string;
+  definitionId: LedgerEntryDefinitionId;
   entryName: string;
   kind: string;
 };

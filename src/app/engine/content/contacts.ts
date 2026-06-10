@@ -123,6 +123,13 @@ export const CONTACT_DEFINITIONS = [
         contactEffects: {
           exposure: 4,
         },
+        ledgerEffects: [
+          {
+            type: 'create_entry',
+            definitionId: 'favor_checkpoint_captain',
+            relatedContact: true,
+          },
+        ],
       },
       {
         id: 'lose_the_file',

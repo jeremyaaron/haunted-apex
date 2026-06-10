@@ -19,6 +19,7 @@ import {
   type ContactMetricDeltaView,
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
+  type LedgerContactDeltaRow,
   type HireCandidateView,
   type LedgerDeltaRow,
   type LedgerEntryView,
@@ -377,10 +378,18 @@ export class App {
     return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
 
+  protected ledgerContactEffectText(row: LedgerContactDeltaRow): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
   protected ledgerUseSummary(option: LedgerUseOptionView): string {
-    const rows = [...option.costRows, ...option.effectRows].map((row) =>
-      this.ledgerDeltaText(row),
-    );
+    const rows = [
+      ...option.costRows.map((row) => this.ledgerDeltaText(row)),
+      ...option.effectRows.map((row) => this.ledgerDeltaText(row)),
+      ...option.relatedContactEffectRows.map((row) =>
+        this.ledgerContactEffectText(row),
+      ),
+    ];
 
     if (option.consumesEntry) {
       rows.push('Consumes Entry');

@@ -313,6 +313,12 @@
                           {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
                         </span>
                       }
+                      @for (effect of ledgerUse.relatedContactEffectRows; track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ ledgerUse.relatedContactName || 'Contact' }}
+                          {{ ledgerContactEffectText(effect) }}
+                        </span>
+                      }
                       @if (ledgerUse.consumesEntry) {
                         <span>Consumes Entry</span>
                       }
@@ -759,6 +765,12 @@
         <div>
           <dt>Context</dt>
           <dd>{{ entry.relatedContextLabel }}</dd>
+        </div>
+      }
+      @if (entry.relatedContactLabel) {
+        <div>
+          <dt>Contact</dt>
+          <dd>{{ entry.relatedContactLabel }}</dd>
         </div>
       }
     </dl>

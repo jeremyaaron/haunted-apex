@@ -10,6 +10,7 @@ import {
 } from '../content';
 import type {
   ActionTarget,
+  ContactMetricDelta,
   GameState,
   LedgerEntry,
   LedgerEntryDefinition,
@@ -30,12 +31,18 @@ export type LedgerDeltaRow = {
   value: number;
 };
 
+export type LedgerContactDeltaRow = {
+  id: keyof ContactMetricDelta;
+  value: number;
+};
+
 export type LedgerUseOptionView = {
   id: LedgerUseOptionId;
   label: string;
   description?: string;
   costRows: LedgerDeltaRow[];
   effectRows: LedgerDeltaRow[];
+  relatedContactEffectRows: LedgerContactDeltaRow[];
   consumesEntry: boolean;
   affordable: boolean;
   unavailableReason?: 'insufficient_resources' | 'insufficient_intel' | 'entry_consumed';
@@ -52,6 +59,7 @@ export type LedgerEntryView = {
   status: LedgerEntryStatus;
   sourceLabel: string;
   relatedContextLabel?: string;
+  relatedContactLabel?: string;
   tags: string[];
   useOptions: LedgerUseOptionView[];
 };
@@ -166,6 +174,7 @@ function toLedgerEntryView(state: GameState, entry: LedgerEntry): LedgerEntryVie
       status: getLedgerEntryStatus(entry),
       sourceLabel: getSourceLabel(entry),
       relatedContextLabel: getRelatedContextLabel(entry),
+      relatedContactLabel: getRelatedContactLabel(entry),
       tags: [...definition.tags],
       useOptions: definition.useOptions.map((option) =>
         toLedgerUseOptionView(state, entry, option),
@@ -187,6 +196,9 @@ function toLedgerUseOptionView(
     description: option.description,
     costRows: toCostRows(option.cost),
     effectRows: toDeltaRows(option.effects),
+    relatedContactEffectRows: entry.relatedContactId
+      ? toContactDeltaRows(option.relatedContactEffects)
+      : [],
     consumesEntry: option.consumesEntry,
     affordable: unavailableReason === undefined,
     unavailableReason,
@@ -251,6 +263,12 @@ function getRelatedContextLabel(entry: LedgerEntry): string | undefined {
   return undefined;
 }
 
+function getRelatedContactLabel(entry: LedgerEntry): string | undefined {
+  return entry.relatedContactId
+    ? getContactDefinition(entry.relatedContactId)?.name
+    : undefined;
+}
+
 function getTargetLabel(target: ActionTarget): string | undefined {
   switch (target.type) {
     case 'district':
@@ -283,6 +301,25 @@ function toCostRows(cost: LedgerUseOptionDefinition['cost']): LedgerDeltaRow[] {
 
 function toDeltaRows(delta: PressureDelta): LedgerDeltaRow[] {
   return PRESSURE_IDS.flatMap((id) => {
+    const value = delta[id];
+
+    return typeof value === 'number' && value !== 0
+      ? [
+          {
+            id,
+            value,
+          },
+        ]
+      : [];
+  });
+}
+
+function toContactDeltaRows(delta: ContactMetricDelta | undefined): LedgerContactDeltaRow[] {
+  if (!delta) {
+    return [];
+  }
+
+  return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
     const value = delta[id];
 
     return typeof value === 'number' && value !== 0

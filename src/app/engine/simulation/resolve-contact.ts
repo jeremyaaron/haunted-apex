@@ -7,6 +7,7 @@ import {
   previewContactOption,
   type ContactOptionPreview,
 } from '../contacts';
+import { addLedgerEntry } from '../ledger';
 import type {
   ActionTarget,
   ContactId,
@@ -80,6 +81,7 @@ export function resolveContactOption(
   const quietTreatment = applyQuietTreatment(next, preview);
   next = quietTreatment.state;
   next = applyRivalPressureEffects(next, preview.rivalPressureEffects);
+  next = applyContactLedgerEffects(next, preview);
   next = appendLog(next, {
     type: 'order_resolved',
     title: `Manage Contact: ${preview.contactName}`,
@@ -176,6 +178,29 @@ function applyRivalPressureEffects(
   };
 }
 
+function applyContactLedgerEffects(
+  state: GameState,
+  preview: Extract<ContactOptionPreview, { ok: true }>,
+): GameState {
+  return preview.ledgerEffects.reduce(
+    (next, effect) =>
+      addLedgerEntry(next, {
+        definitionId: effect.definitionId,
+        source: {
+          type: 'action',
+          actionId: 'manage_contact',
+          target: {
+            type: 'contact',
+            contactId: preview.contactId,
+            optionId: preview.id,
+          },
+        },
+        relatedContactId: preview.contactId,
+      }),
+    state,
+  );
+}
+
 function createResolutionBody(
   preview: Extract<ContactOptionPreview, { ok: true }>,
   roll: number,
@@ -190,7 +215,7 @@ function createResolutionBody(
     ? ` ${preview.quietTreatment.operativeName} Stress ${stressDelta}.`
     : '';
   const ledgerText = preview.ledgerEffects.length > 0
-    ? ` Ledger hooks pending: ${preview.ledgerEffects.map((effect) => effect.entryName).join(', ')}.`
+    ? ` Ledger entries created: ${preview.ledgerEffects.map((effect) => effect.entryName).join(', ')}.`
     : '';
   const result = complication ? 'Resolved with blowback.' : 'Resolved cleanly.';
 

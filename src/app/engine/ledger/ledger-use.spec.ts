@@ -235,4 +235,69 @@ describe('Ledger use preview and resolution', () => {
       applyPressureDelta(state.pressures, preview.resolvedDelta),
     );
   });
+
+  it('previews and applies declared contact effects for contact-linked Ledger use', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-CONTACT-EFFECTS' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'action',
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'private_room_access',
+        },
+      },
+      relatedContactId: 'contact_veyra_lux',
+    });
+    const target = {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'pay_in_credits',
+    } as const;
+    const preview = previewLedgerUse(state, target);
+    const result = resolveLedgerUse(state, target);
+
+    if (!preview.ok) {
+      fail(`Expected valid preview, got ${preview.reason}`);
+      return;
+    }
+
+    expect(preview.relatedContactName).toBe('Veyra Lux');
+    expect(preview.relatedContactEffectRows).toEqual([
+      { id: 'trust', value: 4 },
+      { id: 'volatility', value: -2 },
+    ]);
+    expect(result.state.contacts.contact_veyra_lux.trust).toBe(
+      state.contacts.contact_veyra_lux.trust + 4,
+    );
+    expect(result.state.contacts.contact_veyra_lux.volatility).toBe(
+      state.contacts.contact_veyra_lux.volatility - 2,
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Veyra Lux: trust +4, volatility -2.',
+    );
+  });
+
+  it('does not change a linked contact when the use option declares no contact effects', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-CONTACT-NO-EFFECTS' }), {
+      definitionId: 'favor_hidden_route',
+      source: {
+        type: 'event',
+        eventId: 'blackmail_lead',
+        choiceId: 'save_it_for_later',
+      },
+      relatedContactId: 'contact_ciro_moth',
+    });
+    const result = resolveLedgerUse(state, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'open_hidden_route',
+    });
+
+    expect(result.state.contacts.contact_ciro_moth).toEqual(
+      state.contacts.contact_ciro_moth,
+    );
+    expect(result.state.eventLog.at(-1)?.body).not.toContain('Ciro Moth:');
+  });
 });
