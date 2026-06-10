@@ -9,6 +9,7 @@ Development documentation is organized under [`docs/`](docs/README.md):
 - [`docs/releases/v0.2-rival-territory/`](docs/releases/v0.2-rival-territory/) contains the Rival Territory direction, clarifications, TDD, and implementation plan.
 - [`docs/releases/v0.3-the-roster/`](docs/releases/v0.3-the-roster/) contains The Roster direction, clarifications, TDD, and implementation plan.
 - [`docs/releases/v0.4-the-black-ledger/`](docs/releases/v0.4-the-black-ledger/) contains The Black Ledger direction, clarifications, TDD, implementation plan, and release notes.
+- [`docs/releases/v0.5-entanglements/`](docs/releases/v0.5-entanglements/) contains the Entanglements direction, clarifications, TDD, and implementation plan.
 
 ## Runtime
 
