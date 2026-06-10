@@ -9,6 +9,7 @@ import {
 } from '../content';
 import type {
   ActionDefinition,
+  ActionAssignmentRule,
   ActionId,
   ActionTarget,
   DistrictDefinition,
@@ -118,6 +119,7 @@ export type OperativeAssignmentPreview = {
 export type ActionPreview = {
   actionId: ActionId;
   label: string;
+  assignment: ActionAssignmentRule;
   requiresTarget: boolean;
   commandCost: number;
   resourceCost: number;
@@ -378,6 +380,7 @@ export function getActionPreview(
   return {
     actionId: action.id,
     label: action.label,
+    assignment: action.assignment,
     requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
@@ -449,7 +452,8 @@ export function selectActionCards(state: GameState): ActionCardView[] {
       ...preview,
       state: isQueued ? 'queued' : availability.available ? 'available' : 'unavailable',
       unavailableReason: availability.reason,
-      availableOperatives: selectAssignmentOptions(state, actionId),
+      availableOperatives:
+        preview.assignment === 'none' ? [] : selectAssignmentOptions(state, actionId),
     };
   });
 }

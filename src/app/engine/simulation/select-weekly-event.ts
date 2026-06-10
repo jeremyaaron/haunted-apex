@@ -288,14 +288,14 @@ function getContextModifiers(
   }
 
   if (event.id === 'ledger_debt_comes_due' && context.activeDebts > 0) {
-    modifiers.push({ id: 'active_debts', amount: Math.min(10, 5 + context.activeDebts * 2) });
+    modifiers.push({ id: 'active_debts', amount: Math.min(14, 8 + context.activeDebts * 3) });
 
     if (context.oldestDebtAge >= 2) {
-      modifiers.push({ id: 'old_debt', amount: Math.min(8, context.oldestDebtAge * 2) });
+      modifiers.push({ id: 'old_debt', amount: Math.min(12, context.oldestDebtAge * 3) });
     }
 
     if (state.pressures.heat >= 60 || state.pressures.loyalty <= 45) {
-      modifiers.push({ id: 'leverage_pressure', amount: 4 });
+      modifiers.push({ id: 'leverage_pressure', amount: 6 });
     }
   }
 

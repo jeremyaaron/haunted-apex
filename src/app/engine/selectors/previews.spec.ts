@@ -564,12 +564,14 @@ describe('action previews', () => {
     const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
 
     expect(cards.length).toBe(7);
+    expect(recruitCard?.assignment).toBe('none');
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
-    expect(recruitCard?.availableOperatives.every((operative) => operative.disabled)).toBeTrue();
-    expect(recruitCard?.availableOperatives[0].reason).toBe('operative_not_allowed');
+    expect(recruitCard?.availableOperatives).toEqual([]);
+    expect(ledgerCard?.assignment).toBe('none');
     expect(ledgerCard?.state).toBe('unavailable');
     expect(ledgerCard?.unavailableReason).toBe('target_required');
+    expect(ledgerCard?.availableOperatives).toEqual([]);
   });
 
   it('converts pressure deltas into stable display rows', () => {

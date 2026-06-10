@@ -354,10 +354,6 @@ export class App {
     ];
   }
 
-  protected primaryLedgerUse(entry: LedgerEntryView): LedgerUseOptionView | undefined {
-    return entry.useOptions[0];
-  }
-
   protected ledgerDeltaText(row: LedgerDeltaRow): string {
     return `${this.signed(row.value)} ${this.pressureLabel(row.id)}`;
   }

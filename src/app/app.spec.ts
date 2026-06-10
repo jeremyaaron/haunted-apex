@@ -469,6 +469,9 @@ describe('App', () => {
     const ledgerPanel = compiled.querySelector<HTMLElement>('.black-ledger-panel');
 
     expect(ledgerPanel?.textContent).toContain('Owes the Liaison');
+    expect(ledgerPanel?.textContent).toContain('Pay in Credits');
+    expect(ledgerPanel?.textContent).toContain('Offer Information');
+    expect(ledgerPanel?.textContent).toContain('-5 Intel');
     expect(ledgerPanel?.textContent).toContain('Hidden Route');
     expect(ledgerPanel?.textContent).toContain('Patrol Schedule');
     expect(ledgerPanel?.textContent).toContain('Resolved');
@@ -496,6 +499,7 @@ describe('App', () => {
 
     expect(workCard.textContent).toContain('Select a target to queue this order.');
     expect(workCard.textContent).toContain('Owes the Liaison - Pay in Credits');
+    expect(workCard.querySelector('.assignment-control')).toBeNull();
 
     selectValue(workCard, '.target-control select', `ledger:${entryId}:pay_in_credits`);
     fixture.detectChanges();
@@ -539,6 +543,9 @@ describe('App', () => {
     expect(workCard.textContent).toContain('Insufficient Resources');
     expect(compiled.querySelector('.black-ledger-panel')?.textContent).toContain(
       'Insufficient Resources',
+    );
+    expect(compiled.querySelector('.black-ledger-panel')?.textContent).toContain(
+      'Offer Information',
     );
   });
 

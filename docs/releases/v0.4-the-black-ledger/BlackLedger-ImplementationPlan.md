@@ -972,6 +972,21 @@ Unit/harness tests:
 
 Run an initial 100-runs-per-agent report and inspect Ledger frequency before balance.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Extended legal harness order enumeration to include engine-validated Ledger targets.
+- Added Ledger-aware scoring to RandomBot, AggressiveBot, CautiousBot, GreedyBot, and
+  OperatorBot while preserving their existing strategic personalities.
+- Counted per-run Ledger entries, created Secrets/Debts/Favors, consumed entries,
+  unresolved Debts, targeted Gather Intel attempts, Secret discoveries, and Ledger event
+  eligibility/selection.
+- Added `ledger_summary`, `ledger_usage`, `ledger_outcomes`, `secret_discovery`, and
+  `ledger_events` CSV sections.
+- Added tests for legal Ledger option generation, invalid Ledger exclusion, personality
+  Ledger use, report sections, and UI harness report visibility.
+
 ## Phase 11: Balance, Tuning, and Release Readiness
 
 ### Objective
@@ -1074,4 +1089,30 @@ Run-end summary and Copy Run Report work.
 Harness reports expose Ledger behavior.
 Balance remains recognizable from v0.3.
 Production and Pages builds pass.
+```
+
+### Completion Record
+
+Completed June 9, 2026:
+
+- Ran repeated 100-runs-per-agent harness batches through a temporary command-line runner.
+- Tuned Favor generation by adding defensive Favor creation to Rival Sends Flowers and
+  Orchid's Route Memory.
+- Raised Debt Comes Due contextual weighting so active Debts surface more often without
+  becoming automatic losses.
+- Added Field Guide copy for Secrets, Debts, Favors, Work the Ledger, and event Ledger
+  consequences.
+- Confirmed README/release docs follow the simplified release-status policy.
+- Added `BlackLedger-ReleaseNotes.md`.
+- Added tests for Favor creation through city and operative event choices.
+
+Final 100-runs-per-agent snapshot, seed prefix `PHASE11-TUNED-2`:
+
+```text
+agent      winRate  avgEntries  avgSecrets  avgDebts  avgFavors  avgConsumed
+random     0.000    2.17        1.27        0.79      0.11       0.41
+aggressive 0.380    2.20        0.63        1.13      0.44       0.74
+cautious   0.000    2.95        2.46        0.00      0.49       1.20
+greedy     0.470    4.71        2.34        1.72      0.65       0.90
+operator   0.710    1.80        0.95        0.26      0.59       0.80
 ```

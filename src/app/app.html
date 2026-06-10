@@ -155,7 +155,7 @@
                 </label>
               }
 
-              @if (action.actionId !== 'recruit_operative') {
+              @if (action.assignment !== 'none') {
                 <label class="assignment-control">
                   <span>Assign</span>
                   <select
@@ -721,15 +721,17 @@
         <span>{{ displayToken(tag) }}</span>
       }
     </div>
-    @if (primaryLedgerUse(entry); as use) {
-      <div class="ledger-primary-use" [class.unavailable]="!use.affordable">
-        <strong>{{ use.label }}</strong>
-        <span>{{ ledgerUseSummary(use) }}</span>
-        @if (!use.affordable) {
-          <small>{{ ledgerUseUnavailableReason(use) }}</small>
-        }
-      </div>
-    }
+    <div class="ledger-use-list">
+      @for (use of entry.useOptions; track use.id) {
+        <div class="ledger-use-option" [class.unavailable]="!use.affordable">
+          <strong>{{ use.label }}</strong>
+          <span>{{ ledgerUseSummary(use) }}</span>
+          @if (!use.affordable) {
+            <small>{{ ledgerUseUnavailableReason(use) }}</small>
+          }
+        </div>
+      }
+    </div>
   </ng-template>
 
   <section class="territory-rival-grid" aria-label="Territory and rival intelligence">
@@ -991,6 +993,20 @@
           Intel is below 20. Attack names the pressure meter each rival prefers to damage.
           Disposition and the remaining profile ratings are intelligence for future systems; they do
           not modify actions in this release.
+        </p>
+      </details>
+
+      <details>
+        <summary>The Black Ledger</summary>
+        <p>
+          The Ledger records leverage created by actions and event responses. Secrets are useful
+          information, Debts are obligations that can return as pressure, and Favors are rare
+          comeback tools. Consumed or resolved entries stay visible as history.
+        </p>
+        <p>
+          Targeted Gather Intel can discover Secrets when the target has matching hidden
+          opportunities. Work the Ledger spends a Command point to use an active Secret, settle a
+          Debt, or call a Favor. Event choices show their Ledger consequences before you choose.
         </p>
       </details>
 

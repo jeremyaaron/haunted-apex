@@ -335,6 +335,12 @@ export const DISTRICT_ZERO_EVENTS: readonly EventDefinition[] = [
         label: 'Display them',
         effects: { loyalty: 3, ruin: 1 },
         flags: ['accepted_rival_gesture'],
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'favor_checkpoint_captain',
+          },
+        ],
       },
     ],
   },

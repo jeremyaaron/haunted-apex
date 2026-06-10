@@ -234,6 +234,12 @@ export const ROSTER_EVENTS: readonly OperativeEventDefinition[] = [
         label: 'Map it first',
         cost: { intel: 5 },
         effects: { resources: 900, heat: -3 },
+        ledgerEffects: [
+          {
+            type: 'create',
+            definitionId: 'favor_hidden_route',
+          },
+        ],
       },
       {
         id: 'seal_it',
