@@ -15,6 +15,7 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type AppliedModifierSource,
+  type ContactEffectPreviewRow,
   type ContactCostRow,
   type ContactMetricDeltaView,
   type EventChoiceDefinition,
@@ -332,6 +333,16 @@ export class App {
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.ledgerEffects ?? [];
   }
 
+  protected eventContactRows(choiceId: string): ContactEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.contactEffects ?? [];
+  }
+
   protected formatLedgerEventRow(row: EventLedgerEffectPreviewRow): string {
     const kind = this.capitalize(row.kind);
 
@@ -376,6 +387,10 @@ export class App {
 
   protected contactMetricText(row: ContactMetricDeltaView): string {
     return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
+  protected eventContactEffectText(row: ContactEffectPreviewRow): string {
+    return `${row.contactName} ${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
 
   protected ledgerContactEffectText(row: LedgerContactDeltaRow): string {

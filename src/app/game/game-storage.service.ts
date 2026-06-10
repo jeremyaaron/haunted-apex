@@ -554,7 +554,10 @@ function isSeenSignatureEventIds(value: unknown): boolean {
     return false;
   }
 
-  return value.every((eventId) => getEventDefinition(eventId)?.kind === 'operative');
+  return value.every((eventId) => {
+    const definition = getEventDefinition(eventId);
+    return definition?.kind === 'operative' || definition?.contact?.signature === true;
+  });
 }
 
 function isLedgerState(value: unknown): boolean {
@@ -591,6 +594,9 @@ function isLedgerState(value: unknown): boolean {
       (entry['relatedRivalId'] !== undefined &&
         (typeof entry['relatedRivalId'] !== 'string' ||
           !getRivalDefinition(entry['relatedRivalId'] as RivalId))) ||
+      (entry['relatedContactId'] !== undefined &&
+        (typeof entry['relatedContactId'] !== 'string' ||
+          !getContactDefinition(entry['relatedContactId'] as ContactId))) ||
       (entry['flags'] !== undefined && !isFlags(entry['flags']))
     ) {
       return false;
@@ -696,7 +702,10 @@ function isPendingEvent(value: unknown): boolean {
     getEventDefinition(value['definitionId']) !== undefined &&
     isPositiveInteger(value['week']) &&
     (value['selectedLedgerEntryId'] === undefined ||
-      typeof value['selectedLedgerEntryId'] === 'string')
+      typeof value['selectedLedgerEntryId'] === 'string') &&
+    (value['selectedContactId'] === undefined ||
+      (typeof value['selectedContactId'] === 'string' &&
+        getContactDefinition(value['selectedContactId'] as ContactId) !== undefined))
   );
 }
 

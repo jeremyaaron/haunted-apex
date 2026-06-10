@@ -367,6 +367,13 @@ export const CONTACT_DEFINITIONS = [
           trust: -5,
           volatility: 8,
         },
+        ledgerEffects: [
+          {
+            type: 'create_entry',
+            definitionId: 'secret_dead_channel_trace',
+            relatedContact: true,
+          },
+        ],
       },
     ],
     eventIds: ['event_confession_leak'],

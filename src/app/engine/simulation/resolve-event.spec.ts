@@ -1,4 +1,4 @@
-import type { EventId, GameState } from '../model';
+import type { ContactId, EventId, GameState } from '../model';
 import { materializeOperativeState } from '../roster';
 import { addLedgerEntry } from '../ledger';
 import { newGame } from './new-game';
@@ -163,6 +163,102 @@ describe('resolveEventChoice', () => {
         optional: true,
       }),
     ]);
+  });
+
+  it('previews and applies Contact effects from Contact event choices', () => {
+    const state = withActiveContacts(withPendingEvent('contact_wants_assurance'), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const selectedState: GameState = {
+      ...state,
+      pendingEvent: {
+        ...state.pendingEvent!,
+        selectedContactId: 'contact_veyra_lux',
+      },
+    };
+    const preview = getEventChoicePreview(selectedState, 'event_1_1', 'reassure_them');
+    const result = resolveEventChoice(selectedState, 'event_1_1', 'reassure_them');
+
+    if (!result.ok) {
+      fail(`Expected Contact event resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(preview?.contactEffects).toEqual([
+      {
+        contactId: 'contact_veyra_lux',
+        contactName: 'Veyra Lux',
+        id: 'trust',
+        value: 6,
+      },
+      {
+        contactId: 'contact_veyra_lux',
+        contactName: 'Veyra Lux',
+        id: 'volatility',
+        value: -4,
+      },
+    ]);
+    expect(result.state.contacts.contact_veyra_lux.trust).toBe(
+      selectedState.contacts.contact_veyra_lux.trust + 6,
+    );
+    expect(result.state.contacts.contact_veyra_lux.volatility).toBe(
+      selectedState.contacts.contact_veyra_lux.volatility - 4,
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Contact: Veyra Lux: trust +6, volatility -4.',
+    );
+  });
+
+  it('creates contact-linked Ledger entries from Contact event choices', () => {
+    const state = withActiveContacts(withPendingEvent('event_veyra_room'), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const result = resolveEventChoice(state, 'event_1_1', 'take_the_private_room');
+
+    if (!result.ok) {
+      fail(`Expected Veyra event resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'debt_owes_liaison',
+        relatedContactId: 'contact_veyra_lux',
+      }),
+    );
+  });
+
+  it('applies existing event Contact hooks only when the contact is active', () => {
+    const active = withActiveContacts(withPendingEvent('liaison_favor'), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const inactive = withActiveContacts(withPendingEvent('liaison_favor'), [
+      'contact_captain_hollis',
+      'contact_father_static',
+      'contact_ciro_moth',
+    ]);
+    const activeResult = resolveEventChoice(active, 'event_1_1', 'accept_the_favor');
+    const inactiveResult = resolveEventChoice(inactive, 'event_1_1', 'accept_the_favor');
+
+    if (!activeResult.ok || !inactiveResult.ok) {
+      fail('Expected Liaison Favor choices to resolve');
+      return;
+    }
+
+    expect(activeResult.state.contacts.contact_veyra_lux.trust).toBe(
+      active.contacts.contact_veyra_lux.trust - 3,
+    );
+    expect(activeResult.state.ledger.entries[0].relatedContactId).toBe('contact_veyra_lux');
+    expect(inactiveResult.state.contacts.contact_veyra_lux).toEqual(
+      inactive.contacts.contact_veyra_lux,
+    );
+    expect(inactiveResult.state.ledger.entries[0].relatedContactId).toBeUndefined();
   });
 
   it('creates exact Ledger definitions from existing event choices', () => {
@@ -404,5 +500,12 @@ function withPendingEvent(definitionId: EventId): GameState {
       definitionId,
       week: 1,
     },
+  };
+}
+
+function withActiveContacts(state: GameState, activeContactIds: ContactId[]): GameState {
+  return {
+    ...state,
+    activeContactIds,
   };
 }

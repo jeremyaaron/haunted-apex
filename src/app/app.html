@@ -389,6 +389,15 @@
                       }
                     </small>
                   }
+                  @if (eventContactRows(choice.id).length > 0) {
+                    <small class="choice-ledger-effects">
+                      @for (row of eventContactRows(choice.id); track row.contactId + row.id) {
+                        <b [class.negative]="row.value < 0">
+                          {{ eventContactEffectText(row) }}
+                        </b>
+                      }
+                    </small>
+                  }
                 </button>
               }
             </div>

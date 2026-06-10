@@ -800,6 +800,54 @@ Unit tests:
 
 Review event frequency and event copy before UI work makes the system more visible.
 
+### Phase 6 Completion Record
+
+- Added Contact-aware event contracts:
+  - event-level Contact eligibility and recurrence metadata;
+  - choice-level `contactEffects`;
+  - `selectedContactId` on pending event instances;
+  - `relatedContactId` on event-created Ledger entries.
+- Added Contact event selection helpers for active/non-burned eligibility, signature
+  event exclusion, generic event cooldown, post-first generic downweighting, and selected
+  Contact resolution.
+- Added six Contact-aware city events:
+  - `Contact Wants Assurance`
+  - `Veyra's Room`
+  - `Hollis Is Being Watched`
+  - `Mercy's Bill`
+  - `Ciro's Route Remembers`
+  - `Confession Leak`
+- Hooked existing events into active Contacts:
+  - `A Favor in Violet Light` can affect and link Veyra Lux.
+  - `Corp Patrol Sweep` can affect and link Captain Rafe Hollis.
+  - `Money From a Dead Channel` can affect and link Ciro Moth.
+- Event choice previews and resolution now share Contact effect rows.
+- Event logs identify Contact consequences when a choice changes Contact state.
+- Contact signature events are recorded in `seenSignatureEventIds` beside operative
+  signature events.
+- Presented event logs now include the event id in tags so recurrence/cooldown logic can
+  use history reliably.
+- Storage validation accepts `selectedContactId`, Contact signature event ids, and
+  Contact-linked Ledger entries inside the v0.5 schema.
+- Added the missing Father Static service Ledger hook for `Confession Leak`, creating a
+  linked `Dead Channel Trace` Secret.
+
+Validation:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/simulation/select-weekly-event.spec.ts --include=src/app/engine/simulation/resolve-event.spec.ts --include=src/app/engine/content/contact-content.spec.ts --include=src/app/game/game-storage.service.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Phase 6 tests passed: 73 specs.
+Full browser suite passed: 369 specs.
+The production build, documentation link check, and whitespace diff check passed.
+
 ## Phase 7: Contact Selectors and UI Panel
 
 ### Objective

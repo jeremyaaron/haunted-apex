@@ -1,6 +1,6 @@
 import { DISTRICT_ZERO_EVENTS } from '../content';
 import { addLedgerEntry } from '../ledger';
-import type { GameLogEntry, GameState, RecentActivityEntry, RivalId } from '../model';
+import type { ContactId, GameLogEntry, GameState, RecentActivityEntry, RivalId } from '../model';
 import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
 import {
@@ -360,6 +360,132 @@ describe('weekly event selection', () => {
 
     expect(selectWeeklyEvent(state)).toEqual(selectWeeklyEvent(state));
   });
+
+  it('only includes Contact events for active non-burned eligible contacts', () => {
+    const active = withActiveContacts(newGame({ seed: 'CONTACT-EVENT-ACTIVE' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const inactive = withActiveContacts(newGame({ seed: 'CONTACT-EVENT-INACTIVE' }), [
+      'contact_captain_hollis',
+      'contact_father_static',
+      'contact_ciro_moth',
+    ]);
+    const burned = {
+      ...active,
+      contacts: {
+        ...active.contacts,
+        contact_veyra_lux: {
+          ...active.contacts.contact_veyra_lux,
+          burned: true,
+        },
+      },
+    };
+
+    expect(getWeightedEvents(active).some((candidate) => candidate.event.id === 'event_veyra_room'))
+      .withContext('active Veyra')
+      .toBeTrue();
+    expect(getWeightedEvents(inactive).some((candidate) => candidate.event.id === 'event_veyra_room'))
+      .withContext('inactive Veyra')
+      .toBeFalse();
+    expect(getWeightedEvents(burned).some((candidate) => candidate.event.id === 'event_veyra_room'))
+      .withContext('burned Veyra')
+      .toBeFalse();
+  });
+
+  it('removes seen Contact signature events from the weighted pool', () => {
+    const state = {
+      ...withActiveContacts(newGame({ seed: 'CONTACT-SIGNATURE-SEEN' }), [
+        'contact_veyra_lux',
+        'contact_captain_hollis',
+        'contact_father_static',
+      ]),
+      seenSignatureEventIds: ['event_veyra_room'] as GameState['seenSignatureEventIds'],
+    };
+
+    expect(getWeightedEvents(state).some((candidate) => candidate.event.id === 'event_veyra_room'))
+      .toBeFalse();
+  });
+
+  it('applies generic Contact event cooldown and post-first downweighting', () => {
+    const base = withActiveContacts(newGame({ seed: 'CONTACT-GENERIC-BASE' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const cooledDown = {
+      ...base,
+      week: 4,
+      eventLog: [presentedLog('contact_wants_assurance', ['CONTACT', 'contact_wants_assurance'], 2)],
+    };
+    const seenEarlier = {
+      ...base,
+      week: 5,
+      eventLog: [presentedLog('contact_wants_assurance', ['CONTACT', 'contact_wants_assurance'], 1)],
+    };
+    const baseline = requireWeightedEvent(base, 'contact_wants_assurance').weight;
+
+    expect(getWeightedEvents(cooledDown).some((candidate) => candidate.event.id === 'contact_wants_assurance'))
+      .withContext('two-week cooldown')
+      .toBeFalse();
+    expect(requireWeightedEvent(seenEarlier, 'contact_wants_assurance').weight)
+      .withContext('post-first downweight')
+      .toBe(Math.floor(baseline * 0.5));
+  });
+
+  it('uses Contact metrics and recent interaction context for Contact event eligibility', () => {
+    const lowVolatility = withActiveContacts(newGame({ seed: 'CONTACT-CIRO-LOW' }), [
+      'contact_ciro_moth',
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+    ]);
+    const highVolatility: GameState = {
+      ...lowVolatility,
+      contacts: {
+        ...lowVolatility.contacts,
+        contact_ciro_moth: {
+          ...lowVolatility.contacts.contact_ciro_moth,
+          volatility: 70,
+          recentInteractions: [
+            {
+              week: lowVolatility.week,
+              optionId: 'pressure',
+              kind: 'pressure',
+              label: 'Pressure',
+              effectsSummary: { volatility: 8 },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(getWeightedEvents(lowVolatility).some((candidate) => candidate.event.id === 'event_ciro_route_remembers'))
+      .toBeTrue();
+    expect(modifierIdsFor(highVolatility, 'event_ciro_route_remembers')).toContain(
+      'contact_recent_interaction',
+    );
+    expect(modifierIdsFor(highVolatility, 'event_ciro_route_remembers')).toContain(
+      'contact_volatile',
+    );
+  });
+
+  it('stores selected Contact ids on selected Contact events', () => {
+    const state = withActiveContacts(newGame({ seed: 'CONTACT-SELECTED' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const selected = findSelection(state, 'contact_wants_assurance');
+
+    expect(selected.event.selectedContactId).toBeDefined();
+    if (!selected.event.selectedContactId) {
+      fail('Expected selected Contact id');
+      return;
+    }
+
+    expect(state.activeContactIds).toContain(selected.event.selectedContactId);
+  });
 });
 
 function requireEvent(eventId: string) {
@@ -372,10 +498,10 @@ function requireEvent(eventId: string) {
   return event;
 }
 
-function presentedLog(id: string, tags: string[]): GameLogEntry {
+function presentedLog(id: string, tags: string[], week = 1): GameLogEntry {
   return {
     id,
-    week: 1,
+    week,
     type: 'event_presented',
     title: id,
     tags,
@@ -457,4 +583,11 @@ function findSelection(state: GameState, eventId: string) {
   }
 
   throw new Error(`Expected to select ${eventId}`);
+}
+
+function withActiveContacts(state: GameState, activeContactIds: ContactId[]): GameState {
+  return {
+    ...state,
+    activeContactIds,
+  };
 }

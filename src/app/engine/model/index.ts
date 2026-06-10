@@ -60,6 +60,7 @@ export type {
 } from './ledger';
 export type {
   CityEventDefinition,
+  ContactEventDefinition,
   EventChoiceDefinition,
   EventChoiceLedgerEffect,
   EventDefinition,

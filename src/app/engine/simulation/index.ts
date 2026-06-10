@@ -15,6 +15,12 @@ export { applyWinLoss, getGameOverState } from './win-loss';
 export { clampPressures, clampStress } from './clamps';
 export { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 export {
+  getContactEventEligibility,
+  previewEventContactEffects,
+  resolveEventContactId,
+  selectContactForEvent,
+} from './contact-events';
+export {
   buildEventWeightContext,
   calculateEventWeight,
   getWeightedEvents,
@@ -31,6 +37,10 @@ export type { QueueOrderResult, RemoveQueuedOrderResult } from './queue-order';
 export type { ActionResolution } from './resolve-action';
 export type { ResolveContactOptionResult } from './resolve-contact';
 export type { AdvanceWeekResult, OrderResolutionDiagnostic } from './resolve-week';
+export type {
+  ContactEffectPreviewRow,
+  ContactEventEligibilityDiagnostics,
+} from './contact-events';
 export type {
   EventSelection,
   EventWeightContext,
