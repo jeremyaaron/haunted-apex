@@ -24,6 +24,16 @@ export type {
 } from './agents';
 export type {
   AgentBatchSummary,
+  ContactEventReport,
+  ContactFinalRunStats,
+  ContactLedgerReport,
+  ContactLedgerRunStats,
+  ContactOutcomeReport,
+  ContactRunStats,
+  ContactSetReport,
+  ContactSummaryReport,
+  ContactUsageReport,
+  ContactUsageRunStats,
   ContextualEventCounts,
   DistrictAverage,
   HarnessBatchOptions,

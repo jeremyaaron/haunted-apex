@@ -1096,6 +1096,62 @@ Recommended harness:
 full detailed report copied from UI harness
 ```
 
+### Completion Record
+
+Completed June 10, 2026:
+
+- Updated all harness agents for basic `Manage Contact` decision-making:
+  - `AggressiveBot` values pressure, Dominion-positive services, Intel, and victory moves
+    while braking near Heat loss.
+  - `CautiousBot` values cultivation, Heat/Loyalty/Ruin relief, lower risk, and stable
+    relationship metrics.
+  - `GreedyBot` values resources, Intel, leverage, pressure, and services while avoiding
+    immediate Heat loss.
+  - `OperatorBot` uses Contact services as pressure-management tools and has explicit
+    heat, loyalty, ruin, Intel, and quiet-treatment biases.
+  - `RandomBot` automatically participates through legal option enumeration.
+- Extended run telemetry with `ContactRunStats`, including:
+  - active Contact set;
+  - per-option Contact usage and complications;
+  - Contact event eligibility and selections;
+  - final Trust, Leverage, Volatility, Exposure, and burned state;
+  - Contact-linked Ledger creation, consumption, and active-at-end counts.
+- Extended batch summaries with Contact reports:
+  - `contact_summary`
+  - `contact_usage`
+  - `contact_outcomes`
+  - `contact_events`
+  - `contact_ledger`
+  - `contact_sets`
+- Added deterministic Contact set win-rate grouping by sorted active Contact ids.
+- Exported the new Contact harness report types through `src/app/engine/harness/index.ts`.
+- Added harness specs proving:
+  - deterministic runs include identical Contact telemetry;
+  - legal `Manage Contact` options are engine-validated and queueable;
+  - every strategy can choose a queueable Contact action when Contact options are the
+    relevant decision space;
+  - `OperatorBot` picks Captain Hollis' Heat-saving `Clean Passage` under high Heat;
+  - the 100-runs-per-agent batch emits all Contact report sections and summary metrics.
+- The deterministic 100-runs-per-agent harness spec now serves as the initial v0.5
+  Contact-aware snapshot seed path for Phase 10 review. The manually reviewed UI harness
+  CSV should still be copied into the Phase 10 balance notes before tuning numbers.
+
+Verification:
+
+```bash
+npm test -- --watch=false --include src/app/engine/harness/simulation-harness.spec.ts
+npm test -- --watch=false
+npm run build
+```
+
+Results:
+
+```text
+Harness spec: 22 specs passed.
+Full suite:   381 specs passed.
+Build:        passed.
+```
+
 ### Review Gate
 
 Review first Contact harness output before balance changes.

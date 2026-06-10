@@ -4,6 +4,7 @@ import {
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
   getDistrictDefinition,
+  getContactDefinition,
   getEventDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
@@ -13,6 +14,8 @@ import {
 import type {
   ActionId,
   ActionTarget,
+  ContactId,
+  ContactOptionKind,
   DistrictId,
   EventChoiceDefinition,
   EventId,
@@ -84,6 +87,7 @@ export type HarnessRunResult = {
   operativeStats: Record<OperativeId, OperativeRunStats>;
   operativeEventStats: Partial<Record<EventId, OperativeEventRunStats>>;
   ledgerStats: LedgerRunStats;
+  contactStats: ContactRunStats;
   trace: HarnessTraceEntry[];
 };
 
@@ -125,6 +129,12 @@ export type AgentBatchSummary = {
   ledgerOutcomeReports: LedgerOutcomeReport[];
   secretDiscoveryReport: SecretDiscoveryReport;
   ledgerEventReports: LedgerEventReport[];
+  contactSummary: ContactSummaryReport;
+  contactUsageReports: ContactUsageReport[];
+  contactOutcomeReports: ContactOutcomeReport[];
+  contactEventReports: ContactEventReport[];
+  contactLedgerReports: ContactLedgerReport[];
+  contactSetReports: ContactSetReport[];
 };
 
 export type HarnessBatchReport = {
@@ -317,6 +327,97 @@ export type LedgerEventReport = {
   selectionRate: number;
 };
 
+export type ContactRunStats = {
+  activeContactIds: ContactId[];
+  usage: Record<string, ContactUsageRunStats>;
+  contactEventsEligible: Partial<Record<EventId, number>>;
+  contactEventsSelected: Partial<Record<EventId, number>>;
+  finalContacts: Record<ContactId, ContactFinalRunStats>;
+  ledgerLinks: Record<string, ContactLedgerRunStats>;
+};
+
+export type ContactUsageRunStats = {
+  contactId: ContactId;
+  contactName: string;
+  optionId: string;
+  optionLabel: string;
+  optionKind: ContactOptionKind;
+  uses: number;
+  complications: number;
+};
+
+export type ContactFinalRunStats = {
+  contactId: ContactId;
+  contactName: string;
+  burned: boolean;
+  trust: number;
+  leverage: number;
+  volatility: number;
+  exposure: number;
+};
+
+export type ContactLedgerRunStats = {
+  contactId: ContactId;
+  contactName: string;
+  definitionId: LedgerEntryDefinitionId;
+  name: string;
+  kind: LedgerEntryKind;
+  created: number;
+  consumed: number;
+  activeAtEnd: number;
+};
+
+export type ContactSummaryReport = {
+  averageManageContactUses: number;
+  averageBurnedContacts: number;
+  averageFinalTrust: number;
+  averageFinalLeverage: number;
+  averageFinalVolatility: number;
+  averageFinalExposure: number;
+};
+
+export type ContactUsageReport = ContactUsageRunStats & {
+  wins: number;
+  losses: number;
+  winRate: number;
+};
+
+export type ContactOutcomeReport = ContactFinalRunStats & {
+  presentRuns: number;
+  burnedRuns: number;
+  burnedRate: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageTrust: number;
+  averageLeverage: number;
+  averageVolatility: number;
+  averageExposure: number;
+};
+
+export type ContactEventReport = {
+  eventId: EventId;
+  eventTitle: string;
+  eligibleRuns: number;
+  selections: number;
+  selectionRate: number;
+};
+
+export type ContactLedgerReport = ContactLedgerRunStats & {
+  wins: number;
+  losses: number;
+};
+
+export type ContactSetReport = {
+  contactSetKey: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageWeeksPlayed: number;
+  averageBurnedContacts: number;
+};
+
 const MAX_HARNESS_STEPS = 64;
 const DANGEROUS_TARGET_MINIMUM_SELECTIONS = 5;
 const TARGET_TAG_MODIFIERS = new Set([
@@ -338,6 +439,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const eventChoiceUsage: Record<string, number> = {};
   const contextualEvents = createEmptyContextualEventCounts();
   const ledgerStats = createEmptyLedgerRunStats();
+  const contactStats = createEmptyContactRunStats(state);
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   let stalled = false;
@@ -351,6 +453,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         actionUsage,
         targetUsage,
         ledgerStats,
+        contactStats,
         trace,
         options.collectTrace,
       );
@@ -386,6 +489,12 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         advanced.eventCandidates,
         advanced.eventSelection,
       );
+      recordContactOrderComplications(contactStats, advanced.orderResolutions);
+      recordContactEventStats(
+        contactStats,
+        advanced.eventCandidates,
+        advanced.eventSelection,
+      );
       recordContextualEvent(contextualEvents, advanced.eventSelection);
       state = advanced.state;
       appendTrace(trace, options.collectTrace, state, 'Advanced week and presented event.');
@@ -418,6 +527,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
 
   finalizeOperativeStats(operativeStats, state);
   finalizeLedgerRunStats(ledgerStats, state);
+  finalizeContactRunStats(contactStats, state);
 
   return {
     agentId: options.agent.id,
@@ -436,6 +546,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     operativeStats,
     operativeEventStats,
     ledgerStats,
+    contactStats,
     trace,
   };
 }
@@ -708,6 +819,151 @@ export function formatBatchReport(report: HarnessBatchReport): string {
 
   lines.push(
     '',
+    'contact_summary',
+    'agent,avgManageContactUses,avgBurnedContacts,avgFinalTrust,avgFinalLeverage,avgFinalVolatility,avgFinalExposure',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.contactSummary.averageManageContactUses.toFixed(2),
+        summary.contactSummary.averageBurnedContacts.toFixed(2),
+        summary.contactSummary.averageFinalTrust.toFixed(2),
+        summary.contactSummary.averageFinalLeverage.toFixed(2),
+        summary.contactSummary.averageFinalVolatility.toFixed(2),
+        summary.contactSummary.averageFinalExposure.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'contact_usage',
+    'agent,contactId,contactName,optionId,optionLabel,optionKind,uses,complications,complicationRate,wins,losses,winRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const contact of summary.contactUsageReports) {
+      lines.push(
+        [
+          summary.agentId,
+          contact.contactId,
+          csvCell(contact.contactName),
+          contact.optionId,
+          csvCell(contact.optionLabel),
+          contact.optionKind,
+          contact.uses,
+          contact.complications,
+          (contact.uses > 0 ? contact.complications / contact.uses : 0).toFixed(3),
+          contact.wins,
+          contact.losses,
+          contact.winRate.toFixed(3),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'contact_outcomes',
+    'agent,contactId,contactName,presentRuns,burnedRuns,burnedRate,wins,losses,winRate,avgTrust,avgLeverage,avgVolatility,avgExposure',
+  );
+
+  for (const summary of report.summaries) {
+    for (const contact of summary.contactOutcomeReports) {
+      lines.push(
+        [
+          summary.agentId,
+          contact.contactId,
+          csvCell(contact.contactName),
+          contact.presentRuns,
+          contact.burnedRuns,
+          contact.burnedRate.toFixed(3),
+          contact.wins,
+          contact.losses,
+          contact.winRate.toFixed(3),
+          contact.averageTrust.toFixed(2),
+          contact.averageLeverage.toFixed(2),
+          contact.averageVolatility.toFixed(2),
+          contact.averageExposure.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'contact_events',
+    'agent,eventId,eventTitle,eligibleRuns,selections,selectionRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const event of summary.contactEventReports) {
+      lines.push(
+        [
+          summary.agentId,
+          event.eventId,
+          csvCell(event.eventTitle),
+          event.eligibleRuns,
+          event.selections,
+          event.selectionRate.toFixed(3),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'contact_ledger',
+    'agent,contactId,contactName,kind,definitionId,name,created,consumed,activeAtEnd,wins,losses',
+  );
+
+  for (const summary of report.summaries) {
+    for (const ledger of summary.contactLedgerReports) {
+      lines.push(
+        [
+          summary.agentId,
+          ledger.contactId,
+          csvCell(ledger.contactName),
+          ledger.kind,
+          ledger.definitionId,
+          csvCell(ledger.name),
+          ledger.created,
+          ledger.consumed,
+          ledger.activeAtEnd,
+          ledger.wins,
+          ledger.losses,
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'contact_sets',
+    'agent,contactSetKey,runs,wins,losses,winRate,avgWeeks,avgBurnedContacts',
+  );
+
+  for (const summary of report.summaries) {
+    for (const contactSet of summary.contactSetReports) {
+      lines.push(
+        [
+          summary.agentId,
+          contactSet.contactSetKey,
+          contactSet.runs,
+          contactSet.wins,
+          contactSet.losses,
+          contactSet.winRate.toFixed(3),
+          contactSet.averageWeeksPlayed.toFixed(2),
+          contactSet.averageBurnedContacts.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
     'roster_compositions',
     'agent,rosterKey,runs,wins,losses,winRate,avgWeeks',
   );
@@ -953,6 +1209,7 @@ function queueAgentOrders(
   actionUsage: Record<ActionId, number>,
   targetUsage: Record<string, TargetRunStats>,
   ledgerStats: LedgerRunStats,
+  contactStats: ContactRunStats,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
 ): GameState {
@@ -981,6 +1238,7 @@ function queueAgentOrders(
     actionUsage[decision.actionId] += 1;
     recordTargetSelection(targetUsage, decision.target);
     recordLedgerOrderStats(ledgerStats, decision);
+    recordContactOrderStats(contactStats, decision);
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
@@ -1061,6 +1319,12 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
   const ledgerOutcomeReports = new Map<number, LedgerOutcomeReport & { pressureTotals: Pressures }>();
   const secretDiscoveryTotals = createEmptySecretDiscoveryTotals();
   const ledgerEventReports = new Map<EventId, LedgerEventReport>();
+  const contactSummaryTotals = createEmptyContactSummaryTotals();
+  const contactUsageReports = new Map<string, ContactUsageReport>();
+  const contactOutcomeReports = new Map<ContactId, ContactOutcomeReport>();
+  const contactEventReports = new Map<EventId, ContactEventReport>();
+  const contactLedgerReports = new Map<string, ContactLedgerReport>();
+  const contactSetReports = new Map<string, ContactSetReport & { burnedContacts: number }>();
   let weeksTotal = 0;
   let wins = 0;
   let losses = 0;
@@ -1139,6 +1403,12 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     addLedgerOutcomeReports(ledgerOutcomeReports, run);
     addSecretDiscoveryTotals(secretDiscoveryTotals, run.ledgerStats);
     addLedgerEventReports(ledgerEventReports, run.ledgerStats);
+    addContactSummaryTotals(contactSummaryTotals, run.contactStats);
+    addContactUsageReports(contactUsageReports, run);
+    addContactOutcomeReports(contactOutcomeReports, run);
+    addContactEventReports(contactEventReports, run.contactStats);
+    addContactLedgerReports(contactLedgerReports, run);
+    addContactSetReports(contactSetReports, run);
   }
 
   const targetReports = [...targetReportsByKey.values()]
@@ -1181,6 +1451,12 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     ledgerOutcomeReports: finalizeLedgerOutcomeReports(ledgerOutcomeReports),
     secretDiscoveryReport: finalizeSecretDiscoveryReport(secretDiscoveryTotals),
     ledgerEventReports: sortLedgerEventReports([...ledgerEventReports.values()]),
+    contactSummary: finalizeContactSummaryReport(contactSummaryTotals, runs.length),
+    contactUsageReports: sortContactUsageReports([...contactUsageReports.values()]),
+    contactOutcomeReports: sortContactOutcomeReports([...contactOutcomeReports.values()]),
+    contactEventReports: sortContactEventReports([...contactEventReports.values()]),
+    contactLedgerReports: sortContactLedgerReports([...contactLedgerReports.values()]),
+    contactSetReports: finalizeContactSetReports(contactSetReports),
   };
 }
 
@@ -1651,6 +1927,428 @@ function sortLedgerEventReports(reports: LedgerEventReport[]): LedgerEventReport
       selectionRate: report.eligibleRuns > 0 ? report.selections / report.eligibleRuns : 0,
     }))
     .sort((left, right) => left.eventTitle.localeCompare(right.eventTitle));
+}
+
+function createEmptyContactRunStats(state: GameState): ContactRunStats {
+  return {
+    activeContactIds: [...state.activeContactIds],
+    usage: {},
+    contactEventsEligible: {},
+    contactEventsSelected: {},
+    finalContacts: {} as Record<ContactId, ContactFinalRunStats>,
+    ledgerLinks: {},
+  };
+}
+
+function recordContactOrderStats(stats: ContactRunStats, decision: LegalOrderOption): void {
+  const contact = decision.preview.contactUse;
+
+  if (!contact?.ok) {
+    return;
+  }
+
+  const usage = getContactUsageRunStats(stats, contact.contactId, contact.id, {
+    contactName: contact.contactName,
+    optionLabel: contact.label,
+    optionKind: contact.kind,
+  });
+  usage.uses += 1;
+}
+
+function recordContactOrderComplications(
+  stats: ContactRunStats,
+  resolutions: readonly OrderResolutionDiagnostic[],
+): void {
+  for (const resolution of resolutions) {
+    const target = resolution.order.target;
+
+    if (target?.type !== 'contact' || !resolution.complication) {
+      continue;
+    }
+
+    const usage = getContactUsageRunStats(stats, target.contactId, target.optionId);
+    usage.complications += 1;
+  }
+}
+
+function recordContactEventStats(
+  stats: ContactRunStats,
+  candidates: readonly WeightedEvent[],
+  selection: EventSelection,
+): void {
+  for (const candidate of candidates) {
+    if (!isContactEvent(candidate.event)) {
+      continue;
+    }
+
+    stats.contactEventsEligible[candidate.event.id] =
+      (stats.contactEventsEligible[candidate.event.id] ?? 0) + 1;
+  }
+
+  if (isContactEvent(selection.definition)) {
+    stats.contactEventsSelected[selection.definition.id] =
+      (stats.contactEventsSelected[selection.definition.id] ?? 0) + 1;
+  }
+}
+
+function finalizeContactRunStats(stats: ContactRunStats, state: GameState): void {
+  for (const contactId of stats.activeContactIds) {
+    const contact = state.contacts[contactId];
+    const definition = getContactDefinition(contactId);
+
+    if (!contact) {
+      continue;
+    }
+
+    stats.finalContacts[contactId] = {
+      contactId,
+      contactName: definition?.name ?? contactId,
+      burned: contact.burned,
+      trust: contact.trust,
+      leverage: contact.leverage,
+      volatility: contact.volatility,
+      exposure: contact.exposure,
+    };
+  }
+
+  for (const entry of state.ledger.entries) {
+    if (!entry.relatedContactId) {
+      continue;
+    }
+
+    const definition = getLedgerEntryDefinition(entry.definitionId);
+
+    if (!definition) {
+      continue;
+    }
+
+    const key = getContactLedgerKey(entry.relatedContactId, entry.definitionId);
+    const report = stats.ledgerLinks[key] ?? {
+      contactId: entry.relatedContactId,
+      contactName: getContactName(entry.relatedContactId),
+      definitionId: entry.definitionId,
+      name: definition.name,
+      kind: entry.kind,
+      created: 0,
+      consumed: 0,
+      activeAtEnd: 0,
+    };
+    report.created += 1;
+    report.consumed += entry.consumed ? 1 : 0;
+    report.activeAtEnd += entry.consumed ? 0 : 1;
+    stats.ledgerLinks[key] = report;
+  }
+}
+
+function createEmptyContactSummaryTotals(): ContactSummaryReport & {
+  finalContactSamples: number;
+} {
+  return {
+    averageManageContactUses: 0,
+    averageBurnedContacts: 0,
+    averageFinalTrust: 0,
+    averageFinalLeverage: 0,
+    averageFinalVolatility: 0,
+    averageFinalExposure: 0,
+    finalContactSamples: 0,
+  };
+}
+
+function addContactSummaryTotals(
+  totals: ContactSummaryReport & { finalContactSamples: number },
+  stats: ContactRunStats,
+): void {
+  totals.averageManageContactUses += Object.values(stats.usage).reduce(
+    (sum, usage) => sum + usage.uses,
+    0,
+  );
+  totals.averageBurnedContacts += Object.values(stats.finalContacts).filter(
+    (contact) => contact.burned,
+  ).length;
+
+  for (const contact of Object.values(stats.finalContacts)) {
+    totals.averageFinalTrust += contact.trust;
+    totals.averageFinalLeverage += contact.leverage;
+    totals.averageFinalVolatility += contact.volatility;
+    totals.averageFinalExposure += contact.exposure;
+    totals.finalContactSamples += 1;
+  }
+}
+
+function finalizeContactSummaryReport(
+  totals: ContactSummaryReport & { finalContactSamples: number },
+  runs: number,
+): ContactSummaryReport {
+  const samples = totals.finalContactSamples;
+
+  return {
+    averageManageContactUses: runs > 0 ? totals.averageManageContactUses / runs : 0,
+    averageBurnedContacts: runs > 0 ? totals.averageBurnedContacts / runs : 0,
+    averageFinalTrust: samples > 0 ? totals.averageFinalTrust / samples : 0,
+    averageFinalLeverage: samples > 0 ? totals.averageFinalLeverage / samples : 0,
+    averageFinalVolatility: samples > 0 ? totals.averageFinalVolatility / samples : 0,
+    averageFinalExposure: samples > 0 ? totals.averageFinalExposure / samples : 0,
+  };
+}
+
+function addContactUsageReports(
+  reports: Map<string, ContactUsageReport>,
+  run: HarnessRunResult,
+): void {
+  for (const usage of Object.values(run.contactStats.usage)) {
+    const key = getContactUsageKey(usage.contactId, usage.optionId);
+    const report = reports.get(key) ?? {
+      ...usage,
+      uses: 0,
+      complications: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+    };
+    report.uses += usage.uses;
+    report.complications += usage.complications;
+    report.wins += run.outcome === 'victory' ? 1 : 0;
+    report.losses += run.outcome === 'loss' ? 1 : 0;
+    reports.set(key, report);
+  }
+}
+
+function sortContactUsageReports(reports: ContactUsageReport[]): ContactUsageReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      winRate: report.wins + report.losses > 0 ? report.wins / (report.wins + report.losses) : 0,
+    }))
+    .sort(
+      (left, right) =>
+        left.contactName.localeCompare(right.contactName) ||
+        left.optionLabel.localeCompare(right.optionLabel) ||
+        left.optionId.localeCompare(right.optionId),
+    );
+}
+
+function addContactOutcomeReports(
+  reports: Map<ContactId, ContactOutcomeReport>,
+  run: HarnessRunResult,
+): void {
+  for (const contact of Object.values(run.contactStats.finalContacts)) {
+    const report = reports.get(contact.contactId) ?? {
+      ...contact,
+      presentRuns: 0,
+      burnedRuns: 0,
+      burnedRate: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      averageTrust: 0,
+      averageLeverage: 0,
+      averageVolatility: 0,
+      averageExposure: 0,
+    };
+    report.presentRuns += 1;
+    report.burnedRuns += contact.burned ? 1 : 0;
+    report.wins += run.outcome === 'victory' ? 1 : 0;
+    report.losses += run.outcome === 'loss' ? 1 : 0;
+    report.averageTrust += contact.trust;
+    report.averageLeverage += contact.leverage;
+    report.averageVolatility += contact.volatility;
+    report.averageExposure += contact.exposure;
+    reports.set(contact.contactId, report);
+  }
+}
+
+function sortContactOutcomeReports(reports: ContactOutcomeReport[]): ContactOutcomeReport[] {
+  return reports
+    .map((report) => {
+      const averageTrust = report.presentRuns > 0 ? report.averageTrust / report.presentRuns : 0;
+      const averageLeverage =
+        report.presentRuns > 0 ? report.averageLeverage / report.presentRuns : 0;
+      const averageVolatility =
+        report.presentRuns > 0 ? report.averageVolatility / report.presentRuns : 0;
+      const averageExposure =
+        report.presentRuns > 0 ? report.averageExposure / report.presentRuns : 0;
+
+      return {
+        ...report,
+        burned: report.burnedRuns > 0,
+        trust: averageTrust,
+        leverage: averageLeverage,
+        volatility: averageVolatility,
+        exposure: averageExposure,
+        burnedRate: report.presentRuns > 0 ? report.burnedRuns / report.presentRuns : 0,
+        winRate:
+          report.wins + report.losses > 0 ? report.wins / (report.wins + report.losses) : 0,
+        averageTrust,
+        averageLeverage,
+        averageVolatility,
+        averageExposure,
+      };
+    })
+    .sort((left, right) => left.contactName.localeCompare(right.contactName));
+}
+
+function addContactEventReports(
+  reports: Map<EventId, ContactEventReport>,
+  stats: ContactRunStats,
+): void {
+  const eventIds = new Set<EventId>([
+    ...Object.keys(stats.contactEventsEligible),
+    ...Object.keys(stats.contactEventsSelected),
+  ] as EventId[]);
+
+  for (const eventId of eventIds) {
+    const report = reports.get(eventId) ?? {
+      eventId,
+      eventTitle: getEventTitle(eventId),
+      eligibleRuns: 0,
+      selections: 0,
+      selectionRate: 0,
+    };
+    report.eligibleRuns += stats.contactEventsEligible[eventId] ?? 0;
+    report.selections += stats.contactEventsSelected[eventId] ?? 0;
+    reports.set(eventId, report);
+  }
+}
+
+function sortContactEventReports(reports: ContactEventReport[]): ContactEventReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      selectionRate: report.eligibleRuns > 0 ? report.selections / report.eligibleRuns : 0,
+    }))
+    .sort((left, right) => left.eventTitle.localeCompare(right.eventTitle));
+}
+
+function addContactLedgerReports(
+  reports: Map<string, ContactLedgerReport>,
+  run: HarnessRunResult,
+): void {
+  for (const ledger of Object.values(run.contactStats.ledgerLinks)) {
+    const key = getContactLedgerKey(ledger.contactId, ledger.definitionId);
+    const report = reports.get(key) ?? {
+      ...ledger,
+      created: 0,
+      consumed: 0,
+      activeAtEnd: 0,
+      wins: 0,
+      losses: 0,
+    };
+    report.created += ledger.created;
+    report.consumed += ledger.consumed;
+    report.activeAtEnd += ledger.activeAtEnd;
+    report.wins += run.outcome === 'victory' ? 1 : 0;
+    report.losses += run.outcome === 'loss' ? 1 : 0;
+    reports.set(key, report);
+  }
+}
+
+function sortContactLedgerReports(reports: ContactLedgerReport[]): ContactLedgerReport[] {
+  return reports.sort(
+    (left, right) =>
+      left.contactName.localeCompare(right.contactName) ||
+      left.kind.localeCompare(right.kind) ||
+      left.name.localeCompare(right.name),
+  );
+}
+
+function addContactSetReports(
+  reports: Map<string, ContactSetReport & { burnedContacts: number }>,
+  run: HarnessRunResult,
+): void {
+  const key = getContactSetKey(run.contactStats.activeContactIds);
+  const report = reports.get(key) ?? {
+    contactSetKey: key,
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageWeeksPlayed: 0,
+    averageBurnedContacts: 0,
+    burnedContacts: 0,
+  };
+  report.runs += 1;
+  report.wins += run.outcome === 'victory' ? 1 : 0;
+  report.losses += run.outcome === 'loss' ? 1 : 0;
+  report.averageWeeksPlayed += run.weeksPlayed;
+  report.burnedContacts += Object.values(run.contactStats.finalContacts).filter(
+    (contact) => contact.burned,
+  ).length;
+  reports.set(key, report);
+}
+
+function finalizeContactSetReports(
+  reports: Map<string, ContactSetReport & { burnedContacts: number }>,
+): ContactSetReport[] {
+  return [...reports.values()]
+    .map((report) => ({
+      contactSetKey: report.contactSetKey,
+      runs: report.runs,
+      wins: report.wins,
+      losses: report.losses,
+      winRate: report.runs > 0 ? report.wins / report.runs : 0,
+      averageWeeksPlayed: report.runs > 0 ? report.averageWeeksPlayed / report.runs : 0,
+      averageBurnedContacts: report.runs > 0 ? report.burnedContacts / report.runs : 0,
+    }))
+    .sort((left, right) => left.contactSetKey.localeCompare(right.contactSetKey));
+}
+
+function getContactUsageRunStats(
+  stats: ContactRunStats,
+  contactId: ContactId,
+  optionId: string,
+  metadata?: {
+    contactName: string;
+    optionLabel: string;
+    optionKind: ContactOptionKind;
+  },
+): ContactUsageRunStats {
+  const key = getContactUsageKey(contactId, optionId);
+  stats.usage[key] ??= {
+    contactId,
+    contactName: metadata?.contactName ?? getContactName(contactId),
+    optionId,
+    optionLabel: metadata?.optionLabel ?? optionId,
+    optionKind: metadata?.optionKind ?? inferContactOptionKind(optionId),
+    uses: 0,
+    complications: 0,
+  };
+
+  return stats.usage[key];
+}
+
+function getContactUsageKey(contactId: ContactId, optionId: string): string {
+  return `${contactId}:${optionId}`;
+}
+
+function getContactLedgerKey(
+  contactId: ContactId,
+  definitionId: LedgerEntryDefinitionId,
+): string {
+  return `${contactId}:${definitionId}`;
+}
+
+function getContactSetKey(contactIds: readonly ContactId[]): string {
+  return [...contactIds].sort().join('+');
+}
+
+function getContactName(contactId: ContactId): string {
+  return getContactDefinition(contactId)?.name ?? contactId;
+}
+
+function inferContactOptionKind(optionId: string): ContactOptionKind {
+  if (optionId === 'cultivate') {
+    return 'cultivate';
+  }
+
+  if (optionId === 'pressure') {
+    return 'pressure';
+  }
+
+  return 'request_service';
+}
+
+function isContactEvent(event: WeightedEvent['event'] | EventSelection['definition']): boolean {
+  return event.tags.includes('CONTACT') || event.contact !== undefined;
 }
 
 function addRosterCompositionReport(
