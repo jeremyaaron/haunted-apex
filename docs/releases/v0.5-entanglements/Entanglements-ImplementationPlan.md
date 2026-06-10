@@ -908,6 +908,36 @@ Component tests:
 Manual UI review: confirm Contact cards are readable and do not make the one-screen layout
 feel like an enterprise dashboard.
 
+### Phase 7 Implementation Notes
+
+- Expanded Contact selectors with UI-ready card data:
+  - associated district, venue, and rival labels;
+  - Trust, Leverage, Volatility, and Exposure metric rows;
+  - service availability, cost summaries, and effect summaries;
+  - related Ledger links;
+  - recent interaction effect rows.
+- Added `game.contacts()` to the facade and rendered a `Contact Network` panel in the
+  right-side shell.
+- The panel now shows active Contacts only, including burned Contacts with muted visual
+  treatment and disabled service copy.
+- Kept inactive Contacts out of normal UI and left debug-only Contact state behind the
+  existing debug toggle.
+- Renamed the recruit section from `Available Contacts` to `Available Recruits` so the
+  Contact network has a distinct label.
+- Raised the Angular `anyComponentStyle` production budget to reflect the growing
+  one-component prototype shell and keep production builds warning-free.
+
+Verification:
+
+- `npx tsc -p tsconfig.app.json --noEmit`
+- `npx tsc -p tsconfig.spec.json --noEmit`
+- `npx ng test --watch=false --browsers=ChromeHeadless --include=src/app/engine/selectors/contacts.spec.ts --include=src/app/app.spec.ts`
+  - 38 specs passed.
+- `npx ng test --watch=false --browsers=ChromeHeadless`
+  - 373 specs passed.
+- `npm run build`
+- `npm run check:docs`
+
 ## Phase 8: Command Board and Event Choice UX
 
 ### Objective

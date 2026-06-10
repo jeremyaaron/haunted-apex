@@ -18,6 +18,8 @@ import {
   type ContactEffectPreviewRow,
   type ContactCostRow,
   type ContactMetricDeltaView,
+  type ContactMetricView,
+  type ContactServiceView,
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
@@ -424,6 +426,18 @@ export class App {
       default:
         return option.unavailableReason ? this.displayToken(option.unavailableReason) : '';
     }
+  }
+
+  protected contactServiceUnavailableReason(service: ContactServiceView): string {
+    if (!service.unavailableReason) {
+      return '';
+    }
+
+    return this.actionUnavailableReason(service.unavailableReason);
+  }
+
+  protected contactMetricToneClass(metric: ContactMetricView): string {
+    return `tone-${metric.tone}`;
   }
 
   protected runOperativeNames(operatives: readonly RunSummaryOperative[]): string {

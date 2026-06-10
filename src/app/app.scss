@@ -900,6 +900,7 @@ dt {
   color: #ffb4a8;
 }
 
+.contact-network,
 .hire-pool {
   margin-top: 16px;
   padding-top: 14px;
@@ -918,9 +919,180 @@ dt {
   margin-bottom: 10px;
 }
 
+.contact-list,
 .hire-list {
   display: grid;
   gap: 8px;
+}
+
+.contact-list {
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.contact-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(232, 237, 242, 0.12);
+  background:
+    linear-gradient(180deg, rgba(129, 216, 208, 0.04), transparent), rgba(4, 7, 11, 0.5);
+}
+
+.contact-card.burned {
+  border-color: rgba(255, 113, 113, 0.36);
+  background:
+    linear-gradient(90deg, rgba(255, 113, 113, 0.08), transparent), rgba(4, 7, 11, 0.58);
+  opacity: 0.72;
+}
+
+.contact-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.contact-heading div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.contact-heading strong {
+  color: #e8edf2;
+}
+
+.contact-heading span,
+.contact-heading b {
+  color: #71808f;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.contact-heading b {
+  color: #d7fffb;
+  white-space: nowrap;
+}
+
+.contact-card.burned .contact-heading b {
+  color: #ffb4a8;
+}
+
+.contact-associations {
+  grid-template-columns: 1fr;
+  gap: 5px;
+  padding-top: 7px;
+  margin-bottom: 0;
+  border-top: 1px solid rgba(232, 237, 242, 0.08);
+}
+
+.contact-associations dd {
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-size: 0.68rem;
+}
+
+.contact-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.contact-metrics div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid rgba(129, 216, 208, 0.13);
+  background: rgba(129, 216, 208, 0.035);
+}
+
+.contact-metrics span {
+  color: #8d9aa7;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+
+.contact-metrics strong {
+  color: #e8edf2;
+  font-size: 0.76rem;
+}
+
+.contact-metrics .tone-volatile,
+.contact-metrics .tone-exposed {
+  border-color: rgba(229, 196, 107, 0.22);
+  background: rgba(229, 196, 107, 0.04);
+}
+
+.contact-services {
+  display: grid;
+  gap: 6px;
+}
+
+.contact-service {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+  border: 1px solid rgba(129, 216, 208, 0.14);
+  background: rgba(129, 216, 208, 0.03);
+}
+
+.contact-service.unavailable {
+  border-color: rgba(255, 113, 113, 0.22);
+  background: rgba(255, 113, 113, 0.035);
+}
+
+.contact-service strong {
+  color: #d7fffb;
+  font-size: 0.74rem;
+}
+
+.contact-service span,
+.contact-service small {
+  color: #8d9aa7;
+  font-size: 0.68rem;
+}
+
+.contact-service small {
+  color: #e5c46b;
+}
+
+.contact-ledger-links,
+.contact-interactions {
+  display: grid;
+  gap: 5px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(232, 237, 242, 0.08);
+}
+
+.contact-ledger-links > span,
+.contact-interactions > span {
+  color: #71808f;
+  font-size: 0.62rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.contact-ledger-links b {
+  color: #ffe4a4;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.contact-interactions p {
+  margin: 0;
+  color: #a9b4c0;
+  font-size: 0.68rem;
+}
+
+.contact-interactions b {
+  margin-left: 5px;
+  color: #d7fffb;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .hire-card {
@@ -1128,30 +1300,35 @@ dd {
 }
 
 .guide-scroll,
-.log-list {
+.log-list,
+.contact-list {
   scrollbar-color: rgba(129, 216, 208, 0.42) rgba(4, 7, 11, 0.5);
   scrollbar-width: thin;
 }
 
 .guide-scroll::-webkit-scrollbar,
-.log-list::-webkit-scrollbar {
+.log-list::-webkit-scrollbar,
+.contact-list::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 .guide-scroll::-webkit-scrollbar-track,
-.log-list::-webkit-scrollbar-track {
+.log-list::-webkit-scrollbar-track,
+.contact-list::-webkit-scrollbar-track {
   background: rgba(4, 7, 11, 0.5);
 }
 
 .guide-scroll::-webkit-scrollbar-thumb,
-.log-list::-webkit-scrollbar-thumb {
+.log-list::-webkit-scrollbar-thumb,
+.contact-list::-webkit-scrollbar-thumb {
   border: 2px solid rgba(4, 7, 11, 0.5);
   background: rgba(129, 216, 208, 0.42);
 }
 
 .guide-scroll::-webkit-scrollbar-thumb:hover,
-.log-list::-webkit-scrollbar-thumb:hover {
+.log-list::-webkit-scrollbar-thumb:hover,
+.contact-list::-webkit-scrollbar-thumb:hover {
   background: rgba(129, 216, 208, 0.62);
 }
 

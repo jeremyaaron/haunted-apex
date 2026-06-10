@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import {
   addLedgerEntry,
+  CONTACT_DEFINITIONS,
   getOperativeDefinition,
   materializeOperativeState,
   newGame,
@@ -63,7 +64,8 @@ describe('App', () => {
     expect(compiled.textContent).not.toContain('velvet_tyrant');
     expect(compiled.querySelectorAll('.operative-card').length).toBe(3);
     expect(compiled.querySelectorAll('.hire-card').length).toBe(4);
-    expect(compiled.textContent).toContain('Available Contacts');
+    expect(compiled.textContent).toContain('Contact Network');
+    expect(compiled.textContent).toContain('Available Recruits');
     expect(compiled.textContent).toContain('Dominion target 90');
     expect(compiled.textContent).toContain('Win at 90');
     expect(compiled.textContent).toContain('Warning at 25');
@@ -75,6 +77,105 @@ describe('App', () => {
     expect(compiled.textContent).toContain('do not modify actions in this release');
     expect(compiled.textContent).toContain('Rarity changes how often an operative appears');
     expect(compiled.textContent).not.toContain('operative_stress_at_least');
+  });
+
+  it('renders active Contacts with display labels, metrics, and services', () => {
+    const state = newGame({ seed: 'PHASE-7-CONTACT-PANEL' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const contactPanel = compiled.querySelector<HTMLElement>('.contact-network');
+
+    expect(contactPanel?.textContent).toContain('Contact Network');
+    expect(contactPanel?.textContent).toContain('Entanglements');
+    expect(contactPanel?.querySelectorAll('.contact-card')).toHaveSize(3);
+    expect(contactPanel?.textContent).toContain('Veyra Lux');
+    expect(contactPanel?.textContent).toContain('Captain Rafe Hollis');
+    expect(contactPanel?.textContent).toContain('Father Static');
+    expect(contactPanel?.textContent).toContain('Liaison');
+    expect(contactPanel?.textContent).toContain('Official');
+    expect(contactPanel?.textContent).toContain('Confessor');
+    expect(contactPanel?.textContent).toContain('Useful');
+    expect(contactPanel?.textContent).toContain('Trust');
+    expect(contactPanel?.textContent).toContain('Leverage');
+    expect(contactPanel?.textContent).toContain('Volatility');
+    expect(contactPanel?.textContent).toContain('Exposure');
+    expect(contactPanel?.textContent).toContain('Private Room Access');
+    expect(contactPanel?.textContent).toContain('Clean Passage');
+    expect(contactPanel?.textContent).toContain('Absolution Protocol');
+    expect(contactPanel?.textContent).not.toContain('contact_mina_glass');
+    expect(contactPanel?.textContent).not.toContain('Mina Glass');
+
+    const inactive = CONTACT_DEFINITIONS.find(
+      (definition) => !state.activeContactIds.includes(definition.id),
+    );
+    expect(inactive).toBeTruthy();
+    expect(contactPanel?.textContent).not.toContain(inactive?.name ?? 'inactive contact');
+  });
+
+  it('renders burned Contact state, related Ledger entries, and recent interactions', () => {
+    const base = newGame({ seed: 'PHASE-7-CONTACT-DETAILS' });
+    base.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    const contactId = 'contact_veyra_lux';
+    const withContactState: GameState = {
+      ...base,
+      contacts: {
+        ...base.contacts,
+        [contactId]: {
+          ...base.contacts[contactId],
+          burned: true,
+          recentInteractions: [
+            {
+              week: 1,
+              optionId: 'cultivate',
+              kind: 'cultivate',
+              label: 'Cultivate',
+              effectsSummary: {
+                trust: 10,
+                volatility: -6,
+              },
+            },
+          ],
+        },
+      },
+    };
+    const state = addLedgerEntry(withContactState, {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'action',
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId,
+          optionId: 'cultivate',
+        },
+      },
+      relatedContactId: contactId,
+    });
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const veyraCard = findCard(compiled, '.contact-card', 'Veyra Lux');
+
+    expect(veyraCard.classList).toContain('burned');
+    expect(veyraCard.textContent).toContain('Burned');
+    expect(veyraCard.textContent).toContain('Contact burned');
+    expect(veyraCard.textContent).toContain('Owes the Liaison');
+    expect(veyraCard.textContent).toContain('Active');
+    expect(veyraCard.textContent).toContain('Week 1 · Cultivate');
+    expect(veyraCard.textContent).toContain('+10 Trust');
+    expect(veyraCard.textContent).toContain('-6 Volatility');
   });
 
   it('renders roster identity, role, trait, liability, and Stress information', () => {

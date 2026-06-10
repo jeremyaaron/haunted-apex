@@ -600,11 +600,114 @@
         }
       </div>
 
+      <div class="contact-network">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Contact Network</p>
+            <h2>Entanglements</h2>
+          </div>
+          <span class="panel-count">{{ game.contacts().length }}</span>
+        </div>
+
+        <div class="contact-list">
+          @for (contact of game.contacts(); track contact.id) {
+            <article class="contact-card" [class.burned]="contact.burned">
+              <div class="contact-heading">
+                <div>
+                  <strong>{{ contact.name }}</strong>
+                  <span>{{ displayToken(contact.archetype) }}</span>
+                </div>
+                <b>{{ displayToken(contact.status) }}</b>
+              </div>
+
+              <div class="identity-tags">
+                @for (role of contact.roleTags; track role) {
+                  <span>{{ displayToken(role) }}</span>
+                }
+              </div>
+
+              <dl class="contact-associations">
+                @if (contact.associatedDistrictName) {
+                  <div>
+                    <dt>District</dt>
+                    <dd>{{ contact.associatedDistrictName }}</dd>
+                  </div>
+                }
+                @if (contact.associatedVenueName) {
+                  <div>
+                    <dt>Venue</dt>
+                    <dd>{{ contact.associatedVenueName }}</dd>
+                  </div>
+                }
+                @if (contact.associatedRivalName) {
+                  <div>
+                    <dt>Rival</dt>
+                    <dd>{{ contact.associatedRivalName }}</dd>
+                  </div>
+                }
+              </dl>
+
+              <div class="contact-metrics">
+                @for (metric of contact.metrics; track metric.id) {
+                  <div [class]="contactMetricToneClass(metric)">
+                    <span>{{ metric.label }}</span>
+                    <strong>{{ metric.value }}</strong>
+                  </div>
+                }
+              </div>
+
+              <div class="contact-services">
+                @for (service of contact.services; track service.id) {
+                  <div class="contact-service" [class.unavailable]="!service.available || contact.burned">
+                    <strong>{{ service.label }}</strong>
+                    <span>{{ service.costSummary }} · {{ service.effectSummary }}</span>
+                    @if (!service.available || contact.burned) {
+                      <small>
+                        {{
+                          contact.burned
+                            ? 'Contact burned'
+                            : contactServiceUnavailableReason(service)
+                        }}
+                      </small>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (contact.relatedLedgerEntries.length > 0) {
+                <div class="contact-ledger-links">
+                  <span>Linked Ledger</span>
+                  @for (entry of contact.relatedLedgerEntries; track entry.id) {
+                    <b>{{ displayToken(entry.kind) }}: {{ entry.name }} / {{ displayToken(entry.status) }}</b>
+                  }
+                </div>
+              }
+
+              @if (contact.recentInteractions.length > 0) {
+                <div class="contact-interactions">
+                  <span>Recent</span>
+                  @for (interaction of contact.recentInteractions.slice(-2); track $index) {
+                    <p>
+                      Week {{ interaction.week }} · {{ interaction.label }}
+                      @for (effect of interaction.effectRows; track effect.id) {
+                        <b [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ effect.label }}
+                        </b>
+                      }
+                    </p>
+                  }
+                </div>
+              }
+            </article>
+          }
+        </div>
+      </div>
+
       <div class="hire-pool">
         <div class="section-divider">
           <div>
             <p class="panel-label">Hire Pool</p>
-            <h2>Available Contacts</h2>
+            <h2>Available Recruits</h2>
           </div>
           <span class="panel-count">{{ game.hirePool().length }}</span>
         </div>

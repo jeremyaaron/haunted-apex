@@ -5,6 +5,9 @@ export {
   selectContactView,
 } from './contacts';
 export type {
+  ContactInteractionView,
+  ContactLedgerLinkView,
+  ContactMetricView,
   ContactServiceView,
   ContactView,
 } from './contacts';
