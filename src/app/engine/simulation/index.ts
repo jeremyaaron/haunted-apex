@@ -2,6 +2,7 @@ export { newGame } from './new-game';
 export { queueOrder, removeQueuedOrder } from './queue-order';
 export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
+export { resolveContactOption } from './resolve-contact';
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyDrift } from './weekly-drift';
 export {
@@ -28,6 +29,7 @@ export {
 } from './operative-events';
 export type { QueueOrderResult, RemoveQueuedOrderResult } from './queue-order';
 export type { ActionResolution } from './resolve-action';
+export type { ResolveContactOptionResult } from './resolve-contact';
 export type { AdvanceWeekResult, OrderResolutionDiagnostic } from './resolve-week';
 export type {
   EventSelection,

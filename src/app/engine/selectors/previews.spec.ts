@@ -562,8 +562,9 @@ describe('action previews', () => {
     const cards = selectActionCards(state);
     const recruitCard = cards.find((card) => card.actionId === 'recruit_operative');
     const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
+    const contactCard = cards.find((card) => card.actionId === 'manage_contact');
 
-    expect(cards.length).toBe(7);
+    expect(cards.length).toBe(8);
     expect(recruitCard?.assignment).toBe('none');
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
@@ -572,6 +573,10 @@ describe('action previews', () => {
     expect(ledgerCard?.state).toBe('unavailable');
     expect(ledgerCard?.unavailableReason).toBe('target_required');
     expect(ledgerCard?.availableOperatives).toEqual([]);
+    expect(contactCard?.assignment).toBe('none');
+    expect(contactCard?.state).toBe('unavailable');
+    expect(contactCard?.unavailableReason).toBe('target_required');
+    expect(contactCard?.availableOperatives).toEqual([]);
   });
 
   it('converts pressure deltas into stable display rows', () => {

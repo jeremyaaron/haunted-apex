@@ -15,6 +15,8 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type AppliedModifierSource,
+  type ContactCostRow,
+  type ContactMetricDeltaView,
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
   type HireCandidateView,
@@ -362,6 +364,19 @@ export class App {
     return `${this.signed(-Math.abs(row.value))} ${this.pressureLabel(row.id)}`;
   }
 
+  protected contactCostText(row: ContactCostRow): string {
+    const label =
+      row.id === 'resources' || row.id === 'intel'
+        ? this.pressureLabel(row.id)
+        : this.displayToken(row.id);
+
+    return `${this.signed(-Math.abs(row.value))} ${label}`;
+  }
+
+  protected contactMetricText(row: ContactMetricDeltaView): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
   protected ledgerUseSummary(option: LedgerUseOptionView): string {
     const rows = [...option.costRows, ...option.effectRows].map((row) =>
       this.ledgerDeltaText(row),
@@ -399,6 +414,18 @@ export class App {
         return 'Insufficient Resources for this order.';
       case 'not_enough_intel':
         return 'Insufficient Intel for this Ledger use.';
+      case 'not_enough_trust':
+        return 'Insufficient Trust for this contact option.';
+      case 'not_enough_leverage':
+        return 'Insufficient Leverage for this contact option.';
+      case 'contact_burned':
+        return 'This contact is burned and cannot be used.';
+      case 'contact_option_not_found':
+        return 'That contact option is no longer available.';
+      case 'requirement_not_met':
+        return 'This contact option requirement is not met.';
+      case 'quiet_treatment_no_target':
+        return 'No stressed operative is available for Quiet Treatment.';
       case 'ledger_target_required':
         return 'Select a Ledger entry and use option.';
       case 'ledger_entry_unknown':

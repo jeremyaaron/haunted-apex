@@ -13,7 +13,8 @@ export type ActionId =
   | 'recruit_operative'
   | 'expand_influence'
   | 'lay_low'
-  | 'work_the_ledger';
+  | 'work_the_ledger'
+  | 'manage_contact';
 
 export type ActionStressType = 'normal' | 'dangerous' | 'recovery' | 'none';
 

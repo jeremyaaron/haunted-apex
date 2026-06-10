@@ -1,13 +1,17 @@
 import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
-  getContactDefinition,
   getDistrictDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
+import {
+  previewContactOption,
+  type ContactCostRow,
+  type ContactOptionPreview,
+} from '../contacts';
 import type {
   ActionDefinition,
   ActionAssignmentRule,
@@ -80,7 +84,13 @@ export type QueueOrderUnavailableReason =
   | 'target_not_found'
   | 'target_inactive'
   | 'ledger_entry_consumed'
-  | 'ledger_use_option_not_found';
+  | 'ledger_use_option_not_found'
+  | 'contact_burned'
+  | 'contact_option_not_found'
+  | 'not_enough_trust'
+  | 'not_enough_leverage'
+  | 'requirement_not_met'
+  | 'quiet_treatment_no_target';
 
 export type OrderAvailability = {
   available: boolean;
@@ -138,7 +148,16 @@ export type ActionPreview = {
   ledgerUse?: LedgerUsePreview;
   ledgerCosts?: LedgerCostRow[];
   ledgerConsumesEntry?: boolean;
+  contactUse?: ContactOptionPreview;
+  contactCosts?: ContactCostRow[];
+  contactEffects?: ContactMetricDeltaView[];
+  contactResolvedEffects?: ContactMetricDeltaView[];
   secretDiscovery?: SecretDiscoveryPreview;
+};
+
+export type ContactMetricDeltaView = {
+  id: 'trust' | 'leverage' | 'volatility' | 'exposure';
+  value: number;
 };
 
 export type RivalAttentionPreview = {
@@ -171,6 +190,8 @@ export type QueuedOrderView = {
   targetLabel?: string;
   adjustedEffects: PressureDelta;
   adjustedResourceCost: number;
+  contactEffects?: ContactMetricDeltaView[];
+  contactResolvedEffects?: ContactMetricDeltaView[];
   riskLabel: RiskLabel;
 };
 
@@ -196,14 +217,18 @@ export function getQueuedResourceCost(state: GameState): number {
     return (
       cost +
       getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target) +
-      getLedgerUseCost(state, order.target, 'resources')
+      getLedgerUseCost(state, order.target, 'resources') +
+      getContactUseCost(state, order.target, 'resources')
     );
   }, 0);
 }
 
 export function getQueuedIntelCost(state: GameState): number {
   return state.queuedOrders.reduce(
-    (cost, order) => cost + getLedgerUseCost(state, order.target, 'intel'),
+    (cost, order) =>
+      cost +
+      getLedgerUseCost(state, order.target, 'intel') +
+      getContactUseCost(state, order.target, 'intel'),
     0,
   );
 }
@@ -314,10 +339,50 @@ function getTargetAvailability(
     case 'ledger':
       return getLedgerTargetAvailability(state, target);
     case 'contact':
-      return getContactDefinition(target.contactId)
-        ? { available: true }
-        : unavailable('target_not_found');
+      return getContactTargetAvailability(state, target);
   }
+}
+
+function getContactTargetAvailability(
+  state: GameState,
+  target: Extract<ActionTarget, { type: 'contact' }>,
+): OrderAvailability {
+  const preview = previewContactOption(state, target);
+
+  if (!preview.ok) {
+    return unavailable(preview.unavailableReason);
+  }
+
+  if (
+    state.pressures.resources - getQueuedResourceCost(state) <
+    preview.cost.resources
+  ) {
+    return unavailable('not_enough_resources');
+  }
+
+  if (state.pressures.intel - getQueuedIntelCost(state) < preview.cost.intel) {
+    return unavailable('not_enough_intel');
+  }
+
+  if (
+    state.contacts[target.contactId].trust -
+      getQueuedContactMetricCost(state, target.contactId, 'trust') <
+    preview.cost.trust
+  ) {
+    return unavailable('not_enough_trust');
+  }
+
+  if (
+    state.contacts[target.contactId].leverage -
+      getQueuedContactMetricCost(state, target.contactId, 'leverage') <
+    preview.cost.leverage
+  ) {
+    return unavailable('not_enough_leverage');
+  }
+
+  return {
+    available: true,
+  };
 }
 
 function getLedgerTargetAvailability(
@@ -366,21 +431,26 @@ export function getActionPreview(
   const ledgerUse = action.id === 'work_the_ledger'
     ? previewLedgerUse(state, target, baseRiskChance)
     : undefined;
+  const contactUse = action.id === 'manage_contact'
+    ? previewContactOption(state, target, baseRiskChance)
+    : undefined;
   const secretDiscovery = previewSecretDiscovery(state, {
     actionId: action.id,
     assignedOperativeId,
     target,
   });
-  const adjustedEffects = ledgerUse?.ok
-    ? ledgerUse.effects
-    : getAdjustedEffects(
-        action,
+  const adjustedEffects = contactUse?.ok
+    ? contactUse.effects
+    : ledgerUse?.ok
+      ? ledgerUse.effects
+      : getAdjustedEffects(
+          action,
         assignedOperativeId,
         state,
         target,
         modifiers,
       );
-  const riskChance = ledgerUse?.riskChance ?? baseRiskChance;
+  const riskChance = contactUse?.riskChance ?? ledgerUse?.riskChance ?? baseRiskChance;
 
   return {
     actionId: action.id,
@@ -389,9 +459,11 @@ export function getActionPreview(
     requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
-    adjustedResourceCost: ledgerUse?.ok
-      ? ledgerUse.cost.resources
-      : getAdjustedResourceCost(
+    adjustedResourceCost: contactUse?.ok
+      ? contactUse.cost.resources
+      : ledgerUse?.ok
+        ? ledgerUse.cost.resources
+        : getAdjustedResourceCost(
           action,
           assignedOperativeId,
           state,
@@ -428,6 +500,14 @@ export function getActionPreview(
     ledgerUse,
     ledgerCosts: ledgerUse?.ok ? ledgerUse.costRows : undefined,
     ledgerConsumesEntry: ledgerUse?.ok ? ledgerUse.consumesEntry : undefined,
+    contactUse,
+    contactCosts: contactUse?.ok ? contactUse.costRows : undefined,
+    contactEffects: contactUse?.ok
+      ? contactMetricDeltaToView(contactUse.contactEffects)
+      : undefined,
+    contactResolvedEffects: contactUse?.ok
+      ? contactMetricDeltaToView(contactUse.resolvedContactEffects)
+      : undefined,
     secretDiscovery,
   };
 }
@@ -441,6 +521,7 @@ export function selectActionCards(state: GameState): ActionCardView[] {
     'expand_influence',
     'lay_low',
     'work_the_ledger',
+    'manage_contact',
   ] satisfies ActionId[];
 
   return actionIds.map((actionId) => {
@@ -495,6 +576,8 @@ export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
       targetLabel: preview.targetLabel,
       adjustedEffects: preview.adjustedEffects,
       adjustedResourceCost: preview.adjustedResourceCost,
+      contactEffects: preview.contactEffects,
+      contactResolvedEffects: preview.contactResolvedEffects,
       riskLabel: preview.riskLabel,
     };
   });
@@ -502,6 +585,13 @@ export function selectQueuedOrderViews(state: GameState): QueuedOrderView[] {
 
 export function pressureDeltaToView(delta: PressureDelta): PressureDeltaView[] {
   return PRESSURE_IDS.flatMap((id) => {
+    const value = delta[id];
+    return value === undefined || value === 0 ? [] : [{ id, value }];
+  });
+}
+
+export function contactMetricDeltaToView(delta: ContactOptionPreview['contactEffects']): ContactMetricDeltaView[] {
+  return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
     const value = delta[id];
     return value === undefined || value === 0 ? [] : [{ id, value }];
   });
@@ -929,6 +1019,34 @@ function getLedgerUseCost(
   pressure: 'resources' | 'intel',
 ): number {
   return getLedgerUseOption(state, target)?.cost?.[pressure] ?? 0;
+}
+
+function getContactUseCost(
+  state: GameState,
+  target: ActionTarget | undefined,
+  costId: 'resources' | 'intel',
+): number {
+  if (target?.type !== 'contact') {
+    return 0;
+  }
+
+  const preview = previewContactOption(state, target);
+  return preview.ok ? preview.cost[costId] : 0;
+}
+
+function getQueuedContactMetricCost(
+  state: GameState,
+  contactId: Extract<ActionTarget, { type: 'contact' }>['contactId'],
+  costId: 'trust' | 'leverage',
+): number {
+  return state.queuedOrders.reduce((total, order) => {
+    if (order.target?.type !== 'contact' || order.target.contactId !== contactId) {
+      return total;
+    }
+
+    const preview = previewContactOption(state, order.target);
+    return total + (preview.ok ? preview.cost[costId] : 0);
+  }, 0);
 }
 
 function mergePressureDeltas(base: PressureDelta, modifier: PressureDelta = {}): PressureDelta {

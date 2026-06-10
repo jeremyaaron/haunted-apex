@@ -588,6 +588,64 @@ Unit tests:
 Confirm `Manage Contact` is mechanically playable in engine tests before connecting it to
 Ledger and UI.
 
+### Phase 4 Completion Record
+
+- Added `manage_contact` to the action registry:
+
+```ts
+{
+  id: 'manage_contact',
+  label: 'Manage Contact',
+  commandCost: 1,
+  resourceCost: 0,
+  effects: {},
+  baseRisk: 10,
+  stressType: 'none',
+  assignment: 'none',
+  requiresTarget: true,
+  allowedTargetTypes: ['contact'],
+}
+```
+
+- Wired Contact targets into normal target selection so the command board can show rows
+  such as `Veyra Lux - Cultivate`.
+- Added queue validation for:
+  - missing Contact target;
+  - assigned operative rejection;
+  - inactive Contacts;
+  - burned Contacts;
+  - unknown Contact option ids;
+  - Resource, Intel, Trust, Leverage, and service requirement failures;
+  - queued Contact costs against already queued orders.
+- Added `resolveContactOption` in `src/app/engine/simulation/resolve-contact.ts`.
+- `Manage Contact` resolution now:
+  - consumes Resource, Intel, Trust, and Leverage costs through the shared preview;
+  - applies pressure effects;
+  - applies Contact metric effects;
+  - applies deterministic Quiet Treatment Stress relief;
+  - applies rival pressure effects;
+  - records recent Contact interactions;
+  - emits order resolution and complication logs.
+- Contact service Ledger creation is intentionally deferred to Phase 5, while previews and
+  resolution logs preserve visible Ledger hook information.
+- Added Contact cost/effect rows to command-card previews and queued-order views.
+
+Validation:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/simulation/queue-order.spec.ts --include=src/app/engine/simulation/resolve-contact.spec.ts --include=src/app/engine/selectors/previews.spec.ts --include=src/app/engine/contacts/contact-options.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Phase 4 tests passed: 72 specs.
+Full browser suite passed: 357 specs.
+The production build, documentation link check, and whitespace diff check passed.
+
 ## Phase 5: Contact-Ledger Integration
 
 ### Objective

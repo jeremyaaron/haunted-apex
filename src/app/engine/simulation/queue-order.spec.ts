@@ -1,4 +1,5 @@
 import { addLedgerEntry } from '../ledger';
+import type { ContactId, GameState } from '../model';
 import { getCommandPointsRemaining, getOrderAvailability, selectQueuedOrderViews } from '../selectors';
 import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
@@ -95,6 +96,17 @@ describe('queueOrder', () => {
     expect(
       getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
         actionId: 'work_the_ledger',
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_required',
+    });
+  });
+
+  it('requires a Contact target for Manage Contact', () => {
+    expect(
+      getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
+        actionId: 'manage_contact',
       }),
     ).toEqual({
       available: false,
@@ -331,6 +343,108 @@ describe('queueOrder', () => {
     });
   });
 
+  it('rejects invalid Contact targets and options', () => {
+    const state = withActiveContacts(newGame({ seed: 'CONTACT-QUEUE' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const inactive = {
+      type: 'contact',
+      contactId: 'contact_mina_glass',
+      optionId: 'cultivate',
+    } as const;
+    const burned: GameState = {
+      ...state,
+      contacts: {
+        ...state.contacts,
+        contact_veyra_lux: {
+          ...state.contacts.contact_veyra_lux,
+          burned: true,
+        },
+      },
+    };
+
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'manage_contact',
+        assignedOperativeId: state.operatives[0].id,
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'cultivate',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'operative_not_allowed',
+    });
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'manage_contact',
+        target: inactive,
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_inactive',
+    });
+    expect(
+      getOrderAvailability(burned, {
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'cultivate',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'contact_burned',
+    });
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'missing_option',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'contact_option_not_found',
+    });
+  });
+
+  it('rejects unaffordable Contact options', () => {
+    const state = withActiveContacts(newGame({ seed: 'CONTACT-BROKE' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const brokeState: GameState = {
+      ...state,
+      pressures: {
+        ...state.pressures,
+        resources: 100,
+      },
+    };
+
+    expect(
+      getOrderAvailability(brokeState, {
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'cultivate',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'not_enough_resources',
+    });
+  });
+
   it('preserves the target on a queued order', () => {
     const target = {
       type: 'venue',
@@ -385,6 +499,46 @@ describe('queueOrder', () => {
         actionId: 'work_the_ledger',
         label: 'Work the Ledger',
         targetLabel: 'Owes the Liaison - Pay in Credits',
+      }),
+    );
+  });
+
+  it('queues an affordable active Contact option and preserves contact and option ids', () => {
+    const state = withActiveContacts(newGame({ seed: 'CONTACT-QUEUE' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ]);
+    const target = {
+      type: 'contact',
+      contactId: 'contact_veyra_lux',
+      optionId: 'cultivate',
+    } as const;
+    const result = queueOrder(state, {
+      actionId: 'manage_contact',
+      target,
+    });
+
+    if (!result.ok) {
+      fail(`Expected Contact order, got ${result.error}`);
+      return;
+    }
+
+    expect(result.order).toEqual({
+      id: 'order_1_1',
+      actionId: 'manage_contact',
+      target,
+    });
+    expect(selectQueuedOrderViews(result.state)[0]).toEqual(
+      jasmine.objectContaining({
+        actionId: 'manage_contact',
+        label: 'Manage Contact',
+        targetLabel: 'Veyra Lux - Cultivate',
+        contactResolvedEffects: [
+          { id: 'trust', value: 10 },
+          { id: 'volatility', value: -6 },
+          { id: 'exposure', value: 2 },
+        ],
       }),
     );
   });
@@ -742,4 +896,11 @@ function queueOneRecruitmentWithFourOperatives() {
   }
 
   return first.state;
+}
+
+function withActiveContacts(state: GameState, activeContactIds: ContactId[]): GameState {
+  return {
+    ...state,
+    activeContactIds,
+  };
 }

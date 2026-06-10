@@ -113,6 +113,10 @@
                   @if (action.ledgerConsumesEntry) {
                     <span>Consumes Entry</span>
                   }
+                } @else if (action.contactCosts?.length) {
+                  @for (cost of action.contactCosts; track cost.id) {
+                    <span>{{ contactCostText(cost) }}</span>
+                  }
                 } @else {
                   <span>{{ action.adjustedResourceCost }} Resources</span>
                 }
@@ -252,6 +256,43 @@
                     <strong>{{ discovery.chance }}%</strong>
                     <small>{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small>
                   </div>
+                }
+              }
+
+              @if (action.contactUse; as contactUse) {
+                @if (contactUse.ok) {
+                  <div class="selection-strip contact-use-preview">
+                    <div>
+                      <span>Contact option</span>
+                      <strong>{{ contactUse.contactName }}</strong>
+                    </div>
+                    <p>{{ contactUse.label }} · Risk {{ contactUse.riskChance }}%</p>
+                    <div class="ledger-preview-rows">
+                      @for (cost of contactUse.costRows; track cost.id) {
+                        <span class="negative">{{ contactCostText(cost) }}</span>
+                      }
+                      @for (effect of deltaRows(contactUse.effects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @for (effect of action.contactResolvedEffects ?? []; track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ contactMetricText(effect) }}
+                        </span>
+                      }
+                      @for (ledgerEffect of contactUse.ledgerEffects; track ledgerEffect.definitionId) {
+                        <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      }
+                      @if (contactUse.quietTreatment) {
+                        <span>{{ contactUse.quietTreatment.operativeName }} Stress -10</span>
+                      }
+                    </div>
+                  </div>
+                } @else if (action.selectedTarget?.type === 'contact') {
+                  <p class="inline-warning">
+                    {{ actionUnavailableReason(contactUse.unavailableReason) }}
+                  </p>
                 }
               }
 
@@ -472,6 +513,11 @@
                   <span [class.negative]="delta.value < 0"
                     >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span
                   >
+                }
+                @for (effect of order.contactResolvedEffects ?? []; track effect.id) {
+                  <span [class.negative]="effect.value < 0">
+                    {{ contactMetricText(effect) }}
+                  </span>
                 }
               </div>
               <button type="button" class="secondary" (click)="removeOrder(order.id)">

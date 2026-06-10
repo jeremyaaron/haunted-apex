@@ -30,6 +30,10 @@ import type {
 } from '../model';
 import { getRivalPressureTier } from './rivals';
 import { selectActiveLedgerEntryViews } from '../ledger';
+import {
+  selectManageContactTargetOptions,
+  type ContactTargetOption,
+} from '../contacts';
 
 export type TerritoryTargetOption = {
   target: Exclude<ActionTarget, { type: 'recruit' }>;
@@ -64,7 +68,11 @@ export type LedgerTargetOption = {
   unavailableReason?: string;
 };
 
-export type ActionTargetOption = TerritoryTargetOption | RecruitTargetOption | LedgerTargetOption;
+export type ActionTargetOption =
+  | TerritoryTargetOption
+  | RecruitTargetOption
+  | LedgerTargetOption
+  | ContactTargetOption;
 
 export type VenueTerritoryView = {
   id: VenueId;
@@ -235,6 +243,10 @@ export function selectActionTargetOptions(
         });
       }
     }
+  }
+
+  if (allowedTypes.has('contact')) {
+    options.push(...selectManageContactTargetOptions(state));
   }
 
   return options;
@@ -462,6 +474,7 @@ export function calculateTargetControlGain(
     case 'recruit_operative':
     case 'lay_low':
     case 'work_the_ledger':
+    case 'manage_contact':
       return 0;
   }
 }

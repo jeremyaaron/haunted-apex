@@ -28,6 +28,7 @@ export {
 export type {
   ActionCardView,
   ActionPreview,
+  ContactMetricDeltaView,
   LocalImpactPreview,
   OperativeAssignmentPreview,
   OperativeOptionView,

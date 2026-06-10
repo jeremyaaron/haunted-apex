@@ -8,6 +8,7 @@ const RIVAL_PRESSURE_BY_ACTION: Record<ActionId, number> = {
   expand_influence: 14,
   lay_low: 0,
   work_the_ledger: 0,
+  manage_contact: 0,
 };
 
 export function calculateRivalPressureGain(
