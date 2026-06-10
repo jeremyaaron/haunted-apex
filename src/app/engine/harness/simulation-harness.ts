@@ -2032,11 +2032,23 @@ function getTargetKey(target: ActionTarget): string {
     return `ledger:${target.entryId}:${target.useOptionId}`;
   }
 
+  if (target.type === 'contact') {
+    return `contact:${target.contactId}:${target.optionId}`;
+  }
+
   return `${target.type}:${target.id}`;
 }
 
 function getTargetReportId(target: ActionTarget): string {
-  return target.type === 'ledger' ? `${target.entryId}:${target.useOptionId}` : target.id;
+  if (target.type === 'ledger') {
+    return `${target.entryId}:${target.useOptionId}`;
+  }
+
+  if (target.type === 'contact') {
+    return `${target.contactId}:${target.optionId}`;
+  }
+
+  return target.id;
 }
 
 function getTargetReportLabel(target: TargetRunStats): string {
@@ -2050,6 +2062,8 @@ function getTargetReportLabel(target: TargetRunStats): string {
     case 'recruit':
       return getOperativeDefinition(target.targetId as OperativeId)?.name ?? target.targetId;
     case 'ledger':
+      return target.targetId;
+    case 'contact':
       return target.targetId;
   }
 }

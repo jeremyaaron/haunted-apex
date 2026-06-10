@@ -550,6 +550,10 @@ export class App {
       return `${target.type}:${target.entryId}:${target.useOptionId}`;
     }
 
+    if (target.type === 'contact') {
+      return `${target.type}:${target.contactId}:${target.optionId}`;
+    }
+
     return `${target.type}:${target.id}`;
   }
 

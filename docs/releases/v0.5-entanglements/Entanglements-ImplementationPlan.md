@@ -474,6 +474,50 @@ Unit tests:
 
 Review preview output shape before adding the new command action.
 
+### Phase 3 Completion Record
+
+- Added shared Contact option preview logic in `src/app/engine/contacts/contact-options.ts`.
+- Contact previews now cover:
+  - universal `Cultivate` and `Pressure` options;
+  - contact service options;
+  - Resource, Intel, Trust, and Leverage cost checks;
+  - service requirements;
+  - inactive and burned Contact handling;
+  - pressure effects and resolved pressure deltas;
+  - Contact metric effects and resolved Contact metric deltas;
+  - deterministic Ledger effect previews;
+  - rival pressure effect previews;
+  - contact-option risk hooks.
+- Added deterministic `Quiet Treatment` targeting for the highest-stress current roster
+  operative, with disabled previews when no operative has Stress.
+- Extended `ActionTarget` with the v0.5 Contact target shape:
+
+```ts
+{ type: 'contact'; contactId: ContactId; optionId: ContactOptionId }
+```
+
+- Added neutral compile-time support for Contact targets in existing UI, Ledger, secret
+  discovery, and harness helpers. Contact targets are not command-board actions yet.
+- Added `selectManageContactTargetOptions` to produce future `Manage Contact` target rows
+  like `Veyra Lux - Cultivate`.
+- Added focused Contact option coverage in
+  `src/app/engine/contacts/contact-options.spec.ts`.
+
+Validation:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/contacts/contact-options.spec.ts --include=src/app/engine/contacts/generate-contacts.spec.ts --include=src/app/engine/selectors/contacts.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Contact pipeline tests passed: 13 specs.
+Full browser suite passed: 348 specs.
+
 ## Phase 4: Manage Contact Queueing and Resolution
 
 ### Objective

@@ -511,9 +511,15 @@ describe('simulation harness', () => {
 });
 
 function targetKey(target: ActionTarget): string {
-  return target.type === 'ledger'
-    ? `ledger:${target.entryId}:${target.useOptionId}`
-    : `${target.type}:${target.id}`;
+  if (target.type === 'ledger') {
+    return `ledger:${target.entryId}:${target.useOptionId}`;
+  }
+
+  if (target.type === 'contact') {
+    return `contact:${target.contactId}:${target.optionId}`;
+  }
+
+  return `${target.type}:${target.id}`;
 }
 
 function createTestContext(seed: string, agentId: string): AgentDecisionContext {

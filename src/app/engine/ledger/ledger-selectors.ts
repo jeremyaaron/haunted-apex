@@ -1,5 +1,6 @@
 import {
   getActionDefinition,
+  getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
   getLedgerEntryDefinition,
@@ -260,6 +261,10 @@ function getTargetLabel(target: ActionTarget): string | undefined {
       return getRivalDefinition(target.id)?.name;
     case 'recruit':
       return getOperativeDefinition(target.id)?.name;
+    case 'contact': {
+      const contact = getContactDefinition(target.contactId);
+      return contact ? `${contact.name} - ${target.optionId}` : target.contactId;
+    }
     case 'ledger':
       return target.entryId;
   }

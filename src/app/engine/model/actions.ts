@@ -1,3 +1,4 @@
+import type { ContactId, ContactOptionId } from './contacts';
 import type { OperativeId, OperativeSkill } from './operatives';
 import type { PressureDelta } from './pressures';
 import type { DistrictId } from './districts';
@@ -23,7 +24,8 @@ export type ActionTarget =
   | { type: 'venue'; id: VenueId }
   | { type: 'rival'; id: RivalId }
   | { type: 'recruit'; id: OperativeId }
-  | { type: 'ledger'; entryId: LedgerEntryId; useOptionId: LedgerUseOptionId };
+  | { type: 'ledger'; entryId: LedgerEntryId; useOptionId: LedgerUseOptionId }
+  | { type: 'contact'; contactId: ContactId; optionId: ContactOptionId };
 
 export type ActionDefinition = {
   id: ActionId;

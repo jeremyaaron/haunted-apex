@@ -777,6 +777,18 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
       : undefined;
   }
 
+  if (value['type'] === 'contact') {
+    return typeof value['contactId'] === 'string' &&
+      getContactDefinition(value['contactId'] as ContactId) &&
+      typeof value['optionId'] === 'string'
+      ? {
+          type: 'contact',
+          contactId: value['contactId'] as ContactId,
+          optionId: value['optionId'],
+        }
+      : undefined;
+  }
+
   if (typeof value['id'] !== 'string') {
     return undefined;
   }

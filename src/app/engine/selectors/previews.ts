@@ -1,6 +1,7 @@
 import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
+  getContactDefinition,
   getDistrictDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
@@ -312,6 +313,10 @@ function getTargetAvailability(
         : { available: true };
     case 'ledger':
       return getLedgerTargetAvailability(state, target);
+    case 'contact':
+      return getContactDefinition(target.contactId)
+        ? { available: true }
+        : unavailable('target_not_found');
   }
 }
 
