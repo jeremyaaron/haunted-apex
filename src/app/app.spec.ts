@@ -178,6 +178,164 @@ describe('App', () => {
     expect(veyraCard.textContent).toContain('-6 Volatility');
   });
 
+  it('renders Manage Contact target options and rich service previews', () => {
+    const state = newGame({ seed: 'PHASE-8-MANAGE-CONTACT' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const contactCard = findCard(compiled, '.action-card', 'Manage Contact');
+
+    expect(contactCard.querySelector('.assignment-control')).toBeNull();
+    expect(contactCard.textContent).toContain('Select a target to queue this order.');
+    expect(contactCard.textContent).toContain('Veyra Lux - Cultivate');
+    expect(contactCard.textContent).toContain('Veyra Lux - Private Room Access');
+    expect(contactCard.textContent).not.toContain('Mina Glass');
+
+    selectValue(
+      contactCard,
+      '.target-control select',
+      'contact:contact_veyra_lux:private_room_access',
+    );
+    fixture.detectChanges();
+
+    expect(contactCard.textContent).toContain('Contact option');
+    expect(contactCard.textContent).toContain('Veyra Lux');
+    expect(contactCard.textContent).toContain('Private Room Access');
+    expect(contactCard.textContent).toContain('Request Service');
+    expect(contactCard.textContent).toContain('+3 Dominion');
+    expect(contactCard.textContent).toContain('+8 Intel');
+    expect(contactCard.textContent).toContain('-6 Trust');
+    expect(contactCard.textContent).toContain('+8 Volatility');
+    expect(contactCard.textContent).toContain('Creates Debt: Owes the Liaison');
+    expect(contactCard.textContent).toContain('Nyx Ardent Pressure +6');
+    expect(findButton(contactCard, 'Queue Order').disabled).toBeFalse();
+  });
+
+  it('keeps unavailable Contact options visible but disabled with explanatory copy', () => {
+    const state = newGame({ seed: 'PHASE-8-CONTACT-DISABLED' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    state.contacts.contact_captain_hollis.burned = true;
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const contactCard = findCard(compiled, '.action-card', 'Manage Contact');
+    const disabledOption = Array.from(
+      contactCard.querySelectorAll<HTMLOptionElement>('.target-control option'),
+    ).find((option) => option.value === 'contact:contact_father_static:confession_leak');
+
+    expect(disabledOption).toBeTruthy();
+    expect(disabledOption?.disabled).toBeTrue();
+    expect(disabledOption?.textContent).toContain('Father Static - Confession Leak');
+    expect(disabledOption?.textContent).toContain(
+      'This contact option requirement is not met.',
+    );
+    expect(contactCard.textContent).not.toContain('Captain Rafe Hollis - Clean Passage');
+  });
+
+  it('shows Quiet Treatment target details in Contact previews', () => {
+    const state = newGame({ seed: 'PHASE-8-QUIET-TREATMENT' });
+    state.activeContactIds = [
+      'contact_dr_mercy_iram',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    state.operatives[0].stress = 45;
+    const stressedName =
+      getOperativeDefinition(state.operatives[0].id)?.name ?? state.operatives[0].id;
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const contactCard = findCard(compiled, '.action-card', 'Manage Contact');
+
+    selectValue(
+      contactCard,
+      '.target-control select',
+      'contact:contact_dr_mercy_iram:quiet_treatment',
+    );
+    fixture.detectChanges();
+
+    expect(contactCard.textContent).toContain('Dr. Mercy Iram');
+    expect(contactCard.textContent).toContain('Quiet Treatment');
+    expect(contactCard.textContent).toContain(`${stressedName} Stress -10`);
+  });
+
+  it('renders Contact effects in queued order summaries and the Event Feed', () => {
+    const state = newGame({ seed: 'PHASE-8-CONTACT-QUEUE-FEED' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const contactCard = findCard(compiled, '.action-card', 'Manage Contact');
+
+    selectValue(contactCard, '.target-control select', 'contact:contact_veyra_lux:cultivate');
+    fixture.detectChanges();
+    clickButton(contactCard, 'Queue Order');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.queued-order')?.textContent).toContain('Manage Contact');
+    expect(compiled.querySelector('.queued-order')?.textContent).toContain('Veyra Lux - Cultivate');
+    expect(compiled.querySelector('.queued-order')?.textContent).toContain('+10 Trust');
+    expect(compiled.querySelector('.queued-order')?.textContent).toContain('-6 Volatility');
+
+    clickButton(compiled, 'Advance Week');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.fallout-panel')?.textContent).toContain(
+      'Manage Contact: Veyra Lux',
+    );
+    expect(compiled.querySelector('.fallout-panel')?.textContent).toContain(
+      'Veyra Lux: trust +10, volatility -6, exposure +2.',
+    );
+  });
+
+  it('renders Contact effects on event choices and documents Entanglements', () => {
+    const state: GameState = {
+      ...newGame({ seed: 'PHASE-8-CONTACT-EVENT-CHOICE' }),
+      activeContactIds: [
+        'contact_veyra_lux',
+        'contact_captain_hollis',
+        'contact_father_static',
+      ],
+      phase: 'EVENT_CHOICE',
+      pendingEvent: {
+        id: 'event_1_1',
+        definitionId: 'contact_wants_assurance',
+        week: 1,
+        selectedContactId: 'contact_veyra_lux',
+      },
+    };
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.querySelector('.choice-list')?.textContent).toContain('Veyra Lux +6 Trust');
+    expect(compiled.querySelector('.choice-list')?.textContent).toContain('Veyra Lux -4 Volatility');
+    expect(compiled.querySelector('.guide-panel')?.textContent).toContain(
+      'Entanglements and contacts',
+    );
+    expect(compiled.querySelector('.guide-panel')?.textContent).toContain(
+      'Use Manage Contact to cultivate trust',
+    );
+  });
+
   it('renders roster identity, role, trait, liability, and Stress information', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

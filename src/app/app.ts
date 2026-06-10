@@ -8,6 +8,7 @@ import {
   formatBatchReport,
   generateRoster,
   getWeightedEvents,
+  getRivalDefinition,
   pressureDeltaToView,
   simulateBatch,
   type ActionCardView,
@@ -19,6 +20,7 @@ import {
   type ContactCostRow,
   type ContactMetricDeltaView,
   type ContactMetricView,
+  type ContactOptionPreview,
   type ContactServiceView,
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
@@ -31,6 +33,7 @@ import {
   type PressureDelta,
   type PressureDeltaView,
   type PressureId,
+  type RivalId,
   type RunSummaryOperative,
   type SpecialCost,
   type StressTier,
@@ -192,15 +195,25 @@ export class App {
   }
 
   protected targetOptionLabel(option: ActionTargetOption): string {
+    const unavailable = this.targetOptionUnavailableText(option);
+    const suffix = unavailable ? ` (${unavailable})` : '';
+
     if (option.targetType === 'venue' && option.districtName) {
-      return `${option.districtName} / ${option.label}`;
+      return `${option.districtName} / ${option.label}${suffix}`;
     }
 
-    return option.label;
+    return `${option.label}${suffix}`;
   }
 
   protected targetOptionValue(option: ActionTargetOption): string {
     return this.targetKey(option.target);
+  }
+
+  protected targetOptionDisabled(option: ActionTargetOption): boolean {
+    return (
+      (option.targetType === 'ledger' || option.targetType === 'contact') &&
+      option.affordable === false
+    );
   }
 
   protected queueAction(actionId: ActionId): void {
@@ -391,6 +404,17 @@ export class App {
     return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
 
+  protected contactRivalPressureRows(contactUse: ContactOptionPreview): string[] {
+    return Object.entries(contactUse.rivalPressureEffects).flatMap(([rivalId, value]) => {
+      if (typeof value !== 'number' || value === 0) {
+        return [];
+      }
+
+      const rivalName = getRivalDefinition(rivalId as RivalId)?.name ?? this.displayToken(rivalId);
+      return [`${rivalName} Pressure ${this.signed(value)}`];
+    });
+  }
+
   protected eventContactEffectText(row: ContactEffectPreviewRow): string {
     return `${row.contactName} ${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
@@ -475,6 +499,17 @@ export class App {
       default:
         return reason ? this.displayToken(reason) : '';
     }
+  }
+
+  private targetOptionUnavailableText(option: ActionTargetOption): string {
+    if (
+      (option.targetType !== 'ledger' && option.targetType !== 'contact') ||
+      option.affordable
+    ) {
+      return '';
+    }
+
+    return this.actionUnavailableReason(option.unavailableReason);
   }
 
   protected pressureLabel(id: PressureId): string {

@@ -151,7 +151,10 @@
                       option of action.targetOptions;
                       track targetOptionValue(option)
                     ) {
-                      <option [value]="targetOptionValue(option)">
+                      <option
+                        [value]="targetOptionValue(option)"
+                        [disabled]="targetOptionDisabled(option)"
+                      >
                         {{ targetOptionLabel(option) }}
                       </option>
                     }
@@ -266,7 +269,10 @@
                       <span>Contact option</span>
                       <strong>{{ contactUse.contactName }}</strong>
                     </div>
-                    <p>{{ contactUse.label }} · Risk {{ contactUse.riskChance }}%</p>
+                    <p>
+                      {{ contactUse.label }} · {{ displayToken(contactUse.kind) }} · Risk
+                      {{ contactUse.riskChance }}%
+                    </p>
                     <div class="ledger-preview-rows">
                       @for (cost of contactUse.costRows; track cost.id) {
                         <span class="negative">{{ contactCostText(cost) }}</span>
@@ -276,13 +282,16 @@
                           {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
                         </span>
                       }
-                      @for (effect of action.contactResolvedEffects ?? []; track effect.id) {
+                      @for (effect of action.contactEffects ?? []; track effect.id) {
                         <span [class.negative]="effect.value < 0">
                           {{ contactMetricText(effect) }}
                         </span>
                       }
                       @for (ledgerEffect of contactUse.ledgerEffects; track ledgerEffect.definitionId) {
                         <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      }
+                      @for (rivalPressure of contactRivalPressureRows(contactUse); track rivalPressure) {
+                        <span class="negative">{{ rivalPressure }}</span>
                       }
                       @if (contactUse.quietTreatment) {
                         <span>{{ contactUse.quietTreatment.operativeName }} Stress -10</span>
@@ -1055,7 +1064,7 @@
             }
             @if (entry.tags?.length) {
               <div class="log-tags">
-                @for (tag of entry.tags; track tag) {
+                @for (tag of entry.tags; track $index) {
                   <span>{{ tag }}</span>
                 }
               </div>
@@ -1177,6 +1186,26 @@
           Targeted Gather Intel can discover Secrets when the target has matching hidden
           opportunities. Work the Ledger spends a Command point to use an active Secret, settle a
           Debt, or call a Favor. Event choices show their Ledger consequences before you choose.
+        </p>
+      </details>
+
+      <details>
+        <summary>Entanglements and contacts</summary>
+        <p>
+          Each run exposes three active outside Contacts. Use Manage Contact to cultivate trust,
+          apply pressure, or request a specific service. Contacts do not use operative assignment;
+          choose one Contact option from the Target dropdown and queue it like any other command.
+        </p>
+        <p>
+          Trust and Leverage are useful reserves. Volatility and Exposure are danger signals.
+          Contact options can spend Resources, Intel, Trust, or Leverage, then change both city
+          pressures and Contact metrics. Preview chips show those costs and effects before you
+          commit.
+        </p>
+        <p>
+          Services can create Ledger entries, raise rival Pressure, or offer special help such as
+          Quiet Treatment for a stressed operative. Unavailable Contact options stay visible when
+          the relationship is not ready, but burned Contacts cannot be used.
         </p>
       </details>
 

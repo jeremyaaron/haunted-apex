@@ -1006,6 +1006,40 @@ Manual checks:
 Manual playthrough review: confirm players can understand what Contacts do before
 committing actions or event choices.
 
+### Phase 8 Implementation Notes
+
+- Expanded the `Manage Contact` command-board UX:
+  - Contact target rows render in the existing Target dropdown.
+  - Assign remains hidden because Contact actions use `assignment: 'none'`.
+  - Unavailable active Contact options stay visible but disabled with explanatory copy.
+  - Burned Contact options are excluded from the command target list.
+- Expanded Contact option previews with:
+  - selected Contact name;
+  - option kind;
+  - Resource, Intel, Trust, and Leverage costs;
+  - pressure effects;
+  - Contact metric effects;
+  - Ledger creation effects;
+  - rival Pressure effects;
+  - Quiet Treatment target name when available;
+  - risk chance.
+- Queued `Manage Contact` summaries show resolved Contact metric changes.
+- Event choice cards show exact Contact effects through the existing preview path.
+- Event Feed rendering now handles duplicate Contact log tags without Angular tracking
+  warnings.
+- Added a compact `Entanglements and contacts` Field Guide section.
+
+Verification:
+
+- `npx tsc -p tsconfig.app.json --noEmit`
+- `npx tsc -p tsconfig.spec.json --noEmit`
+- `npx ng test --watch=false --browsers=ChromeHeadless --include=src/app/app.spec.ts`
+  - 39 specs passed.
+- `npx ng test --watch=false --browsers=ChromeHeadless`
+  - 378 specs passed.
+- `npm run build`
+- `npm run check:docs`
+
 ## Phase 9: Agents and Harness Reports
 
 ### Objective
