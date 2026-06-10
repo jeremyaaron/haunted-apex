@@ -1,4 +1,5 @@
 export * from './content';
+export * from './contacts';
 export * from './ledger';
 export * from './model';
 export * from './rng';

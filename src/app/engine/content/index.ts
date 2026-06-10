@@ -7,6 +7,11 @@ export {
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
 } from './district-zero-tuning';
 export {
+  CONTACT_DEFINITIONS,
+  getContactDefinition,
+  UNIVERSAL_CONTACT_OPTIONS,
+} from './contacts';
+export {
   DISTRICT_ZERO_ACTIONS,
   getActionDefinition,
 } from './district-zero-actions';

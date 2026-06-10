@@ -253,6 +253,61 @@ Unit tests:
 - `deriveContactStatus` returns correct labels for major metric combinations.
 - Contact metric clamp helper keeps metrics between 0 and 100.
 
+### Completion Record
+
+Completed June 9, 2026:
+
+- Added Contact model contracts in `src/app/engine/model/contacts.ts`.
+- Added explicit types for:
+  - Contact ids, status labels, archetypes, role tags, generation tags, option ids, and
+    service ids.
+  - Contact metric deltas, runtime state, interactions, service costs, service
+    requirements, service definitions, Ledger effect hooks, and universal option
+    definitions.
+- Added `social` and `stability` to `ContactRoleTag`.
+- Added pure Contact helpers:
+  - `deriveContactStatus`.
+  - `clampContactMetric`.
+  - `applyContactMetricDelta`.
+- Added the six v0.5 Contact definitions in `src/app/engine/content/contacts.ts`:
+  - Veyra Lux
+  - Captain Rafe Hollis
+  - Dr. Mercy Iram
+  - Ciro Moth
+  - Mina Glass
+  - Father Static
+- Added the locked universal Contact options:
+
+```text
+Cultivate: Resources -600, Trust +10, Volatility -6, Exposure +2
+Pressure:  Intel +4, Ruin +2, Leverage +10, Trust -6, Volatility +8
+```
+
+- Kept service Ledger hooks deterministic and tied only to existing v0.4 Ledger
+  definitions for this phase:
+  - Veyra can create `debt_owes_liaison`.
+  - Ciro can create `secret_dead_channel_trace`.
+  - Mina can create `debt_contaminated_money`.
+- Added static content validation in `contact-content.spec.ts`.
+- Added helper coverage in `derive-contact-status.spec.ts` and `contact-metrics.spec.ts`.
+- Exported Contact content, model types, and helper APIs through existing engine barrels.
+- Did not add Contact state to `GameState`, did not alter save schema, and did not change
+  runtime gameplay behavior.
+
+Validation:
+
+```text
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/content/contact-content.spec.ts --include=src/app/engine/contacts/derive-contact-status.spec.ts --include=src/app/engine/contacts/contact-metrics.spec.ts
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Contact tests passed: 11 specs.
+Full browser suite passed: 331 specs.
+
 ### Review Gate
 
 Review authored contacts, services, and labels before generating runtime Contact state.
