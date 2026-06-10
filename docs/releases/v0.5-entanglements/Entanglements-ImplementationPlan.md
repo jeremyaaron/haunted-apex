@@ -371,6 +371,41 @@ Unit tests:
 
 Confirm generated contact sets feel varied and coverage-complete before wiring actions.
 
+### Phase 2 Completion Record
+
+- Added deterministic Contact network generation in `src/app/engine/contacts/generate-contacts.ts`.
+- New runs now carry schema `5`, full six-contact mutable state, and exactly three active
+  Contacts selected from coverage-complete combinations.
+- Active Contact selectors expose only active Contacts for normal UI/engine consumers while
+  still allowing raw state lookup for internals.
+- Bumped local persistence to:
+
+```ts
+CURRENT_SAVE_SCHEMA_VERSION = 5;
+CURRENT_GAME_VERSION = '0.5.0';
+CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
+```
+
+- Added `haunted-apex:v0.4:current-run` as a legacy incompatible key and updated the
+  compatibility notice for Entanglements.
+- Storage validation now rejects malformed Contact state, invalid active sets, and missing
+  inactive Contact records.
+
+Validation:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/contacts/generate-contacts.spec.ts --include=src/app/engine/selectors/contacts.spec.ts --include=src/app/engine/simulation/new-game.spec.ts --include=src/app/game/game-storage.service.spec.ts --include=src/app/game/game.facade.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Focused Phase 2 tests passed: 47 specs.
+Full browser suite passed: 340 specs.
+
 ## Phase 3: Contact Options, Affordability, and Preview Pipeline
 
 ### Objective

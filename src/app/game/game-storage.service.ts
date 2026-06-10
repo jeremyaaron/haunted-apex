@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
 import {
+  ACTIVE_CONTACT_COUNT,
+  CONTACT_DEFINITIONS,
   getActionDefinition,
+  getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
   getLedgerEntryDefinition,
@@ -12,6 +15,9 @@ import {
   RIVAL_TERRITORY_RIVALS,
   type ActionId,
   type ActionTarget,
+  type ContactId,
+  type ContactMetricDelta,
+  type ContactOptionKind,
   type DistrictId,
   type GameState,
   type LedgerEntryDefinitionId,
@@ -25,9 +31,10 @@ import {
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 4;
-export const CURRENT_GAME_VERSION = '0.4.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 5;
+export const CURRENT_GAME_VERSION = '0.5.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
+export const LEGACY_V04_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
 export const LEGACY_V03_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
 export const LEGACY_V02_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
 
@@ -81,6 +88,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
       storage.removeItem(LEGACY_V03_STORAGE_KEY);
       storage.removeItem(LEGACY_V02_STORAGE_KEY);
 
@@ -112,6 +120,16 @@ export class GameStorageService implements GameStorage {
       }
     }
 
+    if (storage.getItem(LEGACY_V04_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 4,
+      };
+    }
+
     if (storage.getItem(LEGACY_V03_STORAGE_KEY) !== null) {
       storage.removeItem(LEGACY_V03_STORAGE_KEY);
       storage.removeItem(LEGACY_V02_STORAGE_KEY);
@@ -135,6 +153,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V04_STORAGE_KEY);
     storage?.removeItem(LEGACY_V03_STORAGE_KEY);
     storage?.removeItem(LEGACY_V02_STORAGE_KEY);
   }
@@ -154,7 +173,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 4 &&
+    value['schemaVersion'] === 5 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -165,6 +184,7 @@ function isGameState(value: unknown): value is GameState {
     isPressures(value['pressures']) &&
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
+    isContactNetwork(value['contacts'], value['activeContactIds']) &&
     isSeenSignatureEventIds(value['seenSignatureEventIds']) &&
     isLedgerState(value['ledger']) &&
     isQueuedOrders(value['queuedOrders'], value['operatives'], value['hirePool']) &&
@@ -290,6 +310,83 @@ function isHirePool(value: unknown, operatives: unknown): boolean {
     hireIds.every(
       (id) => getOperativeDefinition(id as OperativeId) !== undefined && !activeIds.has(id),
     )
+  );
+}
+
+function isContactNetwork(contacts: unknown, activeContactIds: unknown): boolean {
+  if (
+    !isRecord(contacts) ||
+    !isStringArray(activeContactIds) ||
+    activeContactIds.length !== ACTIVE_CONTACT_COUNT ||
+    new Set(activeContactIds).size !== activeContactIds.length
+  ) {
+    return false;
+  }
+
+  const contactIds = CONTACT_DEFINITIONS.map((definition) => definition.id);
+  const activeIdSet = new Set(activeContactIds);
+
+  if (
+    Object.keys(contacts).length !== contactIds.length ||
+    activeContactIds.some((contactId) => !getContactDefinition(contactId as ContactId))
+  ) {
+    return false;
+  }
+
+  return contactIds.every((contactId) => {
+    const contact = contacts[contactId];
+
+    if (
+      !isRecord(contact) ||
+      contact['id'] !== contactId ||
+      !isContactMetric(contact['trust']) ||
+      !isContactMetric(contact['leverage']) ||
+      !isContactMetric(contact['volatility']) ||
+      !isContactMetric(contact['exposure']) ||
+      typeof contact['burned'] !== 'boolean' ||
+      !isRecentContactInteractions(contact['recentInteractions']) ||
+      !isFlags(contact['flags'])
+    ) {
+      return false;
+    }
+
+    return !activeIdSet.has(contactId) || getContactDefinition(contactId) !== undefined;
+  });
+}
+
+function isContactMetric(value: unknown): boolean {
+  return isFiniteNumber(value) && value >= 0 && value <= 100;
+}
+
+function isRecentContactInteractions(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every(
+    (interaction) =>
+      isRecord(interaction) &&
+      isPositiveInteger(interaction['week']) &&
+      typeof interaction['optionId'] === 'string' &&
+      isContactOptionKind(interaction['kind']) &&
+      typeof interaction['label'] === 'string' &&
+      isContactMetricDelta(interaction['effectsSummary']),
+  );
+}
+
+function isContactOptionKind(value: unknown): value is ContactOptionKind {
+  return value === 'cultivate' || value === 'pressure' || value === 'request_service';
+}
+
+function isContactMetricDelta(value: unknown): value is ContactMetricDelta {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(
+    ([metric, amount]) =>
+      ['trust', 'leverage', 'volatility', 'exposure'].includes(metric) &&
+      isFiniteNumber(amount),
   );
 }
 

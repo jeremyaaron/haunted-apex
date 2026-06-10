@@ -1,5 +1,6 @@
 import type { QueuedOrder } from './actions';
 import type { RecentActivityEntry } from './activity';
+import type { ContactId, ContactState } from './contacts';
 import type { DistrictId, DistrictState } from './districts';
 import type { EventId, GameEventInstance } from './events';
 import type { LedgerState } from './ledger';
@@ -56,7 +57,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   id: string;
   seed: string;
   rngCursor: number;
@@ -67,6 +68,8 @@ export type GameState = {
   pressures: Pressures;
   operatives: OperativeState[];
   hirePool: OperativeId[];
+  contacts: Record<ContactId, ContactState>;
+  activeContactIds: ContactId[];
   seenSignatureEventIds: EventId[];
   ledger: LedgerState;
   queuedOrders: QueuedOrder[];

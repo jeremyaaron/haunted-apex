@@ -48,7 +48,7 @@ import {
 } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected save from v0.3.x. v0.4.0 - The Black Ledger changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.5.0 - Entanglements changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',

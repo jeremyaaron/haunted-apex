@@ -1,4 +1,14 @@
 export {
+  isActiveContact,
+  selectActiveContacts,
+  selectContactState,
+  selectContactView,
+} from './contacts';
+export type {
+  ContactServiceView,
+  ContactView,
+} from './contacts';
+export {
   calculateRiskChance,
   applyDistrictModifiers,
   applyVenueModifiers,
