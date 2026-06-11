@@ -99,7 +99,7 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     stressType: 'recovery',
     assignment: 'optional',
     requiresTarget: false,
-    allowedTargetTypes: ['district', 'venue'],
+    allowedTargetTypes: ['district', 'venue', 'front'],
   },
   {
     id: 'work_the_ledger',

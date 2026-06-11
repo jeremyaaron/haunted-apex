@@ -54,6 +54,107 @@ describe('resolveQueuedOrder recruitment', () => {
   });
 });
 
+describe('resolveQueuedOrder Front-targeted Lay Low', () => {
+  it('reduces Heat, Dominion, Resources, and selected Front exposure', () => {
+    const base = newGame({ seed: 'FRONT-LAY-LOW-RESOLVE' });
+    const state = {
+      ...base,
+      fronts: {
+        ...base.fronts,
+        front_pale_circuit: {
+          ...base.fronts.front_pale_circuit!,
+          exposure: 28,
+        },
+      },
+    };
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'lay_low',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+
+    expect(result.complication).toBeFalse();
+    expect(result.stressDelta).toBe(0);
+    expect(result.resolvedDelta).toEqual({
+      heat: -6,
+      dominion: -1,
+      resources: -300,
+    });
+    expect(result.state.pressures.heat).toBe(state.pressures.heat - 6);
+    expect(result.state.pressures.dominion).toBe(state.pressures.dominion - 1);
+    expect(result.state.pressures.resources).toBe(state.pressures.resources - 300);
+    expect(result.state.fronts.front_pale_circuit?.exposure).toBe(14);
+    expect(result.state.eventLog.at(-1)).toEqual(
+      jasmine.objectContaining({
+        type: 'order_resolved',
+        title: 'Lay Low',
+        tags: ['FRONT', 'front_pale_circuit'],
+      }),
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain('The Pale Circuit');
+  });
+
+  it('clamps Front exposure at zero', () => {
+    const base = newGame({ seed: 'FRONT-LAY-LOW-CLAMP' });
+    const state = {
+      ...base,
+      fronts: {
+        ...base.fronts,
+        front_pale_circuit: {
+          ...base.fronts.front_pale_circuit!,
+          exposure: 7,
+        },
+      },
+    };
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'lay_low',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+
+    expect(result.state.fronts.front_pale_circuit?.exposure).toBe(0);
+  });
+
+  it('blocks stale Front-targeted Lay Low when the Front is inactive', () => {
+    const base = newGame({ seed: 'FRONT-LAY-LOW-STALE' });
+    const state = {
+      ...base,
+      fronts: {
+        ...base.fronts,
+        front_pale_circuit: {
+          ...base.fronts.front_pale_circuit!,
+          active: false,
+        },
+      },
+    };
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'lay_low',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+
+    expect(result.complication).toBeTrue();
+    expect(result.rng.cursor).toBe(state.rngCursor);
+    expect(result.state.pressures).toEqual(state.pressures);
+    expect(result.state.fronts).toEqual(state.fronts);
+    expect(result.state.eventLog.at(-1)).toEqual(
+      jasmine.objectContaining({
+        type: 'complication',
+        title: 'Lay Low Blocked',
+      }),
+    );
+  });
+});
+
 describe('resolveQueuedOrder operative territory modifiers', () => {
   it('applies Rook Vale Control and Iris Vale rival Pressure modifiers', () => {
     const base = newGame({ seed: 'VIOLET-ASH-1047' });

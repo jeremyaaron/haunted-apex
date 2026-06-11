@@ -40,10 +40,41 @@ describe('territory selectors', () => {
       selectActionTargetOptions(state, 'run_small_job').map((option) => option.targetType),
     ).toEqual(['district', 'district', 'district', 'venue', 'venue', 'venue', 'venue']);
     expect(
+      selectActionTargetOptions(state, 'lay_low').map((option) => option.targetType),
+    ).toEqual([
+      'district',
+      'district',
+      'district',
+      'venue',
+      'venue',
+      'venue',
+      'venue',
+      'front',
+    ]);
+    expect(
       selectActionTargetOptions(state, 'recruit_operative').map(
         (option) => `${option.targetType}:${targetKey(option.target).split(':').at(-1)}`,
       ),
     ).toEqual(state.hirePool.map((operativeId) => `recruit:${operativeId}`));
+  });
+
+  it('labels owned active Fronts as Lay Low cooling targets', () => {
+    const state = newGame({ seed: 'FRONT-LAY-LOW-TARGETS' });
+    const options = selectActionTargetOptions(state, 'lay_low').filter(
+      (option) => option.targetType === 'front',
+    );
+
+    expect(options).toEqual([
+      jasmine.objectContaining({
+        target: {
+          type: 'front',
+          id: 'front_pale_circuit',
+        },
+        label: 'The Pale Circuit - Cool Exposure',
+        mode: 'cool',
+        affordable: true,
+      }),
+    ]);
   });
 
   it('returns Ledger target options for active entries and use options', () => {

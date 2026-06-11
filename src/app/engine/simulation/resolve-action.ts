@@ -1,8 +1,10 @@
 import {
   getActionDefinition,
+  getFrontDefinition,
   getOperativeDefinition,
   getRivalDefinition,
 } from '../content';
+import { clampFrontExposure } from '../fronts';
 import { previewSecretDiscovery, resolveLedgerUse, resolveSecretDiscovery } from '../ledger';
 import type {
   ActionDefinition,
@@ -17,6 +19,7 @@ import {
   calculateRivalPressureGain,
   calculateTargetControlGain,
   calculateTargetLocalHeatGain,
+  FRONT_LAY_LOW_EXPOSURE_DELTA,
   getAdjustedEffects,
   getAdjustedResourceCost,
   getTargetControllerId,
@@ -96,6 +99,26 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     return resolveInvestFront(state, order.target);
   }
 
+  if (action.id === 'lay_low' && order.target?.type === 'front') {
+    const front = state.fronts[order.target.id];
+
+    if (!front?.active) {
+      return {
+        state: appendLog(state, {
+          type: 'complication',
+          title: 'Lay Low Blocked',
+          body: `Order ${order.id} referenced a Front that is no longer active and was skipped.`,
+          tags: ['FRONT', 'BLOCKED', order.target.id],
+        }),
+        rng: createRng(state.seed, state.rngCursor),
+        complication: true,
+        riskChance: 0,
+        resolvedDelta: {},
+        stressDelta: 0,
+      };
+    }
+  }
+
   const secretDiscoveryPreview = previewSecretDiscovery(state, order);
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
@@ -148,6 +171,7 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
     operativeModifiers.districtControlModifier,
     operativeModifiers.rivalPressureModifier,
   );
+  next = applyFrontLayLowExposure(next, action, order.target);
   next = recordRecentActivity(next, action.id, order.target, totalDelta);
   next = resolveRecruitment(next, action, order.target);
   next = applyComplicationFlags(next, action, complication);
@@ -173,9 +197,10 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
       riskChance,
       complication,
       operativeModifiers,
+      next,
     ),
     pressureDelta: totalDelta,
-    tags: getTargetTags(order.target),
+    tags: getResolutionTags(order.target),
   });
 
   if (assignmentOutcome.tierChange) {
@@ -475,10 +500,11 @@ function createResolutionBody(
   riskChance: number,
   complication: boolean,
   operativeModifiers: OperativeModifierResult,
+  state: GameState,
 ): string {
   const operativeName = operative ? getOperativeDefinition(operative.id)?.name : undefined;
   const assignment = operativeName ? ` Assigned: ${operativeName}.` : '';
-  const targetLabel = getTargetLabel(order.target);
+  const targetLabel = getTargetLabel(order.target, state);
   const target = targetLabel ? ` Target: ${targetLabel}.` : '';
   const districtImpact = resolveTargetDistrictId(order.target)
     ? ` Local impact: +${calculateTargetControlGain(action.id, order.target, operativeModifiers.districtControlModifier)} control, +${calculateTargetLocalHeatGain(resolvedDelta, order.target)} Heat.`
@@ -488,9 +514,64 @@ function createResolutionBody(
   const rivalAttention = rival
     ? ` Rival attention: ${rival.name} +${calculateRivalPressureGain(action.id, operativeModifiers.rivalPressureModifier)}.`
     : '';
+  const frontExposure = createFrontExposureBody(action, order.target, state);
   const result = complication ? 'Complication triggered.' : 'Resolved cleanly.';
 
-  return `${result}${assignment}${target}${districtImpact}${rivalAttention} Risk ${riskChance}, roll ${roll}.`;
+  return `${result}${assignment}${target}${districtImpact}${rivalAttention}${frontExposure} Risk ${riskChance}, roll ${roll}.`;
+}
+
+function applyFrontLayLowExposure(
+  state: GameState,
+  action: ActionDefinition,
+  target: QueuedOrder['target'],
+): GameState {
+  if (action.id !== 'lay_low' || target?.type !== 'front') {
+    return state;
+  }
+
+  const front = state.fronts[target.id];
+
+  if (!front?.active) {
+    return state;
+  }
+
+  return {
+    ...state,
+    fronts: {
+      ...state.fronts,
+      [front.id]: {
+        ...front,
+        exposure: clampFrontExposure(front.exposure + FRONT_LAY_LOW_EXPOSURE_DELTA),
+      },
+    },
+  };
+}
+
+function createFrontExposureBody(
+  action: ActionDefinition,
+  target: QueuedOrder['target'],
+  state: GameState,
+): string {
+  if (action.id !== 'lay_low' || target?.type !== 'front') {
+    return '';
+  }
+
+  const front = state.fronts[target.id];
+  const definition = front ? getFrontDefinition(front.definitionId) : undefined;
+
+  if (!front || !definition) {
+    return '';
+  }
+
+  return ` ${definition.name} exposure cooled to ${front.exposure}.`;
+}
+
+function getResolutionTags(target: QueuedOrder['target']): string[] {
+  if (target?.type === 'front') {
+    return ['FRONT', target.id];
+  }
+
+  return getTargetTags(target);
 }
 
 function createComplicationBody(action: ActionDefinition): string {

@@ -388,6 +388,44 @@ describe('action previews', () => {
     ).toBe(45);
   });
 
+  it('previews Front-targeted Lay Low cost, effects, exposure cooling, and no assignment', () => {
+    const state = newGame({ seed: 'FRONT-LAY-LOW-PREVIEW' });
+    const target = {
+      type: 'front',
+      id: 'front_pale_circuit',
+    } as const;
+    const preview = getActionPreview(state, 'lay_low', undefined, target);
+
+    expect(preview).toEqual(
+      jasmine.objectContaining({
+        assignment: 'none',
+        adjustedResourceCost: 300,
+        adjustedEffects: {
+          heat: -6,
+          dominion: -1,
+        },
+        frontExposure: {
+          frontId: 'front_pale_circuit',
+          frontName: 'The Pale Circuit',
+          currentExposure: 12,
+          exposureDelta: -14,
+          projectedExposure: 0,
+        },
+      }),
+    );
+    expect(selectAssignmentOptions(state, 'lay_low', target)).toEqual([]);
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'lay_low',
+        assignedOperativeId: state.operatives[0].id,
+        target,
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'operative_not_allowed',
+    });
+  });
+
   it('keeps Breaking operatives assignable and previews discrete Stress risk', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const mara = state.operatives.find((operative) => operative.id === 'op_mara_voss');

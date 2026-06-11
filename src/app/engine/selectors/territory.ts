@@ -74,7 +74,7 @@ export type FrontTargetOption = {
   target: Extract<ActionTarget, { type: 'front_opportunity' | 'front' }>;
   label: string;
   targetType: 'front_opportunity' | 'front';
-  mode: 'establish' | 'upgrade';
+  mode: 'establish' | 'upgrade' | 'cool';
   frontName: string;
   districtName?: string;
   venueName?: string;
@@ -318,23 +318,30 @@ export function selectActionTargetOptions(
         type: 'front' as const,
         id: front.id,
       };
-      const preview = previewFrontInvestment(state, target);
       const district = getDistrictDefinition(front.districtId);
       const venue = front.venueId ? getVenueDefinition(front.venueId) : undefined;
       const rival = front.relatedRivalId ? getRivalDefinition(front.relatedRivalId) : undefined;
+      const isLayLow = actionId === 'lay_low';
+      const preview = isLayLow ? undefined : previewFrontInvestment(state, target);
+      const affordable = isLayLow
+        ? state.pressures.resources >= 300
+        : Boolean(preview?.ok && state.pressures.resources >= preview.cost);
 
       options.push({
         target,
-        label: `${definition.name} - Upgrade`,
+        label: `${definition.name} - ${isLayLow ? 'Cool Exposure' : 'Upgrade'}`,
         targetType: 'front',
-        mode: 'upgrade',
+        mode: isLayLow ? 'cool' : 'upgrade',
         frontName: definition.name,
         districtName: district?.name,
         venueName: venue?.name,
         relatedRivalName: rival?.name,
-        affordable: preview.ok && state.pressures.resources >= preview.cost,
-        ...(!preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
-        ...(preview.ok && state.pressures.resources < preview.cost
+        affordable,
+        ...(preview && !preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
+        ...(preview?.ok && state.pressures.resources < preview.cost
+          ? { unavailableReason: 'not_enough_resources' }
+          : {}),
+        ...(isLayLow && state.pressures.resources < 300
           ? { unavailableReason: 'not_enough_resources' }
           : {}),
       });
@@ -555,7 +562,7 @@ export function getTargetLabel(target?: ActionTarget, state?: GameState): string
       const front = state?.fronts[target.id];
       const definition = front ? getFrontDefinition(front.definitionId) : undefined;
 
-      return definition ? `${definition.name} - Upgrade` : target.id;
+      return definition?.name ?? getFrontDefinition(target.id)?.name ?? target.id;
     }
   }
 }

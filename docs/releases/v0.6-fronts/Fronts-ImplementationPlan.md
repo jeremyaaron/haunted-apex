@@ -803,6 +803,38 @@ Unit tests:
 
 Confirm exposure is manageable before adding front event pressure.
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Extended `Lay Low` to support owned active Front targets while preserving untargeted
+  `Lay Low` behavior.
+- Added Front cooling target options labeled `Cool Exposure`.
+- Front-targeted `Lay Low` now previews:
+  - `300` Resource cost
+  - `-6` Heat
+  - `-1` Dominion
+  - selected Front Exposure `-14`, clamped at `0`
+- Front-targeted `Lay Low` dynamically disables operative assignment.
+- Queue validation rejects:
+  - unowned Front targets
+  - inactive Front targets
+  - assigned operatives on Front-targeted `Lay Low`
+- Resolution applies global pressure effects, spends Resources, cools the selected Front, and
+  logs the Front name.
+- Stale inactive Front orders are blocked and logged instead of mutating state.
+- Added command-card UI copy for Front exposure cooling.
+- Focused Phase 6 suite passed: 109 tests.
+- Full suite passed: 431 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 510.66 kB, under the 600.00 kB warning budget
+```
+
+- The production build with base href `/haunted-apex/` passed without bundle-budget warnings.
+
 ## Phase 7: Front Events and Ledger Hooks
 
 ### Objective

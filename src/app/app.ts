@@ -187,6 +187,14 @@ export class App {
       ...selected,
       [actionId]: target,
     }));
+
+    if (actionId === 'lay_low' && target?.type === 'front') {
+      this.selectedOperatives.update((selected) => {
+        const next = { ...selected };
+        delete next[actionId];
+        return next;
+      });
+    }
   }
 
   protected selectedTarget(actionId: ActionId): string {

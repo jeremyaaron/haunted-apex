@@ -2,6 +2,7 @@ import {
   DISTRICT_ZERO_MAX_OPERATIVES,
   getActionDefinition,
   getDistrictDefinition,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
@@ -14,6 +15,7 @@ import {
 } from '../contacts';
 import {
   previewFrontInvestment,
+  clampFrontExposure,
   type FrontInvestmentPreview,
 } from '../fronts';
 import type {
@@ -100,6 +102,13 @@ export type QueueOrderUnavailableReason =
   | 'front_already_owned'
   | 'front_already_max_level';
 
+export const FRONT_LAY_LOW_RESOURCE_COST = 300;
+export const FRONT_LAY_LOW_EXPOSURE_DELTA = -14;
+export const FRONT_LAY_LOW_EFFECTS = {
+  heat: -6,
+  dominion: -1,
+} as const satisfies PressureDelta;
+
 export type OrderAvailability = {
   available: boolean;
   reason?: QueueOrderUnavailableReason;
@@ -161,7 +170,16 @@ export type ActionPreview = {
   contactEffects?: ContactMetricDeltaView[];
   contactResolvedEffects?: ContactMetricDeltaView[];
   frontInvestment?: FrontInvestmentPreview;
+  frontExposure?: FrontExposurePreview;
   secretDiscovery?: SecretDiscoveryPreview;
+};
+
+export type FrontExposurePreview = {
+  frontId: Extract<ActionTarget, { type: 'front' }>['id'];
+  frontName: string;
+  currentExposure: number;
+  exposureDelta: number;
+  projectedExposure: number;
 };
 
 export type ContactMetricDeltaView = {
@@ -228,7 +246,7 @@ export function getQueuedResourceCost(state: GameState): number {
       getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target) +
       getLedgerUseCost(state, order.target, 'resources') +
       getContactUseCost(state, order.target, 'resources') +
-      getFrontInvestmentCost(state, order.target)
+      getFrontInvestmentCost(state, order.actionId, order.target)
     );
   }, 0);
 }
@@ -267,11 +285,11 @@ export function getOrderAvailability(
     return unavailable('not_enough_command_points');
   }
 
-  if (action.assignment === 'none' && request.assignedOperativeId) {
+  if (getEffectiveAssignment(action, request.target) === 'none' && request.assignedOperativeId) {
     return unavailable('operative_not_allowed');
   }
 
-  if (action.assignment === 'required' && !request.assignedOperativeId) {
+  if (getEffectiveAssignment(action, request.target) === 'required' && !request.assignedOperativeId) {
     return unavailable('operative_required');
   }
 
@@ -352,14 +370,39 @@ function getTargetAvailability(
       return getContactTargetAvailability(state, target);
     case 'front_opportunity':
     case 'front':
-      return getFrontTargetAvailability(state, target);
+      return getFrontTargetAvailability(state, action, target);
   }
 }
 
 function getFrontTargetAvailability(
   state: GameState,
+  action: ActionDefinition,
   target: Extract<ActionTarget, { type: 'front_opportunity' | 'front' }>,
 ): OrderAvailability {
+  if (action.id === 'lay_low' && target.type === 'front') {
+    const front = state.fronts[target.id];
+
+    if (!front) {
+      return unavailable('target_not_found');
+    }
+
+    if (!front.active) {
+      return unavailable('target_inactive');
+    }
+
+    if (state.pressures.resources - getQueuedResourceCost(state) < FRONT_LAY_LOW_RESOURCE_COST) {
+      return unavailable('not_enough_resources');
+    }
+
+    return {
+      available: true,
+    };
+  }
+
+  if (action.id !== 'invest_front') {
+    return unavailable('target_not_allowed');
+  }
+
   const preview = previewFrontInvestment(state, target);
 
   if (!preview.ok) {
@@ -469,6 +512,9 @@ export function getActionPreview(
   const frontInvestment = action.id === 'invest_front'
     ? previewFrontInvestment(state, target)
     : undefined;
+  const frontExposure = action.id === 'lay_low' && target?.type === 'front'
+    ? previewFrontLayLow(state, target)
+    : undefined;
   const secretDiscovery = previewSecretDiscovery(state, {
     actionId: action.id,
     assignedOperativeId,
@@ -480,19 +526,21 @@ export function getActionPreview(
       ? ledgerUse.effects
       : frontInvestment?.ok
         ? frontInvestment.effects
-        : getAdjustedEffects(
-            action,
-            assignedOperativeId,
-            state,
-            target,
-            modifiers,
-          );
+        : frontExposure
+          ? FRONT_LAY_LOW_EFFECTS
+          : getAdjustedEffects(
+              action,
+              assignedOperativeId,
+              state,
+              target,
+              modifiers,
+            );
   const riskChance = contactUse?.riskChance ?? ledgerUse?.riskChance ?? baseRiskChance;
 
   return {
     actionId: action.id,
     label: action.label,
-    assignment: action.assignment,
+    assignment: getEffectiveAssignment(action, target),
     requiresTarget: action.requiresTarget,
     commandCost: action.commandCost,
     resourceCost: action.resourceCost,
@@ -502,6 +550,8 @@ export function getActionPreview(
         ? ledgerUse.cost.resources
         : frontInvestment?.ok
           ? frontInvestment.cost
+          : frontExposure
+            ? FRONT_LAY_LOW_RESOURCE_COST
           : getAdjustedResourceCost(
               action,
               assignedOperativeId,
@@ -551,6 +601,7 @@ export function getActionPreview(
       ? contactMetricDeltaToView(contactUse.resolvedContactEffects)
       : undefined,
     frontInvestment,
+    frontExposure,
     secretDiscovery,
   };
 }
@@ -593,6 +644,12 @@ export function selectAssignmentOptions(
   actionId: ActionId,
   target?: ActionTarget,
 ): OperativeOptionView[] {
+  const action = getActionDefinition(actionId);
+
+  if (action && getEffectiveAssignment(action, target) === 'none') {
+    return [];
+  }
+
   return state.operatives.map((operative) =>
     getOperativeOptionView(state, actionId, operative, target),
   );
@@ -648,6 +705,10 @@ export function getAdjustedEffects(
   target?: ActionTarget,
   operativeModifiers?: OperativeModifierResult,
 ): PressureDelta {
+  if (action.id === 'lay_low' && target?.type === 'front') {
+    return { ...FRONT_LAY_LOW_EFFECTS };
+  }
+
   const modifiers =
     operativeModifiers ??
     (state
@@ -745,6 +806,10 @@ export function getAdjustedResourceCost(
   target?: ActionTarget,
   operativeModifiers?: OperativeModifierResult,
 ): number {
+  if (action.id === 'lay_low' && target?.type === 'front') {
+    return FRONT_LAY_LOW_RESOURCE_COST;
+  }
+
   const modifiers =
     operativeModifiers ??
     (state
@@ -945,7 +1010,7 @@ function getOperativeOptionView(
 ): OperativeOptionView {
   const action = requireAction(actionId);
 
-  if (action.assignment === 'none') {
+  if (getEffectiveAssignment(action, target) === 'none') {
     return {
       id: operative.id,
       name: getOperativeDefinition(operative.id)?.name ?? operative.id,
@@ -998,7 +1063,7 @@ function getOperativeAssignmentPreview(
     target?.type === 'recruit' ? getOperativeDefinition(target.id) : undefined;
   const definition = operative ? getOperativeDefinition(operative.id) : recruitDefinition;
 
-  if (!definition) {
+  if (!definition || (target?.type !== 'recruit' && getEffectiveAssignment(action, target) === 'none')) {
     return undefined;
   }
 
@@ -1113,13 +1178,48 @@ function getContactUseCost(
   return preview.ok ? preview.cost[costId] : 0;
 }
 
-function getFrontInvestmentCost(state: GameState, target: ActionTarget | undefined): number {
+function getFrontInvestmentCost(
+  state: GameState,
+  actionId: ActionId,
+  target: ActionTarget | undefined,
+): number {
+  if (actionId !== 'invest_front') {
+    return 0;
+  }
+
   if (target?.type !== 'front_opportunity' && target?.type !== 'front') {
     return 0;
   }
 
   const preview = previewFrontInvestment(state, target);
   return preview.ok ? preview.cost : 0;
+}
+
+function getEffectiveAssignment(
+  action: ActionDefinition,
+  target?: ActionTarget,
+): ActionAssignmentRule {
+  return action.id === 'lay_low' && target?.type === 'front' ? 'none' : action.assignment;
+}
+
+function previewFrontLayLow(
+  state: GameState,
+  target: Extract<ActionTarget, { type: 'front' }>,
+): FrontExposurePreview | undefined {
+  const front = state.fronts[target.id];
+  const definition = front ? getFrontDefinition(front.definitionId) : undefined;
+
+  if (!front || !definition || !front.active) {
+    return undefined;
+  }
+
+  return {
+    frontId: front.id,
+    frontName: definition.name,
+    currentExposure: front.exposure,
+    exposureDelta: FRONT_LAY_LOW_EXPOSURE_DELTA,
+    projectedExposure: clampFrontExposure(front.exposure + FRONT_LAY_LOW_EXPOSURE_DELTA),
+  };
 }
 
 function getQueuedContactMetricCost(

@@ -15,6 +15,8 @@ export {
   calculateRiskChance,
   applyDistrictModifiers,
   applyVenueModifiers,
+  FRONT_LAY_LOW_EXPOSURE_DELTA,
+  FRONT_LAY_LOW_RESOURCE_COST,
   getActionPreview,
   getAdjustedEffects,
   getAdjustedResourceCost,

@@ -701,6 +701,85 @@ describe('queueOrder', () => {
     });
   });
 
+  it('queues Front-targeted Lay Low without an operative', () => {
+    const state = newGame({ seed: 'FRONT-LAY-LOW-QUEUE' });
+    const result = queueOrder(state, {
+      actionId: 'lay_low',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+
+    if (!result.ok) {
+      fail(`Expected Front Lay Low order, got ${result.error}`);
+      return;
+    }
+
+    expect(result.order).toEqual({
+      id: 'order_1_1',
+      actionId: 'lay_low',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+    expect(result.state.operatives).toEqual(state.operatives);
+  });
+
+  it('rejects Front-targeted Lay Low for unowned, inactive, or assigned-operative requests', () => {
+    const state = newGame({ seed: 'FRONT-LAY-LOW-QUEUE-INVALID' });
+    const inactive = {
+      ...state,
+      fronts: {
+        ...state.fronts,
+        front_pale_circuit: {
+          ...state.fronts.front_pale_circuit!,
+          active: false,
+        },
+      },
+    };
+
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'lay_low',
+        target: {
+          type: 'front',
+          id: 'front_black_clinic',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_not_found',
+    });
+    expect(
+      getOrderAvailability(inactive, {
+        actionId: 'lay_low',
+        target: {
+          type: 'front',
+          id: 'front_pale_circuit',
+        },
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_inactive',
+    });
+    expect(
+      queueOrder(state, {
+        actionId: 'lay_low',
+        assignedOperativeId: 'op_mara_voss',
+        target: {
+          type: 'front',
+          id: 'front_pale_circuit',
+        },
+      }),
+    ).toEqual({
+      ok: false,
+      state,
+      error: 'operative_not_allowed',
+    });
+  });
+
   it('rejects duplicate candidate recruitment', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const target = {

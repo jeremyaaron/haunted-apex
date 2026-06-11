@@ -399,6 +399,28 @@
                 }
               }
 
+              @if (action.frontExposure; as frontExposure) {
+                <div class="selection-strip front-investment-preview">
+                  <div>
+                    <span>Front exposure</span>
+                    <strong>{{ frontExposure.frontName }}</strong>
+                  </div>
+                  <p>Cool the operation without tying up an operative.</p>
+                  <div class="ledger-preview-rows">
+                    <span class="negative">-300 Resources</span>
+                    @for (effect of deltaRows(action.adjustedEffects); track effect.id) {
+                      <span [class.negative]="effect.value < 0">
+                        {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                      </span>
+                    }
+                    <span class="negative">
+                      Exposure {{ frontExposure.currentExposure }}
+                      → {{ frontExposure.projectedExposure }}
+                    </span>
+                  </div>
+                </div>
+              }
+
               <button
                 type="button"
                 class="queue-button"
