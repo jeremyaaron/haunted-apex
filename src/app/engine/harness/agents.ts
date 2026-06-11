@@ -57,7 +57,7 @@ export const RANDOM_BOT: StrategyAgent = {
   id: 'random',
   label: 'RandomBot',
   chooseOrder: (_state, options, context) =>
-    options.length > 0 ? context.pick(options) : undefined,
+    chooseRandomActionOrder(options, context),
   chooseEventChoice: (_state, options, context) =>
     options.length > 0 ? context.pick(options) : undefined,
 };
@@ -222,6 +222,18 @@ function chooseHighestScoringOrder(
       scoreTarget(option)
     );
   });
+}
+
+function chooseRandomActionOrder(
+  options: readonly LegalOrderOption[],
+  context: AgentDecisionContext,
+): LegalOrderOption | undefined {
+  if (options.length === 0) {
+    return undefined;
+  }
+
+  const actionId = context.pick([...new Set(options.map((option) => option.actionId))]);
+  return context.pick(options.filter((option) => option.actionId === actionId));
 }
 
 function scoreAggressiveTarget(state: GameState, option: LegalOrderOption): number {
@@ -664,10 +676,10 @@ function scoreAggressiveContactOrder(state: GameState, option: LegalOrderOption)
 
   const delta = contact.resolvedDelta;
   const contactDelta = contact.resolvedContactEffects;
-  const dominionBias = (delta.dominion ?? 0) * 11;
-  const intelBias = (delta.intel ?? 0) * 2.6;
-  const pressureBias = contact.kind === 'pressure' ? 46 : 0;
-  const serviceBias = contact.kind === 'request_service' ? 24 : 0;
+  const dominionBias = (delta.dominion ?? 0) * 8;
+  const intelBias = (delta.intel ?? 0) * 1.6;
+  const pressureBias = contact.kind === 'pressure' ? 22 : 0;
+  const serviceBias = contact.kind === 'request_service' ? 18 : 0;
   const victoryBias =
     state.pressures.dominion + (delta.dominion ?? 0) >=
     DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
@@ -676,9 +688,12 @@ function scoreAggressiveContactOrder(state: GameState, option: LegalOrderOption)
   const heatBrake =
     state.pressures.heat >= 85 && (delta.heat ?? 0) >= 0 ? -70 : 0;
   const relationshipCost =
-    (contactDelta.trust ?? 0) * 0.7 -
-    Math.max(0, contactDelta.volatility ?? 0) * 0.45 -
-    Math.max(0, contactDelta.exposure ?? 0) * 0.3;
+    (contactDelta.trust ?? 0) * 0.8 -
+    Math.max(0, contactDelta.volatility ?? 0) * 0.8 -
+    Math.max(0, contactDelta.exposure ?? 0) * 0.5;
+  const debtPenalty = contact.ledgerEffects.some((effect) => effect.kind === 'debt') ? -24 : 0;
+  const repeatPenalty = getContactRepeatPenalty(state, contact.contactId, contact.id, 8);
+  const burnPenalty = getContactBurnPenalty(state, contact.contactId, contactDelta, 120);
 
   return (
     dominionBias +
@@ -687,7 +702,10 @@ function scoreAggressiveContactOrder(state: GameState, option: LegalOrderOption)
     serviceBias +
     victoryBias +
     heatBrake +
-    relationshipCost
+    relationshipCost +
+    debtPenalty +
+    repeatPenalty +
+    burnPenalty
   );
 }
 
@@ -743,10 +761,10 @@ function scoreGreedyContactOrder(state: GameState, option: LegalOrderOption): nu
   const delta = contact.resolvedDelta;
   const contactDelta = contact.resolvedContactEffects;
   const cashBias = (delta.resources ?? 0) * 0.05;
-  const intelBias = (delta.intel ?? 0) * 8;
-  const leverageBias = (contactDelta.leverage ?? 0) * 4.5;
-  const pressureBias = contact.kind === 'pressure' ? 38 : 0;
-  const serviceBias = contact.kind === 'request_service' ? 16 : 0;
+  const intelBias = (delta.intel ?? 0) * 4;
+  const leverageBias = (contactDelta.leverage ?? 0) * 2.2;
+  const pressureBias = contact.kind === 'pressure' ? 6 : 0;
+  const serviceBias = contact.kind === 'request_service' ? 20 : 0;
   const spendPenalty =
     contact.cost.resources > 0
       ? Math.max(0, contact.cost.resources - 500) * -0.025
@@ -755,8 +773,12 @@ function scoreGreedyContactOrder(state: GameState, option: LegalOrderOption): nu
     state.pressures.heat + (delta.heat ?? 0) >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
       ? -10_000
       : 0;
-  const volatilityTolerance = Math.max(0, contactDelta.volatility ?? 0) * -0.35;
-  const trustTolerance = Math.min(0, contactDelta.trust ?? 0) * 0.25;
+  const ruinPenalty =
+    state.pressures.ruin >= 30 && (delta.ruin ?? 0) > 0 ? (delta.ruin ?? 0) * -10 : 0;
+  const volatilityTolerance = Math.max(0, contactDelta.volatility ?? 0) * -1.1;
+  const trustTolerance = Math.min(0, contactDelta.trust ?? 0) * 0.8;
+  const repeatPenalty = getContactRepeatPenalty(state, contact.contactId, contact.id, 12);
+  const burnPenalty = getContactBurnPenalty(state, contact.contactId, contactDelta, 180);
 
   return (
     cashBias +
@@ -766,8 +788,11 @@ function scoreGreedyContactOrder(state: GameState, option: LegalOrderOption): nu
     serviceBias +
     spendPenalty +
     heatLossPenalty +
+    ruinPenalty +
     volatilityTolerance +
-    trustTolerance
+    trustTolerance +
+    repeatPenalty +
+    burnPenalty
   );
 }
 
@@ -825,6 +850,57 @@ function scoreOperatorContactOrder(state: GameState, option: LegalOrderOption): 
     exposurePenalty +
     debtPenalty
   );
+}
+
+function getContactRepeatPenalty(
+  state: GameState,
+  contactId: keyof GameState['contacts'],
+  optionId: string,
+  scale: number,
+): number {
+  const contact = state.contacts[contactId];
+
+  if (!contact) {
+    return 0;
+  }
+
+  const repeatedOptionCount = contact.recentInteractions.filter(
+    (interaction) => interaction.optionId === optionId,
+  ).length;
+
+  return -(contact.recentInteractions.length * scale + repeatedOptionCount * scale);
+}
+
+function getContactBurnPenalty(
+  state: GameState,
+  contactId: keyof GameState['contacts'],
+  delta: {
+    trust?: number;
+    leverage?: number;
+    volatility?: number;
+    exposure?: number;
+  },
+  penalty: number,
+): number {
+  const contact = state.contacts[contactId];
+
+  if (!contact) {
+    return 0;
+  }
+
+  const projectedTrust = clampScoreMetric(contact.trust + (delta.trust ?? 0));
+  const projectedVolatility = clampScoreMetric(contact.volatility + (delta.volatility ?? 0));
+  const projectedExposure = clampScoreMetric(contact.exposure + (delta.exposure ?? 0));
+  const burns =
+    projectedExposure >= 100 ||
+    projectedVolatility >= 100 ||
+    (projectedTrust <= 0 && projectedVolatility >= 75);
+
+  return burns ? -penalty : 0;
+}
+
+function clampScoreMetric(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function scoreAggressiveEventChoice(choice: EventChoiceDefinition): number {

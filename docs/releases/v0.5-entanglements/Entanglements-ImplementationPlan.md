@@ -1225,6 +1225,68 @@ Harness:
 compare win rates, loss causes, Contact use rates, event rates, burned counts
 ```
 
+### Completion Record
+
+Completed June 10, 2026:
+
+- Added a real Contact burn threshold to the shared Contact metric pipeline.
+  - Contacts now burn when Exposure or Volatility reaches the cap.
+  - Contacts also burn when Trust collapses to zero while Volatility is already high.
+  - Burned Contacts keep using the existing disabled/burned UI and selector behavior.
+- Added focused Contact metric tests for burn thresholds.
+- Adjusted harness agent behavior instead of changing the locked universal `Cultivate` and
+  `Pressure` values:
+  - `AggressiveBot` still values Contact services, but discounts debt-heavy,
+    repeated, and burn-risk moves.
+  - `GreedyBot` still values resources, Intel, and leverage, but no longer treats repeated
+    `Pressure` as a dominant strategy.
+  - `RandomBot` now chooses a random action first, then a legal target/assignment variant,
+    so target-rich actions do not dominate solely because they create more legal rows.
+- Left Contact event weights unchanged. Final sampled event rates were inside the
+  0-2 Contact events per run target.
+- Left Contact service content unchanged. The issue was primarily agent valuation and the
+  missing burn consequence, not authored service math.
+- Final sampled 100-runs-per-agent harness snapshot using seed prefix
+  `V05-PHASE10-BASELINE`:
+
+```text
+Random:           0% wins, 0 incomplete, avg 6.19 weeks, 2.30 Contact uses/run
+Aggressive:      56% wins, 0 incomplete, avg 5.01 weeks, 1.00 Contact uses/run
+Cautious:         0% wins, 0 incomplete, avg 7.82 weeks, 0.28 Contact uses/run
+Greedy:          52% wins, 0 incomplete, avg 7.36 weeks, 0.69 Contact uses/run
+Operator / Sane: 62% wins, 0 incomplete, avg 6.06 weeks, 2.38 Contact uses/run
+```
+
+- Notes from the sampled harness:
+  - Operator remained in the 55-75% target range on the baseline seed.
+  - Aggressive and Greedy remained viable and volatile.
+  - Contact use averaged 1.33 uses/run across all agents, inside the 1-3 target.
+  - Random remained below the aspirational 5-12% win target, but this is consistent with
+    the v0.4 baseline being much lower than that target. The game was not globally softened
+    just to force naive random wins.
+  - Burned Contact counts remained rare in 100-run harness samples, but the burn path is now
+    reachable through normal Contact metric changes and covered by tests.
+
+Verification:
+
+```bash
+npm test -- --watch=false --include src/app/engine/contacts/contact-metrics.spec.ts --include src/app/engine/harness/simulation-harness.spec.ts
+npm test -- --watch=false
+npm run build
+npm run check:docs
+git diff --check
+```
+
+Results:
+
+```text
+Focused Contact/harness specs: 25 passed.
+Full suite:                    382 passed.
+Build:                         passed.
+Docs check:                    passed.
+Whitespace check:              passed.
+```
+
 ### Review Gate
 
 Manual and harness review: confirm Contacts are useful, risky, and not mandatory.

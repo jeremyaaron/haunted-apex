@@ -39,4 +39,41 @@ describe('contact metrics', () => {
     expect(original.trust).toBe(5);
     expect(original.leverage).toBe(95);
   });
+
+  it('burns contacts when volatility, exposure, or volatile trust collapse hits the limit', () => {
+    expect(
+      applyContactMetricDelta(contact({ volatility: 94 }), {
+        volatility: 8,
+      }).burned,
+    ).toBeTrue();
+    expect(
+      applyContactMetricDelta(contact({ exposure: 98 }), {
+        exposure: 4,
+      }).burned,
+    ).toBeTrue();
+    expect(
+      applyContactMetricDelta(contact({ trust: 3, volatility: 78 }), {
+        trust: -6,
+      }).burned,
+    ).toBeTrue();
+    expect(
+      applyContactMetricDelta(contact({ trust: 3, volatility: 50 }), {
+        trust: -6,
+      }).burned,
+    ).toBeFalse();
+  });
 });
+
+function contact(overrides: Partial<ContactState>): ContactState {
+  return {
+    id: 'contact_veyra_lux',
+    trust: 45,
+    leverage: 20,
+    volatility: 40,
+    exposure: 30,
+    burned: false,
+    recentInteractions: [],
+    flags: {},
+    ...overrides,
+  };
+}
