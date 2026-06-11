@@ -20,6 +20,7 @@ export {
   getLedgerEntryDefinition,
   LEDGER_ENTRY_DEFINITIONS,
 } from './ledger-entries';
+export { FRONT_DEFINITIONS, getFrontDefinition } from './fronts';
 export { ROSTER_EVENTS } from './roster-events';
 export {
   getDistrictDefinition,

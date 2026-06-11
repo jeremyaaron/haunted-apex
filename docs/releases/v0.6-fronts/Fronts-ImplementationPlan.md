@@ -264,6 +264,56 @@ Unit tests:
 - Exposure clamp keeps values between 0 and 100.
 - Weekly yield helper adds level 2 bonus at level 2 only.
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Added Front domain contracts in `src/app/engine/model/fronts.ts`:
+  - `FrontDefinitionId`
+  - `FrontId`
+  - `FrontOpportunityId`
+  - `FrontOptionId`
+  - `FrontStatus`
+  - `FrontArchetype`
+  - `FrontRoleTag`
+  - `FrontDefinition`
+  - `FrontState`
+  - `FrontOpportunity`
+  - `FrontYieldHistoryEntry`
+- Added the six v0.6 Front definitions in `src/app/engine/content/fronts.ts`:
+  - The Pale Circuit
+  - Black Clinic
+  - Courier Line
+  - Zero Mercy Cut
+  - Shell Gallery
+  - Surveillance Den
+- Added the `getFrontDefinition` registry helper.
+- Added Front helper APIs in `src/app/engine/fronts/`:
+  - `deriveFrontStatus`
+  - `clampFrontExposure`
+  - `calculateFrontWeeklyYield`
+- Added model, content, and engine barrel exports.
+- Added focused tests for:
+  - content registry shape and lookups
+  - supported archetypes and role tags
+  - valid costs, level caps, exposure values, and pressure deltas
+  - preferred district and venue references
+  - status threshold derivation
+  - exposure clamping
+  - level 1 vs level 2 weekly yield calculation
+- No Front state was added to live `GameState`.
+- No save schema, storage key, action, new-game, UI, event, or harness behavior changed.
+
+Verification:
+
+```text
+Focused Front specs:      9 passed.
+Full Angular suite:       393 passed.
+App TypeScript check:     passed.
+Spec TypeScript check:    passed.
+Standard build:           passed.
+```
+
 ### Review Gate
 
 Confirm the content slice before wiring Fronts into `GameState`.

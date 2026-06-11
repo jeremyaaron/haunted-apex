@@ -43,6 +43,19 @@ export type {
   TurnPhase,
 } from './game-state';
 export type {
+  FrontArchetype,
+  FrontDefinition,
+  FrontDefinitionId,
+  FrontId,
+  FrontOpportunity,
+  FrontOpportunityId,
+  FrontOptionId,
+  FrontRoleTag,
+  FrontState,
+  FrontStatus,
+  FrontYieldHistoryEntry,
+} from './fronts';
+export type {
   LedgerConsumptionSource,
   LedgerDiscoveryProfile,
   LedgerEntry,
