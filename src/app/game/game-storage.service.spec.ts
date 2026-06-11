@@ -4,6 +4,7 @@ import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V05_STORAGE_KEY,
   LEGACY_V04_STORAGE_KEY,
   LEGACY_V03_STORAGE_KEY,
   LEGACY_V02_STORAGE_KEY,
@@ -24,7 +25,7 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips a complete v0.5 envelope through localStorage', () => {
+  it('round-trips a complete v0.6 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
@@ -42,6 +43,7 @@ describe('GameStorageService', () => {
 
   it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V05_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V04_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
@@ -49,6 +51,7 @@ describe('GameStorageService', () => {
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V05_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V04_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
@@ -70,6 +73,19 @@ describe('GameStorageService', () => {
       foundVersion: 2,
     });
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.5 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V05_STORAGE_KEY,
+      JSON.stringify(newGame({ seed: 'LEGACY' })),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 5,
+    });
+    expect(localStorage.getItem(LEGACY_V05_STORAGE_KEY)).toBeNull();
   });
 
   it('removes the v0.4 key and reports it incompatible', () => {
@@ -222,6 +238,42 @@ describe('GameStorageService', () => {
       flags: {
         introduced_by: 'night_market',
       },
+    };
+
+    service.saveCurrentRun(state);
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
+  });
+
+  it('round-trips Front state', () => {
+    const state = structuredClone(newGame({ seed: 'FRONT-STORAGE' }));
+    const paleCircuit = state.fronts.front_pale_circuit;
+
+    if (!paleCircuit) {
+      fail('Expected starting Pale Circuit Front');
+      return;
+    }
+
+    state.fronts.front_pale_circuit = {
+      ...paleCircuit,
+      level: 2,
+      exposure: 47,
+      flags: {
+        upgraded_by: 'phase_2_storage_spec',
+      },
+      yieldHistory: [
+        {
+          week: 2,
+          effects: {
+            dominion: 2,
+            resources: 400,
+          },
+          exposureDelta: 4,
+        },
+      ],
     };
 
     service.saveCurrentRun(state);
@@ -531,6 +583,30 @@ describe('GameStorageService', () => {
     expectLoadInvalid(inactiveMissingState);
     expectLoadInvalid(badMetric);
     expectLoadInvalid(malformedInteraction);
+  });
+
+  it('rejects malformed Front state', () => {
+    const missingFronts = structuredClone(newGame()) as Partial<GameState>;
+    const missingStartingFront = structuredClone(newGame());
+    const duplicateOwnedDefinition = structuredClone(newGame());
+    const malformedOpportunity = structuredClone(newGame());
+    const badExposure = structuredClone(newGame());
+    delete missingFronts.fronts;
+    delete (missingStartingFront.fronts as Partial<typeof missingStartingFront.fronts>)
+      .front_pale_circuit;
+    duplicateOwnedDefinition.fronts.front_black_clinic = {
+      ...duplicateOwnedDefinition.fronts.front_pale_circuit!,
+      id: 'front_black_clinic',
+    };
+    (malformedOpportunity.frontOpportunities[0] as { id: string }).id =
+      'front_opportunity_wrong';
+    badExposure.fronts.front_pale_circuit!.exposure = 101;
+
+    expectLoadInvalid(missingFronts as GameState);
+    expectLoadInvalid(missingStartingFront);
+    expectLoadInvalid(duplicateOwnedDefinition);
+    expectLoadInvalid(malformedOpportunity);
+    expectLoadInvalid(badExposure);
   });
 
   function expectLoadInvalid(state: GameState): void {

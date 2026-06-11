@@ -384,6 +384,56 @@ Unit tests:
 
 Confirm v0.6 new runs and persistence before adding player-facing actions.
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Added deterministic Front network generation through `generateFrontNetwork`.
+- New games now start with `The Pale Circuit` as an owned level 1 Front tied to:
+
+```text
+district_violet_ward
+venue_pale_circuit
+rival_nyx_ardent
+```
+
+- New games now generate four fixed seeded Front opportunities per run.
+- Generated opportunities exclude `front_pale_circuit`.
+- Generated opportunities enforce the required v0.6 coverage mix:
+  resources, intel or heat-control, and risky/high-reward.
+- `relatedRivalId` is stored on owned Fronts and opportunities only when a rival is
+  inferred from the generated district or venue context.
+- `GameState` now includes:
+
+```text
+fronts
+frontOpportunities
+```
+
+- Save schema is now `6`.
+- Current game version is now `0.6.0`.
+- Current persistence key is now:
+
+```text
+haunted-apex:v0.6:current-run
+```
+
+- Added `haunted-apex:v0.5:current-run` as the newest incompatible legacy key.
+- v0.5 saves are rejected with the v0.6 compatibility notice and removed.
+- Storage validation now rejects malformed Front state, duplicate owned Front definitions,
+  invalid opportunity IDs, opportunities that duplicate owned definitions, invalid Front
+  exposure, and saves missing the starting Pale Circuit Front.
+- Added focused tests for new-game Front initialization, deterministic opportunity
+  generation, coverage, related-rival storage, v0.6 save round-trips, v0.5 invalidation,
+  and malformed Front rejection.
+- Focused Phase 2 suite passed: 90 tests.
+- Full suite passed: 402 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed.
+- The production build with base href `/haunted-apex/` passed.
+- The structural documentation check passed for six release folders.
+- `git diff --check` passed.
+
 ## Phase 3: Front Targets, Legal Orders, and Invest Preview
 
 ### Objective

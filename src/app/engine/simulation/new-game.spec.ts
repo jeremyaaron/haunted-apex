@@ -3,11 +3,19 @@ import {
   DISTRICT_ZERO_COMMAND_POINTS,
   DISTRICT_ZERO_INITIAL_PRESSURES,
   DISTRICT_ZERO_MAX_WEEKS,
+  FRONT_DEFINITIONS,
+  getDistrictDefinition,
+  getVenueDefinition,
   getOperativeDefinition,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
 import { ACTIVE_CONTACT_COUNT, satisfiesContactCoverage } from '../contacts';
+import {
+  FRONT_OPPORTUNITY_COUNT,
+  satisfiesFrontOpportunityCoverage,
+  STARTING_FRONT_ID,
+} from '../fronts';
 import { newGame } from './new-game';
 
 describe('newGame', () => {
@@ -15,7 +23,7 @@ describe('newGame', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(5);
+    expect(state.schemaVersion).toBe(6);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
@@ -104,6 +112,39 @@ describe('newGame', () => {
         recentInteractions: [],
         flags: {},
       });
+    }
+  });
+
+  it('creates the starting Front and fixed Front opportunities', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const opportunityDefinitionIds = state.frontOpportunities.map(
+      (opportunity) => opportunity.definitionId,
+    );
+
+    expect(Object.keys(state.fronts)).toEqual([STARTING_FRONT_ID]);
+    expect(state.fronts.front_pale_circuit).toEqual(
+      jasmine.objectContaining({
+        id: 'front_pale_circuit',
+        definitionId: 'front_pale_circuit',
+        districtId: 'district_violet_ward',
+        venueId: 'venue_pale_circuit',
+        relatedRivalId: 'rival_nyx_ardent',
+        level: 1,
+        exposure: 12,
+      }),
+    );
+    expect(state.frontOpportunities.length).toBe(FRONT_OPPORTUNITY_COUNT);
+    expect(opportunityDefinitionIds).not.toContain(STARTING_FRONT_ID);
+    expect(satisfiesFrontOpportunityCoverage(FRONT_DEFINITIONS, opportunityDefinitionIds))
+      .toBeTrue();
+
+    for (const opportunity of state.frontOpportunities) {
+      const venue = opportunity.venueId ? getVenueDefinition(opportunity.venueId) : undefined;
+      const district = getDistrictDefinition(opportunity.districtId);
+
+      expect(opportunity.relatedRivalId)
+        .withContext(opportunity.id)
+        .toBe(venue?.controllingRivalId ?? district?.rivalId);
     }
   });
 
