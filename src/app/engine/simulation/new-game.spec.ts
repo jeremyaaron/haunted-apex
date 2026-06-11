@@ -1,4 +1,5 @@
 import {
+  CONTACT_DEFINITIONS,
   DISTRICT_ZERO_COMMAND_POINTS,
   DISTRICT_ZERO_INITIAL_PRESSURES,
   DISTRICT_ZERO_MAX_WEEKS,
@@ -6,6 +7,7 @@ import {
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
+import { ACTIVE_CONTACT_COUNT, satisfiesContactCoverage } from '../contacts';
 import { newGame } from './new-game';
 
 describe('newGame', () => {
@@ -13,7 +15,7 @@ describe('newGame', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(4);
+    expect(state.schemaVersion).toBe(5);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
@@ -84,6 +86,27 @@ describe('newGame', () => {
     expect(getOperativeDefinition(state.hirePool[0])?.name).toBe('Iris Vale');
   });
 
+  it('creates the active contact network', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+
+    expect(Object.keys(state.contacts).length).toBe(CONTACT_DEFINITIONS.length);
+    expect(state.activeContactIds.length).toBe(ACTIVE_CONTACT_COUNT);
+    expect(satisfiesContactCoverage(CONTACT_DEFINITIONS, state.activeContactIds)).toBeTrue();
+
+    for (const definition of CONTACT_DEFINITIONS) {
+      expect(state.contacts[definition.id]).toEqual({
+        id: definition.id,
+        trust: definition.baseTrust,
+        leverage: definition.baseLeverage,
+        volatility: definition.baseVolatility,
+        exposure: definition.baseExposure,
+        burned: false,
+        recentInteractions: [],
+        flags: {},
+      });
+    }
+  });
+
   it('creates identical state for the same seed', () => {
     const first = newGame({ seed: 'violet-ash-1047' });
     const second = newGame({ seed: 'VIOLET-ASH-1047' });
@@ -113,6 +136,9 @@ describe('newGame', () => {
       stressDelta: 1,
     });
     first.hirePool.pop();
+    first.activeContactIds.pop();
+    first.contacts[first.activeContactIds[0]].trust = 99;
+    first.contacts[first.activeContactIds[0]].flags['test_mutation'] = true;
     first.districts['district_violet_ward'].control = 99;
     first.rivals['rival_nyx_ardent'].pressure = 99;
     first.recentActivity.push({
@@ -128,6 +154,9 @@ describe('newGame', () => {
     expect(second.operatives[0].hiddenFlags['test_mutation']).toBeUndefined();
     expect(second.operatives[0].recentAssignments).toEqual([]);
     expect(second.hirePool.length).toBe(4);
+    expect(second.activeContactIds.length).toBe(ACTIVE_CONTACT_COUNT);
+    expect(second.contacts[second.activeContactIds[0]].trust).not.toBe(99);
+    expect(second.contacts[second.activeContactIds[0]].flags['test_mutation']).toBeUndefined();
     expect(second.districts['district_violet_ward'].control).toBe(12);
     expect(second.rivals['rival_nyx_ardent'].pressure).toBe(0);
     expect(second.recentActivity).toEqual([]);

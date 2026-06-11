@@ -113,6 +113,10 @@
                   @if (action.ledgerConsumesEntry) {
                     <span>Consumes Entry</span>
                   }
+                } @else if (action.contactCosts?.length) {
+                  @for (cost of action.contactCosts; track cost.id) {
+                    <span>{{ contactCostText(cost) }}</span>
+                  }
                 } @else {
                   <span>{{ action.adjustedResourceCost }} Resources</span>
                 }
@@ -147,7 +151,10 @@
                       option of action.targetOptions;
                       track targetOptionValue(option)
                     ) {
-                      <option [value]="targetOptionValue(option)">
+                      <option
+                        [value]="targetOptionValue(option)"
+                        [disabled]="targetOptionDisabled(option)"
+                      >
                         {{ targetOptionLabel(option) }}
                       </option>
                     }
@@ -255,6 +262,49 @@
                 }
               }
 
+              @if (action.contactUse; as contactUse) {
+                @if (contactUse.ok) {
+                  <div class="selection-strip contact-use-preview">
+                    <div>
+                      <span>Contact option</span>
+                      <strong>{{ contactUse.contactName }}</strong>
+                    </div>
+                    <p>
+                      {{ contactUse.label }} · {{ displayToken(contactUse.kind) }} · Risk
+                      {{ contactUse.riskChance }}%
+                    </p>
+                    <div class="ledger-preview-rows">
+                      @for (cost of contactUse.costRows; track cost.id) {
+                        <span class="negative">{{ contactCostText(cost) }}</span>
+                      }
+                      @for (effect of deltaRows(contactUse.effects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @for (effect of action.contactEffects ?? []; track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ contactMetricText(effect) }}
+                        </span>
+                      }
+                      @for (ledgerEffect of contactUse.ledgerEffects; track ledgerEffect.definitionId) {
+                        <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      }
+                      @for (rivalPressure of contactRivalPressureRows(contactUse); track rivalPressure) {
+                        <span class="negative">{{ rivalPressure }}</span>
+                      }
+                      @if (contactUse.quietTreatment) {
+                        <span>{{ contactUse.quietTreatment.operativeName }} Stress -10</span>
+                      }
+                    </div>
+                  </div>
+                } @else if (action.selectedTarget?.type === 'contact') {
+                  <p class="inline-warning">
+                    {{ actionUnavailableReason(contactUse.unavailableReason) }}
+                  </p>
+                }
+              }
+
               @if (action.ledgerUse; as ledgerUse) {
                 @if (ledgerUse.ok) {
                   <div class="selection-strip ledger-use-preview">
@@ -270,6 +320,12 @@
                       @for (effect of deltaRows(ledgerUse.effects); track effect.id) {
                         <span [class.negative]="effect.value < 0">
                           {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @for (effect of ledgerUse.relatedContactEffectRows; track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ ledgerUse.relatedContactName || 'Contact' }}
+                          {{ ledgerContactEffectText(effect) }}
                         </span>
                       }
                       @if (ledgerUse.consumesEntry) {
@@ -338,6 +394,15 @@
                       @for (row of eventLedgerRows(choice.id); track row.type + row.entryName) {
                         <b [class.unavailable]="!row.available">
                           {{ formatLedgerEventRow(row) }}
+                        </b>
+                      }
+                    </small>
+                  }
+                  @if (eventContactRows(choice.id).length > 0) {
+                    <small class="choice-ledger-effects">
+                      @for (row of eventContactRows(choice.id); track row.contactId + row.id) {
+                        <b [class.negative]="row.value < 0">
+                          {{ eventContactEffectText(row) }}
                         </b>
                       }
                     </small>
@@ -473,6 +538,11 @@
                     >{{ signed(delta.value) }} {{ pressureLabel(delta.id) }}</span
                   >
                 }
+                @for (effect of order.contactResolvedEffects ?? []; track effect.id) {
+                  <span [class.negative]="effect.value < 0">
+                    {{ contactMetricText(effect) }}
+                  </span>
+                }
               </div>
               <button type="button" class="secondary" (click)="removeOrder(order.id)">
                 Remove
@@ -539,11 +609,114 @@
         }
       </div>
 
+      <div class="contact-network">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Contact Network</p>
+            <h2>Entanglements</h2>
+          </div>
+          <span class="panel-count">{{ game.contacts().length }}</span>
+        </div>
+
+        <div class="contact-list">
+          @for (contact of game.contacts(); track contact.id) {
+            <article class="contact-card" [class.burned]="contact.burned">
+              <div class="contact-heading">
+                <div>
+                  <strong>{{ contact.name }}</strong>
+                  <span>{{ displayToken(contact.archetype) }}</span>
+                </div>
+                <b>{{ displayToken(contact.status) }}</b>
+              </div>
+
+              <div class="identity-tags">
+                @for (role of contact.roleTags; track role) {
+                  <span>{{ displayToken(role) }}</span>
+                }
+              </div>
+
+              <dl class="contact-associations">
+                @if (contact.associatedDistrictName) {
+                  <div>
+                    <dt>District</dt>
+                    <dd>{{ contact.associatedDistrictName }}</dd>
+                  </div>
+                }
+                @if (contact.associatedVenueName) {
+                  <div>
+                    <dt>Venue</dt>
+                    <dd>{{ contact.associatedVenueName }}</dd>
+                  </div>
+                }
+                @if (contact.associatedRivalName) {
+                  <div>
+                    <dt>Rival</dt>
+                    <dd>{{ contact.associatedRivalName }}</dd>
+                  </div>
+                }
+              </dl>
+
+              <div class="contact-metrics">
+                @for (metric of contact.metrics; track metric.id) {
+                  <div [class]="contactMetricToneClass(metric)">
+                    <span>{{ metric.label }}</span>
+                    <strong>{{ metric.value }}</strong>
+                  </div>
+                }
+              </div>
+
+              <div class="contact-services">
+                @for (service of contact.services; track service.id) {
+                  <div class="contact-service" [class.unavailable]="!service.available || contact.burned">
+                    <strong>{{ service.label }}</strong>
+                    <span>{{ service.costSummary }} · {{ service.effectSummary }}</span>
+                    @if (!service.available || contact.burned) {
+                      <small>
+                        {{
+                          contact.burned
+                            ? 'Contact burned'
+                            : contactServiceUnavailableReason(service)
+                        }}
+                      </small>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (contact.relatedLedgerEntries.length > 0) {
+                <div class="contact-ledger-links">
+                  <span>Linked Ledger</span>
+                  @for (entry of contact.relatedLedgerEntries; track entry.id) {
+                    <b>{{ displayToken(entry.kind) }}: {{ entry.name }} / {{ displayToken(entry.status) }}</b>
+                  }
+                </div>
+              }
+
+              @if (contact.recentInteractions.length > 0) {
+                <div class="contact-interactions">
+                  <span>Recent</span>
+                  @for (interaction of contact.recentInteractions.slice(-2); track $index) {
+                    <p>
+                      Week {{ interaction.week }} · {{ interaction.label }}
+                      @for (effect of interaction.effectRows; track effect.id) {
+                        <b [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ effect.label }}
+                        </b>
+                      }
+                    </p>
+                  }
+                </div>
+              }
+            </article>
+          }
+        </div>
+      </div>
+
       <div class="hire-pool">
         <div class="section-divider">
           <div>
             <p class="panel-label">Hire Pool</p>
-            <h2>Available Contacts</h2>
+            <h2>Available Recruits</h2>
           </div>
           <span class="panel-count">{{ game.hirePool().length }}</span>
         </div>
@@ -713,6 +886,12 @@
         <div>
           <dt>Context</dt>
           <dd>{{ entry.relatedContextLabel }}</dd>
+        </div>
+      }
+      @if (entry.relatedContactLabel) {
+        <div>
+          <dt>Contact</dt>
+          <dd>{{ entry.relatedContactLabel }}</dd>
         </div>
       }
     </dl>
@@ -885,7 +1064,7 @@
             }
             @if (entry.tags?.length) {
               <div class="log-tags">
-                @for (tag of entry.tags; track tag) {
+                @for (tag of entry.tags; track $index) {
                   <span>{{ tag }}</span>
                 }
               </div>
@@ -1007,6 +1186,26 @@
           Targeted Gather Intel can discover Secrets when the target has matching hidden
           opportunities. Work the Ledger spends a Command point to use an active Secret, settle a
           Debt, or call a Favor. Event choices show their Ledger consequences before you choose.
+        </p>
+      </details>
+
+      <details>
+        <summary>Entanglements and contacts</summary>
+        <p>
+          Each run exposes three active outside Contacts. Use Manage Contact to cultivate trust,
+          apply pressure, or request a specific service. Contacts do not use operative assignment;
+          choose one Contact option from the Target dropdown and queue it like any other command.
+        </p>
+        <p>
+          Trust and Leverage are useful reserves. Volatility and Exposure are danger signals.
+          Contact options can spend Resources, Intel, Trust, or Leverage, then change both city
+          pressures and Contact metrics. Preview chips show those costs and effects before you
+          commit.
+        </p>
+        <p>
+          Services can create Ledger entries, raise rival Pressure, or offer special help such as
+          Quiet Treatment for a stressed operative. Unavailable Contact options stay visible when
+          the relationship is not ready, but burned Contacts cannot be used.
         </p>
       </details>
 

@@ -32,3 +32,11 @@
 - [`BlackLedger-TDD.md`](releases/v0.4-the-black-ledger/BlackLedger-TDD.md): technical design.
 - [`BlackLedger-ImplementationPlan.md`](releases/v0.4-the-black-ledger/BlackLedger-ImplementationPlan.md): phased implementation plan.
 - [`BlackLedger-ReleaseNotes.md`](releases/v0.4-the-black-ledger/BlackLedger-ReleaseNotes.md): release notes draft.
+
+## v0.5.0: Entanglements
+
+- [`v0.5.md`](releases/v0.5-entanglements/v0.5.md): release direction and product scope.
+- [`v0.5A.md`](releases/v0.5-entanglements/v0.5A.md): locked mechanical decisions.
+- [`Entanglements-TDD.md`](releases/v0.5-entanglements/Entanglements-TDD.md): technical design.
+- [`Entanglements-ImplementationPlan.md`](releases/v0.5-entanglements/Entanglements-ImplementationPlan.md): phased implementation plan.
+- [`Entanglements-ReleaseNotes.md`](releases/v0.5-entanglements/Entanglements-ReleaseNotes.md): release notes draft.

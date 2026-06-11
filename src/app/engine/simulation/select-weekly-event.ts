@@ -1,5 +1,6 @@
 import { DISTRICT_ZERO_EVENTS, getLedgerEntryDefinition } from '../content';
 import type {
+  ContactId,
   DistrictId,
   EventDefinition,
   EventTag,
@@ -16,6 +17,12 @@ import {
   getOperativeEventEligibility,
   type OperativeEventEligibilityDiagnostics,
 } from './operative-events';
+import {
+  getContactEventEligibility,
+  getContactEventRepeatMultiplier,
+  selectContactForEvent,
+  type ContactEventEligibilityDiagnostics,
+} from './contact-events';
 
 const MAJOR_NEGATIVE_TAGS = new Set<EventTag>([
   'HEAT',
@@ -68,7 +75,13 @@ export type EventWeightModifierId =
   | 'active_secrets'
   | 'leverage_pressure'
   | 'active_favors'
-  | 'favor_comeback';
+  | 'favor_comeback'
+  | 'contact_eligible'
+  | 'contact_trusted'
+  | 'contact_pressured'
+  | 'contact_volatile'
+  | 'contact_exposed'
+  | 'contact_recent_interaction';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -82,6 +95,7 @@ export type EventWeightDiagnostics = {
   recentPenaltyApplied: boolean;
   finalWeight: number;
   operativeEligibility?: OperativeEventEligibilityDiagnostics;
+  contactEligibility?: ContactEventEligibilityDiagnostics;
 };
 
 export function selectWeeklyEvent(state: GameState): EventSelection {
@@ -111,9 +125,7 @@ export function getWeightedEvents(state: GameState): WeightedEvent[] {
   const context = buildEventWeightContext(state);
   const recentPenaltyTags = getRecentPenaltyTags(state);
 
-  return DISTRICT_ZERO_EVENTS.filter(
-    (event) => event.kind === 'city' || isEligibleOperativeEvent(state, event),
-  )
+  return DISTRICT_ZERO_EVENTS.filter((event) => isEligibleEvent(state, event))
     .map((event) => calculateWeightedEvent(state, event, context, recentPenaltyTags))
     .filter((candidate) => candidate.weight > 0);
 }
@@ -212,7 +224,13 @@ function calculateWeightedEvent(
     baseAndRuleWeight + contextModifiers.reduce((sum, modifier) => sum + modifier.amount, 0),
   );
   const recentPenaltyApplied = event.tags.some((tag) => recentPenaltyTags.has(tag));
-  const finalWeight = applyRecentPenalty(weightBeforePenalty, event, recentPenaltyTags);
+  const finalWeight = Math.max(
+    0,
+    Math.floor(
+      applyRecentPenalty(weightBeforePenalty, event, recentPenaltyTags) *
+        getContactEventRepeatMultiplier(state, event),
+    ),
+  );
 
   return {
     event,
@@ -225,6 +243,9 @@ function calculateWeightedEvent(
       finalWeight,
       ...(event.kind === 'operative'
         ? { operativeEligibility: getOperativeEventEligibility(state, event) }
+        : {}),
+      ...(event.contact
+        ? { contactEligibility: getContactEventEligibility(state, event) }
         : {}),
     },
   };
@@ -247,6 +268,39 @@ function getContextModifiers(
 
     if (operative && operative.recentAssignments.length > 0) {
       modifiers.push({ id: 'operative_recent_assignment', amount: 2 });
+    }
+  }
+
+  if (event.contact) {
+    const contactIds = getContactEventEligibility(state, event).eligibleContactIds;
+    modifiers.push({ id: 'contact_eligible', amount: 0 });
+
+    for (const contactId of contactIds) {
+      const contact = state.contacts[contactId];
+
+      if (!contact) {
+        continue;
+      }
+
+      if (contact.trust >= 55) {
+        modifiers.push({ id: 'contact_trusted', amount: 2 });
+      }
+
+      if (contact.leverage >= 45) {
+        modifiers.push({ id: 'contact_pressured', amount: 2 });
+      }
+
+      if (contact.volatility >= 60) {
+        modifiers.push({ id: 'contact_volatile', amount: 3 });
+      }
+
+      if (contact.exposure >= 55) {
+        modifiers.push({ id: 'contact_exposed', amount: 2 });
+      }
+
+      if (contact.recentInteractions.some((interaction) => interaction.week >= state.week - 2)) {
+        modifiers.push({ id: 'contact_recent_interaction', amount: 3 });
+      }
     }
   }
 
@@ -321,10 +375,19 @@ function getContextModifiers(
   return modifiers;
 }
 
-function isEligibleOperativeEvent(
-  state: GameState,
-  event: OperativeEventDefinition,
-): boolean {
+function isEligibleEvent(state: GameState, event: EventDefinition): boolean {
+  if (event.contact && !getContactEventEligibility(state, event).eligible) {
+    return false;
+  }
+
+  if (event.kind !== 'operative') {
+    return true;
+  }
+
+  return isEligibleOperativeEvent(state, event);
+}
+
+function isEligibleOperativeEvent(state: GameState, event: OperativeEventDefinition): boolean {
   return getOperativeEventEligibility(state, event).eligible;
 }
 
@@ -334,6 +397,7 @@ function createSelection(
   rng: RngState,
 ): EventSelection {
   const selectedLedgerEntry = selectLedgerEntryForEvent(state, selected.event);
+  const selectedContactId = selectContactForEvent(state, selected.event);
 
   return {
     definition: selected.event,
@@ -344,6 +408,7 @@ function createSelection(
       definitionId: selected.event.id,
       week: state.week,
       ...(selectedLedgerEntry ? { selectedLedgerEntryId: selectedLedgerEntry.id } : {}),
+      ...(selectedContactId ? { selectedContactId } : {}),
     },
   };
 }

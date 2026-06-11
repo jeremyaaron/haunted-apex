@@ -3,6 +3,7 @@ import {
   advanceWeek,
   buildRunSummary,
   getActionPreview,
+  getContactDefinition,
   getCommandPointsRemaining,
   getEventDefinition,
   getEventChoiceAvailability,
@@ -16,6 +17,7 @@ import {
   removeQueuedOrder,
   resolveEventChoice,
   selectActionCards,
+  selectActiveContacts,
   selectAssignmentOptions,
   selectActionTargetOptions,
   selectLedgerPanelView,
@@ -29,6 +31,7 @@ import {
   type ActionPreview,
   type ActionTarget,
   type ActionTargetOption,
+  type ContactView,
   type EventChoiceAvailability,
   type EventChoicePreview,
   type GameState,
@@ -48,7 +51,7 @@ import {
 } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected save from v0.3.x. v0.4.0 - The Black Ledger changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.5.0 - Entanglements changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',
@@ -72,6 +75,7 @@ export class GameFacade {
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
+  readonly contacts = computed<ContactView[]>(() => selectActiveContacts(this.stateSignal()));
   readonly runSummary = computed<RunSummaryReport | undefined>(() => {
     const state = this.stateSignal();
 
@@ -284,11 +288,13 @@ function renderPendingEventText(state: GameState, text: string): string {
   const selectedLedgerDefinition = selectedLedgerEntry
     ? getLedgerEntryDefinition(selectedLedgerEntry.definitionId)
     : undefined;
+  const selectedContactDefinition = state.pendingEvent?.selectedContactId
+    ? getContactDefinition(state.pendingEvent.selectedContactId)
+    : undefined;
 
-  return text.replaceAll(
-    '{ledgerEntryName}',
-    selectedLedgerDefinition?.name ?? 'Ledger Entry',
-  );
+  return text
+    .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
+    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact');
 }
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {

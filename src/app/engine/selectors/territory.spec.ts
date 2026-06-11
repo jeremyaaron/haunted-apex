@@ -258,9 +258,15 @@ describe('territory selectors', () => {
 });
 
 function targetKey(target: ActionTarget): string {
-  return target.type === 'ledger'
-    ? `ledger:${target.entryId}:${target.useOptionId}`
-    : `${target.type}:${target.id}`;
+  if (target.type === 'ledger') {
+    return `ledger:${target.entryId}:${target.useOptionId}`;
+  }
+
+  if (target.type === 'contact') {
+    return `contact:${target.contactId}:${target.optionId}`;
+  }
+
+  return `${target.type}:${target.id}`;
 }
 
 function withInactiveRival(rivalId: 'rival_nyx_ardent' | 'rival_knox_marrow'): GameState {

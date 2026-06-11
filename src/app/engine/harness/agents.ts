@@ -57,7 +57,7 @@ export const RANDOM_BOT: StrategyAgent = {
   id: 'random',
   label: 'RandomBot',
   chooseOrder: (_state, options, context) =>
-    options.length > 0 ? context.pick(options) : undefined,
+    chooseRandomActionOrder(options, context),
   chooseEventChoice: (_state, options, context) =>
     options.length > 0 ? context.pick(options) : undefined,
 };
@@ -101,7 +101,8 @@ export const CAUTIOUS_BOT: StrategyAgent = {
       (option) =>
         scoreCautiousTarget(state, option) +
         scoreCautiousRoster(state, option) +
-        scoreCautiousLedgerOrder(state, option),
+        scoreCautiousLedgerOrder(state, option) +
+        scoreCautiousContactOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -127,7 +128,8 @@ export const GREEDY_BOT: StrategyAgent = {
       (option) =>
         scoreGreedyTarget(state, option) +
         scoreGreedyRoster(state, option) +
-        scoreGreedyLedgerOrder(state, option),
+        scoreGreedyLedgerOrder(state, option) +
+        scoreGreedyContactOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -155,7 +157,8 @@ export const OPERATOR_BOT: StrategyAgent = {
         ) +
         scoreOperatorTarget(state, option) +
         scoreOperatorRoster(state, option) +
-        scoreOperatorLedgerOrder(state, option),
+        scoreOperatorLedgerOrder(state, option) +
+        scoreOperatorContactOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
@@ -221,12 +224,25 @@ function chooseHighestScoringOrder(
   });
 }
 
+function chooseRandomActionOrder(
+  options: readonly LegalOrderOption[],
+  context: AgentDecisionContext,
+): LegalOrderOption | undefined {
+  if (options.length === 0) {
+    return undefined;
+  }
+
+  const actionId = context.pick([...new Set(options.map((option) => option.actionId))]);
+  return context.pick(options.filter((option) => option.actionId === actionId));
+}
+
 function scoreAggressiveTarget(state: GameState, option: LegalOrderOption): number {
   return (
     (option.preview.localImpact?.controlGain ?? 0) * 1.5 +
     (option.preview.rivalAttention ? 2 : 0) +
     scoreAggressiveRoster(option) +
-    scoreAggressiveLedgerOrder(state, option)
+    scoreAggressiveLedgerOrder(state, option) +
+    scoreAggressiveContactOrder(state, option)
   );
 }
 
@@ -649,6 +665,242 @@ function scoreOperatorLedgerOrder(state: GameState, option: LegalOrderOption): n
       : 0;
 
   return heatRelief + debtBias + favorSurvival + dominionBias + riskPenalty;
+}
+
+function scoreAggressiveContactOrder(state: GameState, option: LegalOrderOption): number {
+  const contact = option.preview.contactUse;
+
+  if (!contact?.ok) {
+    return 0;
+  }
+
+  const delta = contact.resolvedDelta;
+  const contactDelta = contact.resolvedContactEffects;
+  const dominionBias = (delta.dominion ?? 0) * 8;
+  const intelBias = (delta.intel ?? 0) * 1.6;
+  const pressureBias = contact.kind === 'pressure' ? 22 : 0;
+  const serviceBias = contact.kind === 'request_service' ? 18 : 0;
+  const victoryBias =
+    state.pressures.dominion + (delta.dominion ?? 0) >=
+    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
+      ? 90
+      : 0;
+  const heatBrake =
+    state.pressures.heat >= 85 && (delta.heat ?? 0) >= 0 ? -70 : 0;
+  const relationshipCost =
+    (contactDelta.trust ?? 0) * 0.8 -
+    Math.max(0, contactDelta.volatility ?? 0) * 0.8 -
+    Math.max(0, contactDelta.exposure ?? 0) * 0.5;
+  const debtPenalty = contact.ledgerEffects.some((effect) => effect.kind === 'debt') ? -24 : 0;
+  const repeatPenalty = getContactRepeatPenalty(state, contact.contactId, contact.id, 8);
+  const burnPenalty = getContactBurnPenalty(state, contact.contactId, contactDelta, 120);
+
+  return (
+    dominionBias +
+    intelBias +
+    pressureBias +
+    serviceBias +
+    victoryBias +
+    heatBrake +
+    relationshipCost +
+    debtPenalty +
+    repeatPenalty +
+    burnPenalty
+  );
+}
+
+function scoreCautiousContactOrder(state: GameState, option: LegalOrderOption): number {
+  const contact = option.preview.contactUse;
+
+  if (!contact?.ok) {
+    return 0;
+  }
+
+  const delta = contact.resolvedDelta;
+  const contactDelta = contact.resolvedContactEffects;
+  const cultivateBias = contact.kind === 'cultivate' ? 22 : 0;
+  const debtPenalty = contact.ledgerEffects.some((effect) => effect.kind === 'debt') ? -42 : 0;
+  const heatRelief =
+    state.pressures.heat >= 65 && (delta.heat ?? 0) < 0 ? Math.abs(delta.heat ?? 0) * 11 : 0;
+  const loyaltyRelief =
+    state.pressures.loyalty <= 42 && (delta.loyalty ?? 0) > 0 ? (delta.loyalty ?? 0) * 9 : 0;
+  const ruinRelief =
+    state.pressures.ruin >= 18 && (delta.ruin ?? 0) < 0 ? Math.abs(delta.ruin ?? 0) * 10 : 0;
+  const trustBias = (contactDelta.trust ?? 0) * 2.2;
+  const volatilityBias = (contactDelta.volatility ?? 0) * -2.4;
+  const exposureBias = (contactDelta.exposure ?? 0) * -1.5;
+  const riskPenalty = contact.riskChance * -0.55;
+  const reservePenalty =
+    contact.cost.resources > 0 && state.pressures.resources - contact.cost.resources < 1800
+      ? -55
+      : 0;
+  const quietTreatmentBias = contact.quietTreatment ? 58 : 0;
+
+  return (
+    cultivateBias +
+    debtPenalty +
+    heatRelief +
+    loyaltyRelief +
+    ruinRelief +
+    trustBias +
+    volatilityBias +
+    exposureBias +
+    riskPenalty +
+    reservePenalty +
+    quietTreatmentBias
+  );
+}
+
+function scoreGreedyContactOrder(state: GameState, option: LegalOrderOption): number {
+  const contact = option.preview.contactUse;
+
+  if (!contact?.ok) {
+    return 0;
+  }
+
+  const delta = contact.resolvedDelta;
+  const contactDelta = contact.resolvedContactEffects;
+  const cashBias = (delta.resources ?? 0) * 0.05;
+  const intelBias = (delta.intel ?? 0) * 4;
+  const leverageBias = (contactDelta.leverage ?? 0) * 2.2;
+  const pressureBias = contact.kind === 'pressure' ? 6 : 0;
+  const serviceBias = contact.kind === 'request_service' ? 20 : 0;
+  const spendPenalty =
+    contact.cost.resources > 0
+      ? Math.max(0, contact.cost.resources - 500) * -0.025
+      : 0;
+  const heatLossPenalty =
+    state.pressures.heat + (delta.heat ?? 0) >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+      ? -10_000
+      : 0;
+  const ruinPenalty =
+    state.pressures.ruin >= 30 && (delta.ruin ?? 0) > 0 ? (delta.ruin ?? 0) * -10 : 0;
+  const volatilityTolerance = Math.max(0, contactDelta.volatility ?? 0) * -1.1;
+  const trustTolerance = Math.min(0, contactDelta.trust ?? 0) * 0.8;
+  const repeatPenalty = getContactRepeatPenalty(state, contact.contactId, contact.id, 12);
+  const burnPenalty = getContactBurnPenalty(state, contact.contactId, contactDelta, 180);
+
+  return (
+    cashBias +
+    intelBias +
+    leverageBias +
+    pressureBias +
+    serviceBias +
+    spendPenalty +
+    heatLossPenalty +
+    ruinPenalty +
+    volatilityTolerance +
+    trustTolerance +
+    repeatPenalty +
+    burnPenalty
+  );
+}
+
+function scoreOperatorContactOrder(state: GameState, option: LegalOrderOption): number {
+  const contact = option.preview.contactUse;
+
+  if (!contact?.ok) {
+    return 0;
+  }
+
+  const pressureScore = scoreOperatorPressureMove(
+    state.pressures,
+    contact.resolvedDelta,
+    contact.riskChance,
+  );
+  const contactDelta = contact.resolvedContactEffects;
+  const heatRelief =
+    state.pressures.heat >= 72 && (contact.resolvedDelta.heat ?? 0) < 0
+      ? 130 + Math.abs(contact.resolvedDelta.heat ?? 0) * 9
+      : 0;
+  const loyaltyRelief =
+    state.pressures.loyalty <= 38 && (contact.resolvedDelta.loyalty ?? 0) > 0
+      ? 80 + (contact.resolvedDelta.loyalty ?? 0) * 8
+      : 0;
+  const ruinRelief =
+    state.pressures.ruin >= 20 && (contact.resolvedDelta.ruin ?? 0) < 0
+      ? 72 + Math.abs(contact.resolvedDelta.ruin ?? 0) * 8
+      : 0;
+  const intelNeed =
+    state.pressures.intel <= 18 && (contact.resolvedDelta.intel ?? 0) > 0
+      ? (contact.resolvedDelta.intel ?? 0) * 7
+      : 0;
+  const quietTreatmentBias =
+    contact.quietTreatment && getHighStressShare(state) > 0
+      ? 90 + getHighStressShare(state) * 80
+      : 0;
+  const cultivateStabilizer =
+    contact.kind === 'cultivate' &&
+    ((contactDelta.trust ?? 0) > 0 || (contactDelta.volatility ?? 0) < 0)
+      ? 24
+      : 0;
+  const volatilityPenalty = Math.max(0, contactDelta.volatility ?? 0) * -1.1;
+  const exposurePenalty = Math.max(0, contactDelta.exposure ?? 0) * -0.8;
+  const debtPenalty = contact.ledgerEffects.some((effect) => effect.kind === 'debt') ? -12 : 0;
+
+  return (
+    pressureScore +
+    heatRelief +
+    loyaltyRelief +
+    ruinRelief +
+    intelNeed +
+    quietTreatmentBias +
+    cultivateStabilizer +
+    volatilityPenalty +
+    exposurePenalty +
+    debtPenalty
+  );
+}
+
+function getContactRepeatPenalty(
+  state: GameState,
+  contactId: keyof GameState['contacts'],
+  optionId: string,
+  scale: number,
+): number {
+  const contact = state.contacts[contactId];
+
+  if (!contact) {
+    return 0;
+  }
+
+  const repeatedOptionCount = contact.recentInteractions.filter(
+    (interaction) => interaction.optionId === optionId,
+  ).length;
+
+  return -(contact.recentInteractions.length * scale + repeatedOptionCount * scale);
+}
+
+function getContactBurnPenalty(
+  state: GameState,
+  contactId: keyof GameState['contacts'],
+  delta: {
+    trust?: number;
+    leverage?: number;
+    volatility?: number;
+    exposure?: number;
+  },
+  penalty: number,
+): number {
+  const contact = state.contacts[contactId];
+
+  if (!contact) {
+    return 0;
+  }
+
+  const projectedTrust = clampScoreMetric(contact.trust + (delta.trust ?? 0));
+  const projectedVolatility = clampScoreMetric(contact.volatility + (delta.volatility ?? 0));
+  const projectedExposure = clampScoreMetric(contact.exposure + (delta.exposure ?? 0));
+  const burns =
+    projectedExposure >= 100 ||
+    projectedVolatility >= 100 ||
+    (projectedTrust <= 0 && projectedVolatility >= 75);
+
+  return burns ? -penalty : 0;
+}
+
+function clampScoreMetric(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function scoreAggressiveEventChoice(choice: EventChoiceDefinition): number {

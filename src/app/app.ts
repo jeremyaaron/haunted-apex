@@ -8,6 +8,7 @@ import {
   formatBatchReport,
   generateRoster,
   getWeightedEvents,
+  getRivalDefinition,
   pressureDeltaToView,
   simulateBatch,
   type ActionCardView,
@@ -15,8 +16,15 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type AppliedModifierSource,
+  type ContactEffectPreviewRow,
+  type ContactCostRow,
+  type ContactMetricDeltaView,
+  type ContactMetricView,
+  type ContactOptionPreview,
+  type ContactServiceView,
   type EventChoiceDefinition,
   type EventLedgerEffectPreviewRow,
+  type LedgerContactDeltaRow,
   type HireCandidateView,
   type LedgerDeltaRow,
   type LedgerEntryView,
@@ -25,6 +33,7 @@ import {
   type PressureDelta,
   type PressureDeltaView,
   type PressureId,
+  type RivalId,
   type RunSummaryOperative,
   type SpecialCost,
   type StressTier,
@@ -186,15 +195,25 @@ export class App {
   }
 
   protected targetOptionLabel(option: ActionTargetOption): string {
+    const unavailable = this.targetOptionUnavailableText(option);
+    const suffix = unavailable ? ` (${unavailable})` : '';
+
     if (option.targetType === 'venue' && option.districtName) {
-      return `${option.districtName} / ${option.label}`;
+      return `${option.districtName} / ${option.label}${suffix}`;
     }
 
-    return option.label;
+    return `${option.label}${suffix}`;
   }
 
   protected targetOptionValue(option: ActionTargetOption): string {
     return this.targetKey(option.target);
+  }
+
+  protected targetOptionDisabled(option: ActionTargetOption): boolean {
+    return (
+      (option.targetType === 'ledger' || option.targetType === 'contact') &&
+      option.affordable === false
+    );
   }
 
   protected queueAction(actionId: ActionId): void {
@@ -329,6 +348,16 @@ export class App {
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.ledgerEffects ?? [];
   }
 
+  protected eventContactRows(choiceId: string): ContactEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.contactEffects ?? [];
+  }
+
   protected formatLedgerEventRow(row: EventLedgerEffectPreviewRow): string {
     const kind = this.capitalize(row.kind);
 
@@ -362,10 +391,46 @@ export class App {
     return `${this.signed(-Math.abs(row.value))} ${this.pressureLabel(row.id)}`;
   }
 
+  protected contactCostText(row: ContactCostRow): string {
+    const label =
+      row.id === 'resources' || row.id === 'intel'
+        ? this.pressureLabel(row.id)
+        : this.displayToken(row.id);
+
+    return `${this.signed(-Math.abs(row.value))} ${label}`;
+  }
+
+  protected contactMetricText(row: ContactMetricDeltaView): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
+  protected contactRivalPressureRows(contactUse: ContactOptionPreview): string[] {
+    return Object.entries(contactUse.rivalPressureEffects).flatMap(([rivalId, value]) => {
+      if (typeof value !== 'number' || value === 0) {
+        return [];
+      }
+
+      const rivalName = getRivalDefinition(rivalId as RivalId)?.name ?? this.displayToken(rivalId);
+      return [`${rivalName} Pressure ${this.signed(value)}`];
+    });
+  }
+
+  protected eventContactEffectText(row: ContactEffectPreviewRow): string {
+    return `${row.contactName} ${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
+  protected ledgerContactEffectText(row: LedgerContactDeltaRow): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
   protected ledgerUseSummary(option: LedgerUseOptionView): string {
-    const rows = [...option.costRows, ...option.effectRows].map((row) =>
-      this.ledgerDeltaText(row),
-    );
+    const rows = [
+      ...option.costRows.map((row) => this.ledgerDeltaText(row)),
+      ...option.effectRows.map((row) => this.ledgerDeltaText(row)),
+      ...option.relatedContactEffectRows.map((row) =>
+        this.ledgerContactEffectText(row),
+      ),
+    ];
 
     if (option.consumesEntry) {
       rows.push('Consumes Entry');
@@ -387,6 +452,18 @@ export class App {
     }
   }
 
+  protected contactServiceUnavailableReason(service: ContactServiceView): string {
+    if (!service.unavailableReason) {
+      return '';
+    }
+
+    return this.actionUnavailableReason(service.unavailableReason);
+  }
+
+  protected contactMetricToneClass(metric: ContactMetricView): string {
+    return `tone-${metric.tone}`;
+  }
+
   protected runOperativeNames(operatives: readonly RunSummaryOperative[]): string {
     return operatives.map((operative) => operative.name).join(', ') || 'None';
   }
@@ -399,6 +476,18 @@ export class App {
         return 'Insufficient Resources for this order.';
       case 'not_enough_intel':
         return 'Insufficient Intel for this Ledger use.';
+      case 'not_enough_trust':
+        return 'Insufficient Trust for this contact option.';
+      case 'not_enough_leverage':
+        return 'Insufficient Leverage for this contact option.';
+      case 'contact_burned':
+        return 'This contact is burned and cannot be used.';
+      case 'contact_option_not_found':
+        return 'That contact option is no longer available.';
+      case 'requirement_not_met':
+        return 'This contact option requirement is not met.';
+      case 'quiet_treatment_no_target':
+        return 'No stressed operative is available for Quiet Treatment.';
       case 'ledger_target_required':
         return 'Select a Ledger entry and use option.';
       case 'ledger_entry_unknown':
@@ -410,6 +499,17 @@ export class App {
       default:
         return reason ? this.displayToken(reason) : '';
     }
+  }
+
+  private targetOptionUnavailableText(option: ActionTargetOption): string {
+    if (
+      (option.targetType !== 'ledger' && option.targetType !== 'contact') ||
+      option.affordable
+    ) {
+      return '';
+    }
+
+    return this.actionUnavailableReason(option.unavailableReason);
   }
 
   protected pressureLabel(id: PressureId): string {
@@ -548,6 +648,10 @@ export class App {
   private targetKey(target: ActionTarget): string {
     if (target.type === 'ledger') {
       return `${target.type}:${target.entryId}:${target.useOptionId}`;
+    }
+
+    if (target.type === 'contact') {
+      return `${target.type}:${target.contactId}:${target.optionId}`;
     }
 
     return `${target.type}:${target.id}`;

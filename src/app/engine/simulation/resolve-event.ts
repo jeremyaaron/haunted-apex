@@ -1,4 +1,5 @@
-import { getEventDefinition, getLedgerEntryDefinition } from '../content';
+import { getContactDefinition, getEventDefinition, getLedgerEntryDefinition } from '../content';
+import { applyContactMetricDelta } from '../contacts';
 import {
   applyEventLedgerEffects,
   eventLedgerEffectsAreAvailable,
@@ -16,6 +17,11 @@ import type {
   SpecialCost,
 } from '../model';
 import { clampStress } from './clamps';
+import {
+  previewEventContactEffects,
+  resolveEventContactId,
+  type ContactEffectPreviewRow,
+} from './contact-events';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { applyWinLoss } from './win-loss';
 
@@ -38,6 +44,7 @@ export type EventChoicePreview = {
   choiceId: string;
   label: string;
   ledgerEffects: EventLedgerEffectPreviewRow[];
+  contactEffects: ContactEffectPreviewRow[];
 };
 
 export type ResolveEventChoiceResult =
@@ -95,6 +102,7 @@ export function resolveEventChoice(
     pressures: applyPressureDelta(state.pressures, pressureDelta),
   };
   next = applyOperativeEffects(next, definition, choice);
+  next = applyContactEffects(next, definition, choice);
   next = applyRivalPressureEffects(next, choice.rivalPressure);
   next = {
     ...next,
@@ -109,7 +117,12 @@ export function resolveEventChoice(
   next = appendLog(next, {
     type: 'event_choice',
     title: choice.label,
-    body: createEventChoiceLogBody(state, definition, ledgerApplication.appliedRows),
+    body: createEventChoiceLogBody(
+      state,
+      definition,
+      ledgerApplication.appliedRows,
+      previewEventContactEffects(state, definition, choice),
+    ),
     pressureDelta,
     tags: definition.tags,
   });
@@ -262,6 +275,33 @@ export function getEventChoicePreview(
     choiceId: choice.id,
     label: choice.label,
     ledgerEffects: previewEventLedgerEffects(state, definition, choice),
+    contactEffects: previewEventContactEffects(state, definition, choice),
+  };
+}
+
+function applyContactEffects(
+  state: GameState,
+  definition: EventDefinition,
+  choice: EventChoiceDefinition,
+): GameState {
+  const contactId = resolveEventContactId(state, definition, choice);
+
+  if (!contactId || !choice.contactEffects) {
+    return state;
+  }
+
+  const contact = state.contacts[contactId];
+
+  if (!contact) {
+    return state;
+  }
+
+  return {
+    ...state,
+    contacts: {
+      ...state.contacts,
+      [contactId]: applyContactMetricDelta(contact, choice.contactEffects),
+    },
   };
 }
 
@@ -325,12 +365,25 @@ function createEventChoiceLogBody(
   state: GameState,
   definition: EventDefinition,
   ledgerRows: readonly EventLedgerEffectPreviewRow[],
+  contactRows: readonly ContactEffectPreviewRow[],
 ): string {
   const ledger = ledgerRows.length > 0
     ? ` Ledger: ${ledgerRows.map(formatLedgerEffectRow).join('; ')}.`
     : '';
+  const contact = contactRows.length > 0
+    ? ` Contact: ${formatContactEffectRows(contactRows)}.`
+    : '';
 
-  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}`;
+  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}${contact}`;
+}
+
+function formatContactEffectRows(rows: readonly ContactEffectPreviewRow[]): string {
+  const contactName = rows[0]?.contactName ?? 'Contact';
+  const effects = rows
+    .map((row) => `${row.id} ${row.value > 0 ? `+${row.value}` : row.value}`)
+    .join(', ');
+
+  return `${contactName}: ${effects}`;
 }
 
 function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
@@ -359,8 +412,13 @@ function renderEventTitle(state: GameState, title: string): string {
   const selectedDefinition = selectedEntry
     ? getLedgerEntryDefinition(selectedEntry.definitionId)
     : undefined;
+  const selectedContact = state.pendingEvent?.selectedContactId
+    ? getContactDefinition(state.pendingEvent.selectedContactId)
+    : undefined;
 
-  return title.replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry');
+  return title
+    .replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry')
+    .replaceAll('{contactName}', selectedContact?.name ?? 'Contact');
 }
 
 function clearTransientFlags(

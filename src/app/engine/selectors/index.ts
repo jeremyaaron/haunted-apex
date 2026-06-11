@@ -1,4 +1,17 @@
 export {
+  isActiveContact,
+  selectActiveContacts,
+  selectContactState,
+  selectContactView,
+} from './contacts';
+export type {
+  ContactInteractionView,
+  ContactLedgerLinkView,
+  ContactMetricView,
+  ContactServiceView,
+  ContactView,
+} from './contacts';
+export {
   calculateRiskChance,
   applyDistrictModifiers,
   applyVenueModifiers,
@@ -18,6 +31,7 @@ export {
 export type {
   ActionCardView,
   ActionPreview,
+  ContactMetricDeltaView,
   LocalImpactPreview,
   OperativeAssignmentPreview,
   OperativeOptionView,

@@ -8,6 +8,25 @@ export type {
 } from './actions';
 export type { RecentActivityEntry } from './activity';
 export type {
+  ContactArchetype,
+  ContactDefinition,
+  ContactGenerationTag,
+  ContactId,
+  ContactInteraction,
+  ContactLedgerEffectDefinition,
+  ContactMetricDelta,
+  ContactOptionId,
+  ContactOptionKind,
+  ContactRoleTag,
+  ContactServiceCost,
+  ContactServiceDefinition,
+  ContactServiceId,
+  ContactServiceRequirement,
+  ContactState,
+  ContactStatus,
+  UniversalContactOptionDefinition,
+} from './contacts';
+export type {
   DistrictArchetype,
   DistrictDefinition,
   DistrictId,
@@ -41,6 +60,7 @@ export type {
 } from './ledger';
 export type {
   CityEventDefinition,
+  ContactEventDefinition,
   EventChoiceDefinition,
   EventChoiceLedgerEffect,
   EventDefinition,

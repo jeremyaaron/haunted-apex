@@ -4,6 +4,7 @@ import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V04_STORAGE_KEY,
   LEGACY_V03_STORAGE_KEY,
   LEGACY_V02_STORAGE_KEY,
   GameStorageService,
@@ -23,7 +24,7 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips a complete v0.4 envelope through localStorage', () => {
+  it('round-trips a complete v0.5 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
@@ -41,12 +42,14 @@ describe('GameStorageService', () => {
 
   it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V04_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V02_STORAGE_KEY, '{}');
 
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V04_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V02_STORAGE_KEY)).toBeNull();
     expect(service.loadCurrentRun()).toEqual({ status: 'empty' });
@@ -67,6 +70,19 @@ describe('GameStorageService', () => {
       foundVersion: 2,
     });
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.4 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V04_STORAGE_KEY,
+      JSON.stringify(newGame({ seed: 'LEGACY' })),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 4,
+    });
+    expect(localStorage.getItem(LEGACY_V04_STORAGE_KEY)).toBeNull();
   });
 
   it('removes the v0.3 key and reports it incompatible', () => {
@@ -172,6 +188,40 @@ describe('GameStorageService', () => {
         },
       ],
       seenSignatureEventIds: ['event_mara_ghost_debt'],
+    };
+
+    service.saveCurrentRun(state);
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
+  });
+
+  it('round-trips Contact state', () => {
+    const state = structuredClone(newGame({ seed: 'CONTACT-STORAGE' }));
+    const contactId = state.activeContactIds[0];
+    state.contacts[contactId] = {
+      ...state.contacts[contactId],
+      trust: 72,
+      leverage: 44,
+      volatility: 18,
+      exposure: 61,
+      recentInteractions: [
+        {
+          week: 2,
+          optionId: 'cultivate',
+          kind: 'cultivate',
+          label: 'Cultivate',
+          effectsSummary: {
+            trust: 10,
+            volatility: -6,
+          },
+        },
+      ],
+      flags: {
+        introduced_by: 'night_market',
+      },
     };
 
     service.saveCurrentRun(state);
@@ -447,6 +497,40 @@ describe('GameStorageService', () => {
     expectLoadInvalid(malformedSource);
     expectLoadInvalid(invalidRelatedTarget);
     expectLoadInvalid(badConsumedCount);
+  });
+
+  it('rejects malformed Contact state', () => {
+    const missingContacts = structuredClone(newGame()) as Partial<GameState>;
+    const duplicateActive = structuredClone(newGame());
+    const inactiveMissingState = structuredClone(newGame());
+    const badMetric = structuredClone(newGame());
+    const malformedInteraction = structuredClone(newGame());
+    delete missingContacts.contacts;
+    duplicateActive.activeContactIds = [
+      duplicateActive.activeContactIds[0],
+      duplicateActive.activeContactIds[0],
+      duplicateActive.activeContactIds[1],
+    ];
+    delete (inactiveMissingState.contacts as Partial<typeof inactiveMissingState.contacts>)
+      .contact_father_static;
+    badMetric.contacts[badMetric.activeContactIds[0]].trust = 101;
+    malformedInteraction.contacts[malformedInteraction.activeContactIds[0]].recentInteractions = [
+      {
+        week: 1,
+        optionId: 'pressure',
+        kind: 'pressure',
+        label: 'Pressure',
+        effectsSummary: {
+          trust: Number.NaN,
+        },
+      },
+    ];
+
+    expectLoadInvalid(missingContacts as GameState);
+    expectLoadInvalid(duplicateActive);
+    expectLoadInvalid(inactiveMissingState);
+    expectLoadInvalid(badMetric);
+    expectLoadInvalid(malformedInteraction);
   });
 
   function expectLoadInvalid(state: GameState): void {

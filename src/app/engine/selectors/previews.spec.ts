@@ -513,6 +513,36 @@ describe('action previews', () => {
     });
   });
 
+  it('uses Contact rival pressure effects instead of generic target-controller pressure', () => {
+    const state = newGame({ seed: 'CONTACT-RIVAL-PREVIEW' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    state.rivals.rival_nyx_ardent.pressure = 12;
+    const privateRoom = getActionPreview(state, 'manage_contact', undefined, {
+      type: 'contact',
+      contactId: 'contact_veyra_lux',
+      optionId: 'private_room_access',
+    });
+    const cultivate = getActionPreview(state, 'manage_contact', undefined, {
+      type: 'contact',
+      contactId: 'contact_veyra_lux',
+      optionId: 'cultivate',
+    });
+
+    expect(privateRoom?.rivalAttention).toEqual({
+      rivalId: 'rival_nyx_ardent',
+      rivalName: 'Nyx Ardent',
+      pressureGain: 6,
+      currentPressure: 12,
+      projectedPressure: 18,
+      projectedTier: 'watching',
+    });
+    expect(cultivate?.rivalAttention).toBeUndefined();
+  });
+
   it('maps rival pressure tiers at exact boundaries', () => {
     expect(getRivalPressureTier(24)).toBe('watching');
     expect(getRivalPressureTier(25)).toBe('interested');
@@ -562,8 +592,9 @@ describe('action previews', () => {
     const cards = selectActionCards(state);
     const recruitCard = cards.find((card) => card.actionId === 'recruit_operative');
     const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
+    const contactCard = cards.find((card) => card.actionId === 'manage_contact');
 
-    expect(cards.length).toBe(7);
+    expect(cards.length).toBe(8);
     expect(recruitCard?.assignment).toBe('none');
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
@@ -572,6 +603,10 @@ describe('action previews', () => {
     expect(ledgerCard?.state).toBe('unavailable');
     expect(ledgerCard?.unavailableReason).toBe('target_required');
     expect(ledgerCard?.availableOperatives).toEqual([]);
+    expect(contactCard?.assignment).toBe('none');
+    expect(contactCard?.state).toBe('unavailable');
+    expect(contactCard?.unavailableReason).toBe('target_required');
+    expect(contactCard?.availableOperatives).toEqual([]);
   });
 
   it('converts pressure deltas into stable display rows', () => {

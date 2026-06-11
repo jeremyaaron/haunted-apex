@@ -79,6 +79,9 @@ export function applyEventLedgerEffects(
           ? { relatedOperativeId: effect.relatedOperativeId }
           : {}),
         ...(effect.relatedRivalId ? { relatedRivalId: effect.relatedRivalId } : {}),
+        ...(effect.relatedContactId && isActiveNonBurnedContact(next, effect.relatedContactId)
+          ? { relatedContactId: effect.relatedContactId }
+          : {}),
       });
     } else {
       const entry = selectLedgerEntry(next, effect.entrySelector);
@@ -97,6 +100,15 @@ export function applyEventLedgerEffects(
     state: next,
     appliedRows,
   };
+}
+
+function isActiveNonBurnedContact(
+  state: GameState,
+  contactId: NonNullable<Extract<EventChoiceLedgerEffect, { type: 'create' }>['relatedContactId']>,
+): boolean {
+  const contact = state.contacts[contactId];
+
+  return state.activeContactIds.includes(contactId) && !!contact && !contact.burned;
 }
 
 function previewEventLedgerEffect(

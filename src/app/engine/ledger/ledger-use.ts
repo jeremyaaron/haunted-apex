@@ -1,6 +1,9 @@
-import { getLedgerEntryDefinition } from '../content';
+import { getContactDefinition, getLedgerEntryDefinition } from '../content';
+import { applyContactMetricDelta } from '../contacts';
 import type {
   ActionTarget,
+  ContactId,
+  ContactMetricDelta,
   GameLogEntry,
   GameState,
   LedgerEntry,
@@ -28,6 +31,11 @@ export type LedgerCostRow = {
   value: number;
 };
 
+export type LedgerContactEffectRow = {
+  id: keyof ContactMetricDelta;
+  value: number;
+};
+
 export type LedgerUsePreview =
   | {
       ok: true;
@@ -44,6 +52,10 @@ export type LedgerUsePreview =
       costRows: LedgerCostRow[];
       effects: PressureDelta;
       resolvedDelta: PressureDelta;
+      relatedContactId?: ContactId;
+      relatedContactName?: string;
+      relatedContactEffects: ContactMetricDelta;
+      relatedContactEffectRows: LedgerContactEffectRow[];
       consumesEntry: boolean;
       affordable: true;
       riskModifier: number;
@@ -102,6 +114,13 @@ export function previewLedgerUse(
     intel: useOption.cost?.intel ?? 0,
   };
   const riskChance = clampRisk(baseRiskChance + (useOption.riskModifier ?? 0));
+  const relatedContactName = entry.relatedContactId
+    ? getContactDefinition(entry.relatedContactId)?.name
+    : undefined;
+  const relatedContactEffects = normalizeRelatedContactEffects(
+    entry,
+    useOption.relatedContactEffects,
+  );
 
   if (cost.resources > state.pressures.resources) {
     return unavailable('not_enough_resources', riskChance);
@@ -123,6 +142,10 @@ export function previewLedgerUse(
     costRows: toCostRows(cost),
     effects: normalizePressureDelta(useOption.effects),
     resolvedDelta: mergePressureDeltas(useOption.effects, toCostDelta(cost)),
+    ...(entry.relatedContactId ? { relatedContactId: entry.relatedContactId } : {}),
+    ...(relatedContactName ? { relatedContactName } : {}),
+    relatedContactEffects,
+    relatedContactEffectRows: toContactEffectRows(relatedContactEffects),
     consumesEntry: useOption.consumesEntry,
     affordable: true,
     riskModifier: useOption.riskModifier ?? 0,
@@ -178,6 +201,8 @@ export function resolveLedgerUse(
     },
   };
 
+  next = applyRelatedContactEffects(next, preview);
+
   next = appendLog(next, {
     type: 'order_resolved',
     title: `Work the Ledger: ${preview.entryName}`,
@@ -188,6 +213,7 @@ export function resolveLedgerUse(
       preview.definition.kind.toUpperCase(),
       ...preview.definition.tags,
       ...(preview.useOption.tags ?? []),
+      ...(preview.relatedContactId ? ['CONTACT', preview.relatedContactId] : []),
     ],
   });
 
@@ -220,9 +246,15 @@ function createResolutionBody(
     .join(', ');
   const costText = cost ? ` Cost: ${cost}.` : '';
   const consumption = preview.consumesEntry ? ' Entry consumed.' : ' Entry retained.';
+  const contactText =
+    preview.relatedContactId && preview.relatedContactEffectRows.length > 0
+      ? ` ${preview.relatedContactName ?? preview.relatedContactId}: ${preview.relatedContactEffectRows
+          .map((row) => `${row.id} ${formatSigned(row.value)}`)
+          .join(', ')}.`
+      : '';
   const result = complication ? 'Resolved with blowback.' : 'Resolved cleanly.';
 
-  return `${result} Use: ${preview.useOptionLabel}.${costText}${consumption} Risk ${preview.riskChance}, roll ${roll}.`;
+  return `${result} Use: ${preview.useOptionLabel}.${costText}${consumption}${contactText} Risk ${preview.riskChance}, roll ${roll}.`;
 }
 
 function toCostDelta(cost: { resources: number; intel: number }): PressureDelta {
@@ -265,6 +297,65 @@ function normalizePressureDelta(delta: PressureDelta): PressureDelta {
   }
 
   return normalized;
+}
+
+function normalizeRelatedContactEffects(
+  entry: LedgerEntry,
+  delta: ContactMetricDelta | undefined,
+): ContactMetricDelta {
+  if (!entry.relatedContactId || !delta) {
+    return {};
+  }
+
+  const normalized: ContactMetricDelta = {};
+
+  for (const id of ['trust', 'leverage', 'volatility', 'exposure'] as const) {
+    const value = delta[id];
+
+    if (value !== undefined && value !== 0) {
+      normalized[id] = value;
+    }
+  }
+
+  return normalized;
+}
+
+function toContactEffectRows(delta: ContactMetricDelta): LedgerContactEffectRow[] {
+  return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
+    const value = delta[id];
+
+    return typeof value === 'number' && value !== 0 ? [{ id, value }] : [];
+  });
+}
+
+function applyRelatedContactEffects(
+  state: GameState,
+  preview: Extract<LedgerUsePreview, { ok: true }>,
+): GameState {
+  if (!preview.relatedContactId || preview.relatedContactEffectRows.length === 0) {
+    return state;
+  }
+
+  const contact = state.contacts[preview.relatedContactId];
+
+  if (!contact) {
+    return state;
+  }
+
+  return {
+    ...state,
+    contacts: {
+      ...state.contacts,
+      [preview.relatedContactId]: applyContactMetricDelta(
+        contact,
+        preview.relatedContactEffects,
+      ),
+    },
+  };
+}
+
+function formatSigned(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
 }
 
 function clampRisk(value: number): number {

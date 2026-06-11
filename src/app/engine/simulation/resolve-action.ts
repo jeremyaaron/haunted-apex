@@ -36,6 +36,7 @@ import { clampStress } from './clamps';
 import { applyTargetedActionConsequences } from './district-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { recordRecentActivity } from './recent-activity';
+import { resolveContactOption } from './resolve-contact';
 
 export type ActionResolution = {
   state: GameState;
@@ -84,6 +85,10 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
 
   if (action.id === 'work_the_ledger') {
     return resolveLedgerUse(state, order.target);
+  }
+
+  if (action.id === 'manage_contact') {
+    return resolveContactOption(state, order.target);
   }
 
   const secretDiscoveryPreview = previewSecretDiscovery(state, order);

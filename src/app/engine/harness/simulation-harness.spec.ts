@@ -11,9 +11,11 @@ import {
   simulateBatch,
   simulateRun,
 } from './index';
+import { CONTACT_DEFINITIONS } from '../content';
+import { materializeContactState } from '../contacts';
 import { addLedgerEntry } from '../ledger';
 import { materializeOperativeState } from '../roster';
-import type { ActionTarget } from '../model';
+import type { ActionTarget, ContactId, GameState } from '../model';
 import { newGame, queueOrder } from '../simulation';
 
 describe('simulation harness', () => {
@@ -38,6 +40,7 @@ describe('simulation harness', () => {
     expect(first.initialHirePoolIds).toEqual(second.initialHirePoolIds);
     expect(first.operativeStats).toEqual(second.operativeStats);
     expect(first.operativeEventStats).toEqual(second.operativeEventStats);
+    expect(first.contactStats).toEqual(second.contactStats);
     expect(first.trace.length).toBeGreaterThan(0);
   });
 
@@ -285,6 +288,88 @@ describe('simulation harness', () => {
     }
   });
 
+  it('includes engine-validated Contact options when active contacts exist', () => {
+    const state = withActiveContacts(newGame({ seed: 'HARNESS-CONTACT-OPTIONS' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_dr_mercy_iram',
+    ]);
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'manage_contact',
+    );
+
+    expect(options.length).toBeGreaterThan(0);
+    expect(
+      options.every((option) => option.target?.type === 'contact' && option.preview.contactUse?.ok),
+    ).toBeTrue();
+
+    for (const option of options) {
+      expect(
+        queueOrder(state, {
+          actionId: option.actionId,
+          target: option.target,
+        }).ok,
+      ).toBeTrue();
+    }
+  });
+
+  it('lets every agent choose queueable Contact actions when Contact options are appropriate', () => {
+    const state = withActiveContacts(newGame({ seed: 'HARNESS-CONTACT-AGENTS' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_dr_mercy_iram',
+    ]);
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'manage_contact',
+    );
+
+    for (const agent of STRATEGY_AGENTS) {
+      const choice = agent.chooseOrder(state, options, createTestContext('CONTACT', agent.id));
+
+      expect(choice).withContext(`${agent.id} should choose a contact option`).toBeDefined();
+      expect(choice?.actionId).toBe('manage_contact');
+      expect(choice?.target?.type).toBe('contact');
+      expect(
+        queueOrder(state, {
+          actionId: choice?.actionId ?? 'manage_contact',
+          target: choice?.target,
+        }).ok,
+      )
+        .withContext(`${agent.id} should choose a queueable contact option`)
+        .toBeTrue();
+    }
+  });
+
+  it('makes OperatorBot use Heat-saving Contacts under high Heat', () => {
+    const withContacts = withActiveContacts(newGame({ seed: 'HARNESS-OPERATOR-CONTACT' }), [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_dr_mercy_iram',
+    ]);
+    const state = {
+      ...withContacts,
+      pressures: {
+        ...withContacts.pressures,
+        heat: 88,
+        resources: 4000,
+      },
+    };
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'manage_contact',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'bot'));
+
+    expect(choice?.actionId).toBe('manage_contact');
+    expect(choice?.target).toEqual({
+      type: 'contact',
+      contactId: 'contact_captain_hollis',
+      optionId: 'clean_passage',
+    });
+    expect(choice?.preview.contactUse?.ok ? choice.preview.contactUse.effects.heat : undefined).toBeLessThan(
+      0,
+    );
+  });
+
   it('does not let agents select consumed or unaffordable Ledger uses', () => {
     const withSecret = addLedgerEntry(newGame({ seed: 'HARNESS-LEDGER-ILLEGAL' }), {
       definitionId: 'secret_patrol_schedule',
@@ -441,6 +526,12 @@ describe('simulation harness', () => {
     expect(output).toContain('ledger_outcomes');
     expect(output).toContain('secret_discovery');
     expect(output).toContain('ledger_events');
+    expect(output).toContain('contact_summary');
+    expect(output).toContain('contact_usage');
+    expect(output).toContain('contact_outcomes');
+    expect(output).toContain('contact_events');
+    expect(output).toContain('contact_ledger');
+    expect(output).toContain('contact_sets');
     expect(output).toContain('roster_compositions');
     expect(output).toContain('operative_presence');
     expect(output).toContain('operative_recruitment');
@@ -483,6 +574,10 @@ describe('simulation harness', () => {
       expect(summary.ledgerSummary.averageEntriesCreated).toBeGreaterThanOrEqual(0);
       expect(summary.ledgerOutcomeReports.length).toBeGreaterThan(0);
       expect(summary.secretDiscoveryReport.targetedGatherIntelOrders).toBeGreaterThanOrEqual(0);
+      expect(summary.contactSummary.averageManageContactUses).toBeGreaterThanOrEqual(0);
+      expect(summary.contactSummary.averageBurnedContacts).toBeGreaterThanOrEqual(0);
+      expect(summary.contactOutcomeReports.length).toBeGreaterThan(0);
+      expect(summary.contactSetReports.length).toBeGreaterThan(0);
     }
 
     expect(
@@ -511,9 +606,15 @@ describe('simulation harness', () => {
 });
 
 function targetKey(target: ActionTarget): string {
-  return target.type === 'ledger'
-    ? `ledger:${target.entryId}:${target.useOptionId}`
-    : `${target.type}:${target.id}`;
+  if (target.type === 'ledger') {
+    return `ledger:${target.entryId}:${target.useOptionId}`;
+  }
+
+  if (target.type === 'contact') {
+    return `contact:${target.contactId}:${target.optionId}`;
+  }
+
+  return `${target.type}:${target.id}`;
 }
 
 function createTestContext(seed: string, agentId: string): AgentDecisionContext {
@@ -534,6 +635,23 @@ function createTestContext(seed: string, agentId: string): AgentDecisionContext 
       const value = items[cursor % items.length];
       cursor += 1;
       return value;
+    },
+  };
+}
+
+function withActiveContacts(state: GameState, activeContactIds: ContactId[]): GameState {
+  return {
+    ...state,
+    activeContactIds,
+    contacts: {
+      ...state.contacts,
+      ...Object.fromEntries(
+        activeContactIds.flatMap((contactId) => {
+          const definition = CONTACT_DEFINITIONS.find((candidate) => candidate.id === contactId);
+
+          return definition ? [[contactId, materializeContactState(definition)]] : [];
+        }),
+      ),
     },
   };
 }

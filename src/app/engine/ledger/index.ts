@@ -12,6 +12,7 @@ export type {
 export { previewLedgerUse, resolveLedgerUse } from './ledger-use';
 export type {
   LedgerCostRow,
+  LedgerContactEffectRow,
   LedgerUsePreview,
   LedgerUseUnavailableReason,
   ResolveLedgerUseResult,
@@ -36,6 +37,7 @@ export {
 } from './ledger-selectors';
 export type {
   LedgerDeltaRow,
+  LedgerContactDeltaRow,
   LedgerEntryStatus,
   LedgerEntryView,
   LedgerPanelView,

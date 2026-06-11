@@ -1,5 +1,6 @@
 import {
   getActionDefinition,
+  getContactDefinition,
   getDistrictDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
@@ -29,6 +30,10 @@ import type {
 } from '../model';
 import { getRivalPressureTier } from './rivals';
 import { selectActiveLedgerEntryViews } from '../ledger';
+import {
+  selectManageContactTargetOptions,
+  type ContactTargetOption,
+} from '../contacts';
 
 export type TerritoryTargetOption = {
   target: Exclude<ActionTarget, { type: 'recruit' }>;
@@ -63,7 +68,11 @@ export type LedgerTargetOption = {
   unavailableReason?: string;
 };
 
-export type ActionTargetOption = TerritoryTargetOption | RecruitTargetOption | LedgerTargetOption;
+export type ActionTargetOption =
+  | TerritoryTargetOption
+  | RecruitTargetOption
+  | LedgerTargetOption
+  | ContactTargetOption;
 
 export type VenueTerritoryView = {
   id: VenueId;
@@ -236,6 +245,10 @@ export function selectActionTargetOptions(
     }
   }
 
+  if (allowedTypes.has('contact')) {
+    options.push(...selectManageContactTargetOptions(state));
+  }
+
   return options;
 }
 
@@ -336,6 +349,7 @@ export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | und
     case 'rival':
     case 'recruit':
     case 'ledger':
+    case 'contact':
       return undefined;
   }
 }
@@ -355,6 +369,8 @@ export function getTargetTags(target?: ActionTarget): string[] {
     }
     case 'rival':
       return [...(getRivalDefinition(target.id)?.traits ?? [])];
+    case 'contact':
+      return [...(getContactDefinition(target.contactId)?.roleTags ?? [])];
     case 'recruit':
     case 'ledger':
       return [];
@@ -382,6 +398,8 @@ export function getTargetControllerId(target?: ActionTarget): RivalId | undefine
     }
     case 'rival':
       return getRivalDefinition(target.id)?.id;
+    case 'contact':
+      return getContactDefinition(target.contactId)?.associatedRivalId;
     case 'recruit':
     case 'ledger':
       return undefined;
@@ -402,6 +420,20 @@ export function getTargetLabel(target?: ActionTarget, state?: GameState): string
       return getRivalDefinition(target.id)?.name;
     case 'recruit':
       return getOperativeDefinition(target.id)?.name;
+    case 'contact': {
+      const contact = getContactDefinition(target.contactId);
+      const option = contact?.services.find((candidate) => candidate.id === target.optionId);
+      const universalLabel =
+        target.optionId === 'cultivate'
+          ? 'Cultivate'
+          : target.optionId === 'pressure'
+            ? 'Pressure'
+            : undefined;
+
+      return contact
+        ? `${contact.name} - ${option?.label ?? universalLabel ?? target.optionId}`
+        : target.contactId;
+    }
     case 'ledger': {
       const entry = state?.ledger.entries.find((candidate) => candidate.id === target.entryId);
       const definition = entry ? getLedgerEntryDefinition(entry.definitionId) : undefined;
@@ -425,7 +457,8 @@ export function calculateTargetControlGain(
     !target ||
     target.type === 'rival' ||
     target.type === 'recruit' ||
-    target.type === 'ledger'
+    target.type === 'ledger' ||
+    target.type === 'contact'
   ) {
     return 0;
   }
@@ -441,6 +474,7 @@ export function calculateTargetControlGain(
     case 'recruit_operative':
     case 'lay_low':
     case 'work_the_ledger':
+    case 'manage_contact':
       return 0;
   }
 }

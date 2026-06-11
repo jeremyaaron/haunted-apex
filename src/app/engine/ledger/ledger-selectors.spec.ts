@@ -164,6 +164,29 @@ describe('Ledger lifecycle and selectors', () => {
     expect(view.useOptions.every((option) => !option.affordable)).toBeTrue();
   });
 
+  it('exposes related contact labels and declared contact effects', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-CONTACT-VIEW' }), {
+      definitionId: 'debt_owes_liaison',
+      source: {
+        type: 'action',
+        actionId: 'manage_contact',
+        target: {
+          type: 'contact',
+          contactId: 'contact_veyra_lux',
+          optionId: 'private_room_access',
+        },
+      },
+      relatedContactId: 'contact_veyra_lux',
+    });
+    const view = selectActiveLedgerEntryViews(state)[0];
+
+    expect(view.relatedContactLabel).toBe('Veyra Lux');
+    expect(view.useOptions[0].relatedContactEffectRows).toEqual([
+      { id: 'trust', value: 4 },
+      { id: 'volatility', value: -2 },
+    ]);
+  });
+
   function consumeEntry(state: GameState, entryId: string): GameState {
     return {
       ...state,

@@ -1,4 +1,4 @@
-import { getLedgerEntryDefinition } from '../content';
+import { getContactDefinition, getLedgerEntryDefinition } from '../content';
 import type { GameEventInstance, GameState, QueuedOrder } from '../model';
 import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
@@ -78,7 +78,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
   const eventCandidates = getWeightedEvents(next);
   const selectedEvent = selectWeeklyEvent(next);
   const seenSignatureEventIds =
-    selectedEvent.definition.kind === 'operative'
+    selectedEvent.definition.kind === 'operative' || selectedEvent.definition.contact?.signature
       ? [...next.seenSignatureEventIds, selectedEvent.definition.id]
       : next.seenSignatureEventIds;
   next = {
@@ -96,7 +96,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
         type: 'event_presented',
         title: renderSelectedEventText(next, selectedEvent.event, selectedEvent.definition.title),
         body: renderSelectedEventText(next, selectedEvent.event, selectedEvent.definition.text),
-        tags: selectedEvent.definition.tags,
+        tags: [...selectedEvent.definition.tags, selectedEvent.definition.id],
       },
     ],
   };
@@ -121,9 +121,11 @@ function renderSelectedEventText(
   const selectedLedgerDefinition = selectedLedgerEntry
     ? getLedgerEntryDefinition(selectedLedgerEntry.definitionId)
     : undefined;
+  const selectedContactDefinition = event.selectedContactId
+    ? getContactDefinition(event.selectedContactId)
+    : undefined;
 
-  return text.replaceAll(
-    '{ledgerEntryName}',
-    selectedLedgerDefinition?.name ?? 'Ledger Entry',
-  );
+  return text
+    .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
+    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact');
 }

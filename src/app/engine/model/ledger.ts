@@ -1,4 +1,5 @@
 import type { ActionId, ActionTarget } from './actions';
+import type { ContactId, ContactMetricDelta } from './contacts';
 import type { DistrictId } from './districts';
 import type { EventId } from './events';
 import type { OperativeId } from './operatives';
@@ -44,6 +45,7 @@ export type LedgerUseOptionDefinition = {
   description?: string;
   cost?: LedgerPressureCost;
   effects: PressureDelta;
+  relatedContactEffects?: ContactMetricDelta;
   consumesEntry: boolean;
   riskModifier?: number;
   tags?: readonly string[];
@@ -109,6 +111,7 @@ export type LedgerEntry = {
   relatedTarget?: ActionTarget;
   relatedOperativeId?: OperativeId;
   relatedRivalId?: RivalId;
+  relatedContactId?: ContactId;
   flags?: Record<string, boolean | number | string>;
 };
 

@@ -1,4 +1,5 @@
 import type { ActionId, ActionTarget } from './actions';
+import type { ContactId, ContactMetricDelta } from './contacts';
 import type {
   LedgerEntryDefinitionId,
   LedgerEntryId,
@@ -28,7 +29,13 @@ export type EventId =
   | 'event_orchid_route_memory'
   | 'ledger_debt_comes_due'
   | 'ledger_leverage_window'
-  | 'ledger_favor_returned';
+  | 'ledger_favor_returned'
+  | 'contact_wants_assurance'
+  | 'event_veyra_room'
+  | 'event_hollis_watched'
+  | 'event_mercy_bill'
+  | 'event_ciro_route_remembers'
+  | 'event_confession_leak';
 
 export type EventTag =
   | 'HEAT'
@@ -44,7 +51,8 @@ export type EventTag =
   | 'CORP'
   | 'BLACKMAIL'
   | 'OPERATIVE'
-  | 'LEDGER';
+  | 'LEDGER'
+  | 'CONTACT';
 
 export type EventWeightRule = {
   pressure?: PressureId;
@@ -73,6 +81,7 @@ export type EventChoiceLedgerEffect =
       relatedTarget?: ActionTarget;
       relatedOperativeId?: OperativeId;
       relatedRivalId?: RivalId;
+      relatedContactId?: ContactId;
     }
   | {
       type: 'consume' | 'resolve';
@@ -87,8 +96,22 @@ export type EventChoiceDefinition = {
   effects: PressureDelta;
   flags?: string[];
   operativeEffects?: OperativeStateDelta;
+  contactId?: ContactId;
+  contactEffects?: ContactMetricDelta;
   rivalPressure?: Partial<Record<RivalId, number>>;
   ledgerEffects?: readonly EventChoiceLedgerEffect[];
+};
+
+export type ContactEventDefinition = {
+  contactId?: ContactId;
+  signature?: boolean;
+  generic?: boolean;
+  minTrust?: number;
+  maxTrust?: number;
+  minLeverage?: number;
+  minVolatility?: number;
+  minExposure?: number;
+  recentInteractionWithinWeeks?: number;
 };
 
 export type OperativeEventPredicate =
@@ -120,6 +143,7 @@ type BaseEventDefinition = {
   tags: EventTag[];
   baseWeight: number;
   weightRules?: EventWeightRule[];
+  contact?: ContactEventDefinition;
   choices: EventChoiceDefinition[];
 };
 
@@ -141,4 +165,5 @@ export type GameEventInstance = {
   definitionId: EventId;
   week: number;
   selectedLedgerEntryId?: LedgerEntryId;
+  selectedContactId?: ContactId;
 };
