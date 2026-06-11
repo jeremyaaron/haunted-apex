@@ -41,6 +41,7 @@ export type GameLogEntryType =
   | 'ledger'
   | 'operative_condition'
   | 'complication'
+  | 'front_yield'
   | 'drift'
   | 'rival_effect'
   | 'event_presented'

@@ -5,6 +5,7 @@ export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from
 export { resolveContactOption } from './resolve-contact';
 export { resolveInvestFront } from './resolve-front-investment';
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
+export { applyWeeklyFrontYields } from './front-yields';
 export { applyWeeklyDrift } from './weekly-drift';
 export {
   applyLocalDistrictCooling,

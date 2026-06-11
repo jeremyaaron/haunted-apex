@@ -9,7 +9,7 @@ import { queueOrder } from './queue-order';
 import { newGame } from './new-game';
 
 describe('advanceWeek', () => {
-  it('resolves Gather Intel effects, stress, idle recovery, drift, and logs', () => {
+  it('resolves Gather Intel effects, stress, Front yield, drift, and logs', () => {
     const queued = mustQueue(newGame({ seed: 'VIOLET-ASH-1047' }), {
       actionId: 'gather_intel',
       assignedOperativeId: 'op_mara_voss',
@@ -35,11 +35,13 @@ describe('advanceWeek', () => {
     expect(result.state.pressures).toEqual({
       dominion: 12,
       heat: 17,
-      loyalty: 67,
-      resources: 4100,
+      loyalty: 68,
+      resources: 4350,
       intel: 20,
       ruin: 0,
     });
+    expect(result.state.fronts.front_pale_circuit?.exposure).toBe(14);
+    expect(result.state.districts.district_violet_ward.control).toBe(13);
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       25,
     );
@@ -51,6 +53,7 @@ describe('advanceWeek', () => {
     );
     expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
       'order_resolved',
+      'front_yield',
       'drift',
       'event_presented',
     ]);
@@ -87,7 +90,7 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       30,
     );
-    expect(result.state.pressures.resources).toBe(6450);
+    expect(result.state.pressures.resources).toBe(6700);
     expect(result.state.pressures.dominion).toBe(18);
     expect(result.state.pressures.heat).toBe(31);
     expect(result.state.districts.district_chrome_narrows).toEqual({
@@ -127,14 +130,15 @@ describe('advanceWeek', () => {
     expect(result.state.pressures).toEqual({
       dominion: 12,
       heat: 22,
-      loyalty: 67,
-      resources: 3300,
+      loyalty: 68,
+      resources: 3550,
       intel: 12,
       ruin: 2,
     });
     expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
       'order_resolved',
       'complication',
+      'front_yield',
       'drift',
       'event_presented',
     ]);
@@ -158,8 +162,8 @@ describe('advanceWeek', () => {
     expect(result.state.pressures).toEqual({
       dominion: 16,
       heat: 30,
-      loyalty: 63,
-      resources: 6000,
+      loyalty: 64,
+      resources: 6250,
       intel: 10,
       ruin: 0,
     });
@@ -225,7 +229,13 @@ describe('advanceWeek', () => {
         status: 'available',
       }),
     );
-    expect(result.state.districts).toEqual(untouchedDistricts);
+    expect(result.state.districts).toEqual({
+      ...untouchedDistricts,
+      district_violet_ward: {
+        ...untouchedDistricts.district_violet_ward,
+        control: untouchedDistricts.district_violet_ward.control + 1,
+      },
+    });
     expect(result.state.rivals).toEqual(untouchedRivals);
     expect(result.state.recentActivity[0]).toEqual(
       jasmine.objectContaining({
@@ -352,6 +362,7 @@ describe('advanceWeek', () => {
     expect(result.state.gameOver).toBeUndefined();
     expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
       'order_resolved',
+      'front_yield',
       'drift',
       'rival_effect',
       'event_presented',

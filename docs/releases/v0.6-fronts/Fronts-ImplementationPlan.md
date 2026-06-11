@@ -716,6 +716,42 @@ Unit tests:
 
 Confirm fronts now matter over time before adding exposure-management controls.
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Added `applyWeeklyFrontYields` as a pure weekly simulation step.
+- Wired Front yields into `advanceWeek` after queued orders, idle stress recovery, and
+  assignment pruning, and before weekly drift, local district cooling, rival passive effects,
+  recent activity pruning, and event selection.
+- Active owned Fronts now apply:
+  - base weekly pressure yield
+  - level 2 bonus weekly pressure yield
+  - weekly exposure gain
+  - `+1` extra weekly exposure at level 2
+  - district Control yield where defined
+  - explicit weekly rival pressure where defined
+- Front exposure, district Control, and rival Pressure are clamped.
+- Exposure alone does not apply generic Heat or Loyalty penalties.
+- Each active Front records a lightweight `yieldHistory` entry with week, pressure effects, and
+  exposure delta.
+- Added a single `front_yield` event-log entry per week to summarize network output without
+  flooding the feed.
+- Updated save validation to accept `front_yield` log entries.
+- Updated weekly-resolution expectations to account for the starting Pale Circuit output.
+- Focused Phase 5 suite passed: 34 tests.
+- Full suite passed: 424 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 507.99 kB, under the 600.00 kB warning budget
+```
+
+- The production build with base href `/haunted-apex/` passed without bundle-budget warnings.
+- The structural documentation check passed for six release folders.
+- `git diff --check` passed.
+
 ## Phase 6: Front-Targeted Lay Low
 
 ### Objective

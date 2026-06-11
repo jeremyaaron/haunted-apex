@@ -2,6 +2,7 @@ import { getContactDefinition, getLedgerEntryDefinition } from '../content';
 import type { GameEventInstance, GameState, QueuedOrder } from '../model';
 import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
+import { applyWeeklyFrontYields } from './front-yields';
 import { applyLocalDistrictCooling } from './district-effects';
 import { pruneRecentActivity } from './recent-activity';
 import { applyRivalPassiveEffects } from './rival-effects';
@@ -70,6 +71,7 @@ export function advanceWeek(state: GameState): AdvanceWeekResult {
 
   next = applyIdleStressRecovery(next, state.queuedOrders);
   next = pruneRecentAssignments(next);
+  next = applyWeeklyFrontYields(next);
   next = applyWeeklyDrift(next);
   next = applyLocalDistrictCooling(next);
   next = applyRivalPassiveEffects(next);
