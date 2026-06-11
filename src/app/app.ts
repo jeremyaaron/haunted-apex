@@ -453,6 +453,10 @@ export class App {
   }
 
   protected contactServiceUnavailableReason(service: ContactServiceView): string {
+    if (service.unavailableDetail) {
+      return service.unavailableDetail;
+    }
+
     if (!service.unavailableReason) {
       return '';
     }

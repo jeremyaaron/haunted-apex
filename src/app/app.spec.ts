@@ -109,6 +109,7 @@ describe('App', () => {
     expect(contactPanel?.textContent).toContain('Private Room Access');
     expect(contactPanel?.textContent).toContain('Clean Passage');
     expect(contactPanel?.textContent).toContain('Absolution Protocol');
+    expect(contactPanel?.textContent).toContain('Requires 25 Leverage - Current 18');
     expect(contactPanel?.textContent).not.toContain('contact_mina_glass');
     expect(contactPanel?.textContent).not.toContain('Mina Glass');
 

@@ -63,6 +63,26 @@ describe('Contact selectors', () => {
       .toBeTrue();
   });
 
+  it('explains unmet Contact service requirements with the current metric value', () => {
+    const state = newGame({ seed: 'CONTACT-REQUIREMENT-DETAIL' });
+    state.activeContactIds = [
+      'contact_veyra_lux',
+      'contact_captain_hollis',
+      'contact_father_static',
+    ];
+    state.contacts.contact_father_static.leverage = 18;
+    const view = selectContactView(state, 'contact_father_static');
+    const confessionLeak = view?.services.find((service) => service.id === 'confession_leak');
+
+    expect(confessionLeak).toEqual(
+      jasmine.objectContaining({
+        available: false,
+        unavailableReason: 'requirement_not_met',
+        unavailableDetail: 'Requires 25 Leverage - Current 18',
+      }),
+    );
+  });
+
   it('includes recent interactions and related Ledger links', () => {
     const base = newGame({ seed: 'CONTACT-LINKS-VIEW' });
     const contactId = base.activeContactIds[0]!;
