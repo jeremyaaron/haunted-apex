@@ -131,7 +131,7 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     commandCost: 1,
     resourceCost: 0,
     effects: {},
-    baseRisk: 8,
+    baseRisk: 10,
     stressType: 'none',
     assignment: 'none',
     requiresTarget: true,

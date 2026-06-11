@@ -37,6 +37,7 @@ import { applyTargetedActionConsequences } from './district-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { recordRecentActivity } from './recent-activity';
 import { resolveContactOption } from './resolve-contact';
+import { resolveInvestFront } from './resolve-front-investment';
 
 export type ActionResolution = {
   state: GameState;
@@ -89,6 +90,10 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
 
   if (action.id === 'manage_contact') {
     return resolveContactOption(state, order.target);
+  }
+
+  if (action.id === 'invest_front') {
+    return resolveInvestFront(state, order.target);
   }
 
   const secretDiscoveryPreview = previewSecretDiscovery(state, order);

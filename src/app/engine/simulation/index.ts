@@ -3,6 +3,7 @@ export { queueOrder, removeQueuedOrder } from './queue-order';
 export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
 export { resolveContactOption } from './resolve-contact';
+export { resolveInvestFront } from './resolve-front-investment';
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyDrift } from './weekly-drift';
 export {
