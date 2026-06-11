@@ -1659,7 +1659,9 @@ function recordLedgerOrderStats(stats: LedgerRunStats, decision: LegalOrderOptio
     decision.actionId === 'gather_intel' &&
     decision.target &&
     decision.target.type !== 'ledger' &&
-    decision.target.type !== 'recruit'
+    decision.target.type !== 'recruit' &&
+    decision.target.type !== 'front_opportunity' &&
+    decision.target.type !== 'front'
   ) {
     stats.targetedGatherIntelOrders += 1;
   }
@@ -2762,6 +2764,9 @@ function getTargetReportLabel(target: TargetRunStats): string {
     case 'ledger':
       return target.targetId;
     case 'contact':
+      return target.targetId;
+    case 'front_opportunity':
+    case 'front':
       return target.targetId;
   }
 }

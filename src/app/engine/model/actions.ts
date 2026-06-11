@@ -1,4 +1,5 @@
 import type { ContactId, ContactOptionId } from './contacts';
+import type { FrontId, FrontOpportunityId } from './fronts';
 import type { OperativeId, OperativeSkill } from './operatives';
 import type { PressureDelta } from './pressures';
 import type { DistrictId } from './districts';
@@ -14,7 +15,8 @@ export type ActionId =
   | 'expand_influence'
   | 'lay_low'
   | 'work_the_ledger'
-  | 'manage_contact';
+  | 'manage_contact'
+  | 'invest_front';
 
 export type ActionStressType = 'normal' | 'dangerous' | 'recovery' | 'none';
 
@@ -26,7 +28,9 @@ export type ActionTarget =
   | { type: 'rival'; id: RivalId }
   | { type: 'recruit'; id: OperativeId }
   | { type: 'ledger'; entryId: LedgerEntryId; useOptionId: LedgerUseOptionId }
-  | { type: 'contact'; contactId: ContactId; optionId: ContactOptionId };
+  | { type: 'contact'; contactId: ContactId; optionId: ContactOptionId }
+  | { type: 'front_opportunity'; id: FrontOpportunityId }
+  | { type: 'front'; id: FrontId };
 
 export type ActionDefinition = {
   id: ActionId;

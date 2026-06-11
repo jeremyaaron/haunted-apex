@@ -340,6 +340,65 @@
                 }
               }
 
+              @if (action.frontInvestment; as frontInvestment) {
+                @if (frontInvestment.ok) {
+                  <div class="selection-strip front-investment-preview">
+                    <div>
+                      <span>Front investment</span>
+                      <strong>{{ frontInvestment.frontName }}</strong>
+                    </div>
+                    <p>
+                      {{ displayToken(frontInvestment.mode) }} ·
+                      {{ frontInvestment.districtName }}
+                      @if (frontInvestment.venueName) {
+                        · {{ frontInvestment.venueName }}
+                      }
+                    </p>
+                    <div class="ledger-preview-rows">
+                      @if (frontInvestment.cost > 0) {
+                        <span class="negative">-{{ frontInvestment.cost }} Resources</span>
+                      }
+                      @for (effect of deltaRows(frontInvestment.effects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @for (yield of deltaRows(frontInvestment.weeklyYield); track yield.id) {
+                        <span>
+                          {{ signed(yield.value) }} {{ pressureLabel(yield.id) }} / Week
+                        </span>
+                      }
+                      @if (frontInvestment.districtControlYield > 0) {
+                        <span>Control +{{ frontInvestment.districtControlYield }} / Week</span>
+                      }
+                      <span>
+                        Exposure +{{ frontInvestment.exposureChange }}
+                        → {{ frontInvestment.projectedExposure }}
+                      </span>
+                      <span>
+                        {{ displayToken(frontInvestment.projectedStatus) }} ·
+                        +{{ frontInvestment.weeklyExposureGain }} Exposure / Week
+                      </span>
+                      @if (frontInvestment.rivalPressureWarning; as warning) {
+                        <span class="negative">
+                          {{ warning.rivalName }} Pressure +{{ warning.pressureGain }}
+                          @if (warning.weeklyPressureGain > 0) {
+                            / +{{ warning.weeklyPressureGain }} Weekly
+                          }
+                        </span>
+                      }
+                    </div>
+                  </div>
+                } @else if (
+                  action.selectedTarget?.type === 'front_opportunity' ||
+                  action.selectedTarget?.type === 'front'
+                ) {
+                  <p class="inline-warning">
+                    {{ actionUnavailableReason(frontInvestment.unavailableReason) }}
+                  </p>
+                }
+              }
+
               <button
                 type="button"
                 class="queue-button"

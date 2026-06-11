@@ -12,6 +12,10 @@ import {
   type ContactCostRow,
   type ContactOptionPreview,
 } from '../contacts';
+import {
+  previewFrontInvestment,
+  type FrontInvestmentPreview,
+} from '../fronts';
 import type {
   ActionDefinition,
   ActionAssignmentRule,
@@ -58,6 +62,7 @@ import {
 import { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
 
 export type RiskLabel = 'Very Low' | 'Low' | 'Moderate' | 'High' | 'Severe';
+export type { FrontInvestmentPreview };
 
 export type QueueOrderRequest = {
   actionId: ActionId;
@@ -90,7 +95,10 @@ export type QueueOrderUnavailableReason =
   | 'not_enough_trust'
   | 'not_enough_leverage'
   | 'requirement_not_met'
-  | 'quiet_treatment_no_target';
+  | 'quiet_treatment_no_target'
+  | 'front_cap_reached'
+  | 'front_already_owned'
+  | 'front_already_max_level';
 
 export type OrderAvailability = {
   available: boolean;
@@ -152,6 +160,7 @@ export type ActionPreview = {
   contactCosts?: ContactCostRow[];
   contactEffects?: ContactMetricDeltaView[];
   contactResolvedEffects?: ContactMetricDeltaView[];
+  frontInvestment?: FrontInvestmentPreview;
   secretDiscovery?: SecretDiscoveryPreview;
 };
 
@@ -218,7 +227,8 @@ export function getQueuedResourceCost(state: GameState): number {
       cost +
       getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target) +
       getLedgerUseCost(state, order.target, 'resources') +
-      getContactUseCost(state, order.target, 'resources')
+      getContactUseCost(state, order.target, 'resources') +
+      getFrontInvestmentCost(state, order.target)
     );
   }, 0);
 }
@@ -340,7 +350,29 @@ function getTargetAvailability(
       return getLedgerTargetAvailability(state, target);
     case 'contact':
       return getContactTargetAvailability(state, target);
+    case 'front_opportunity':
+    case 'front':
+      return getFrontTargetAvailability(state, target);
   }
+}
+
+function getFrontTargetAvailability(
+  state: GameState,
+  target: Extract<ActionTarget, { type: 'front_opportunity' | 'front' }>,
+): OrderAvailability {
+  const preview = previewFrontInvestment(state, target);
+
+  if (!preview.ok) {
+    return unavailable(preview.unavailableReason);
+  }
+
+  if (state.pressures.resources - getQueuedResourceCost(state) < preview.cost) {
+    return unavailable('not_enough_resources');
+  }
+
+  return {
+    available: true,
+  };
 }
 
 function getContactTargetAvailability(
@@ -434,6 +466,9 @@ export function getActionPreview(
   const contactUse = action.id === 'manage_contact'
     ? previewContactOption(state, target, baseRiskChance)
     : undefined;
+  const frontInvestment = action.id === 'invest_front'
+    ? previewFrontInvestment(state, target)
+    : undefined;
   const secretDiscovery = previewSecretDiscovery(state, {
     actionId: action.id,
     assignedOperativeId,
@@ -443,13 +478,15 @@ export function getActionPreview(
     ? contactUse.effects
     : ledgerUse?.ok
       ? ledgerUse.effects
-      : getAdjustedEffects(
-          action,
-        assignedOperativeId,
-        state,
-        target,
-        modifiers,
-      );
+      : frontInvestment?.ok
+        ? frontInvestment.effects
+        : getAdjustedEffects(
+            action,
+            assignedOperativeId,
+            state,
+            target,
+            modifiers,
+          );
   const riskChance = contactUse?.riskChance ?? ledgerUse?.riskChance ?? baseRiskChance;
 
   return {
@@ -463,13 +500,15 @@ export function getActionPreview(
       ? contactUse.cost.resources
       : ledgerUse?.ok
         ? ledgerUse.cost.resources
-        : getAdjustedResourceCost(
-          action,
-          assignedOperativeId,
-          state,
-          target,
-          modifiers,
-        ),
+        : frontInvestment?.ok
+          ? frontInvestment.cost
+          : getAdjustedResourceCost(
+              action,
+              assignedOperativeId,
+              state,
+              target,
+              modifiers,
+            ),
     baseEffects: { ...action.effects },
     adjustedEffects,
     selectedOperativeId: assignedOperativeId,
@@ -511,6 +550,7 @@ export function getActionPreview(
     contactResolvedEffects: contactUse?.ok
       ? contactMetricDeltaToView(contactUse.resolvedContactEffects)
       : undefined,
+    frontInvestment,
     secretDiscovery,
   };
 }
@@ -525,6 +565,7 @@ export function selectActionCards(state: GameState): ActionCardView[] {
     'lay_low',
     'work_the_ledger',
     'manage_contact',
+    'invest_front',
   ] satisfies ActionId[];
 
   return actionIds.map((actionId) => {
@@ -1070,6 +1111,15 @@ function getContactUseCost(
 
   const preview = previewContactOption(state, target);
   return preview.ok ? preview.cost[costId] : 0;
+}
+
+function getFrontInvestmentCost(state: GameState, target: ActionTarget | undefined): number {
+  if (target?.type !== 'front_opportunity' && target?.type !== 'front') {
+    return 0;
+  }
+
+  const preview = previewFrontInvestment(state, target);
+  return preview.ok ? preview.cost : 0;
 }
 
 function getQueuedContactMetricCost(

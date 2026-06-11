@@ -2,6 +2,7 @@ import {
   getActionDefinition,
   getContactDefinition,
   getDistrictDefinition,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
@@ -28,6 +29,7 @@ import type {
   VenueArchetype,
   VenueId,
 } from '../model';
+import { previewFrontInvestment } from '../fronts';
 import { getRivalPressureTier } from './rivals';
 import { selectActiveLedgerEntryViews } from '../ledger';
 import {
@@ -68,10 +70,24 @@ export type LedgerTargetOption = {
   unavailableReason?: string;
 };
 
+export type FrontTargetOption = {
+  target: Extract<ActionTarget, { type: 'front_opportunity' | 'front' }>;
+  label: string;
+  targetType: 'front_opportunity' | 'front';
+  mode: 'establish' | 'upgrade';
+  frontName: string;
+  districtName?: string;
+  venueName?: string;
+  relatedRivalName?: string;
+  affordable: boolean;
+  unavailableReason?: string;
+};
+
 export type ActionTargetOption =
   | TerritoryTargetOption
   | RecruitTargetOption
   | LedgerTargetOption
+  | FrontTargetOption
   | ContactTargetOption;
 
 export type VenueTerritoryView = {
@@ -249,6 +265,82 @@ export function selectActionTargetOptions(
     options.push(...selectManageContactTargetOptions(state));
   }
 
+  if (allowedTypes.has('front_opportunity')) {
+    for (const opportunity of state.frontOpportunities) {
+      const definition = getFrontDefinition(opportunity.definitionId);
+
+      if (!definition) {
+        continue;
+      }
+
+      const target = {
+        type: 'front_opportunity' as const,
+        id: opportunity.id,
+      };
+      const preview = previewFrontInvestment(state, target);
+      const district = getDistrictDefinition(opportunity.districtId);
+      const venue = opportunity.venueId ? getVenueDefinition(opportunity.venueId) : undefined;
+      const rival = opportunity.relatedRivalId
+        ? getRivalDefinition(opportunity.relatedRivalId)
+        : undefined;
+
+      options.push({
+        target,
+        label: `${definition.name} - Establish`,
+        targetType: 'front_opportunity',
+        mode: 'establish',
+        frontName: definition.name,
+        districtName: district?.name,
+        venueName: venue?.name,
+        relatedRivalName: rival?.name,
+        affordable: preview.ok && state.pressures.resources >= preview.cost,
+        ...(!preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
+        ...(preview.ok && state.pressures.resources < preview.cost
+          ? { unavailableReason: 'not_enough_resources' }
+          : {}),
+      });
+    }
+  }
+
+  if (allowedTypes.has('front')) {
+    for (const front of Object.values(state.fronts)) {
+      if (!front?.active) {
+        continue;
+      }
+
+      const definition = getFrontDefinition(front.definitionId);
+
+      if (!definition) {
+        continue;
+      }
+
+      const target = {
+        type: 'front' as const,
+        id: front.id,
+      };
+      const preview = previewFrontInvestment(state, target);
+      const district = getDistrictDefinition(front.districtId);
+      const venue = front.venueId ? getVenueDefinition(front.venueId) : undefined;
+      const rival = front.relatedRivalId ? getRivalDefinition(front.relatedRivalId) : undefined;
+
+      options.push({
+        target,
+        label: `${definition.name} - Upgrade`,
+        targetType: 'front',
+        mode: 'upgrade',
+        frontName: definition.name,
+        districtName: district?.name,
+        venueName: venue?.name,
+        relatedRivalName: rival?.name,
+        affordable: preview.ok && state.pressures.resources >= preview.cost,
+        ...(!preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
+        ...(preview.ok && state.pressures.resources < preview.cost
+          ? { unavailableReason: 'not_enough_resources' }
+          : {}),
+      });
+    }
+  }
+
   return options;
 }
 
@@ -350,6 +442,8 @@ export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | und
     case 'recruit':
     case 'ledger':
     case 'contact':
+    case 'front_opportunity':
+    case 'front':
       return undefined;
   }
 }
@@ -373,6 +467,8 @@ export function getTargetTags(target?: ActionTarget): string[] {
       return [...(getContactDefinition(target.contactId)?.roleTags ?? [])];
     case 'recruit':
     case 'ledger':
+    case 'front_opportunity':
+    case 'front':
       return [];
   }
 }
@@ -402,6 +498,8 @@ export function getTargetControllerId(target?: ActionTarget): RivalId | undefine
       return getContactDefinition(target.contactId)?.associatedRivalId;
     case 'recruit':
     case 'ledger':
+    case 'front_opportunity':
+    case 'front':
       return undefined;
   }
 }
@@ -445,6 +543,20 @@ export function getTargetLabel(target?: ActionTarget, state?: GameState): string
         ? `${definition.name} - ${useOption.label}`
         : target.entryId;
     }
+    case 'front_opportunity': {
+      const opportunity = state?.frontOpportunities.find(
+        (candidate) => candidate.id === target.id,
+      );
+      const definition = opportunity ? getFrontDefinition(opportunity.definitionId) : undefined;
+
+      return definition ? `${definition.name} - Establish` : target.id;
+    }
+    case 'front': {
+      const front = state?.fronts[target.id];
+      const definition = front ? getFrontDefinition(front.definitionId) : undefined;
+
+      return definition ? `${definition.name} - Upgrade` : target.id;
+    }
   }
 }
 
@@ -458,7 +570,9 @@ export function calculateTargetControlGain(
     target.type === 'rival' ||
     target.type === 'recruit' ||
     target.type === 'ledger' ||
-    target.type === 'contact'
+    target.type === 'contact' ||
+    target.type === 'front_opportunity' ||
+    target.type === 'front'
   ) {
     return 0;
   }
@@ -475,6 +589,7 @@ export function calculateTargetControlGain(
     case 'lay_low':
     case 'work_the_ledger':
     case 'manage_contact':
+    case 'invest_front':
       return 0;
   }
 }

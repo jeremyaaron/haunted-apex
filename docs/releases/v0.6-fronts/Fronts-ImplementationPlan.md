@@ -505,6 +505,58 @@ Unit tests:
 
 Confirm preview accuracy before allowing investments to resolve.
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Added `invest_front` to action content as a target-required, no-operative-assignment
+  command.
+- Extended `ActionTarget` with:
+
+```text
+front_opportunity
+front
+```
+
+- Added reusable Front investment preview logic for Phase 4 resolution reuse.
+- Front establish previews now include setup cost, immediate effects, projected weekly yield,
+  district Control yield, exposure change, projected status, weekly exposure gain, related rival,
+  and rival pressure warning where applicable.
+- Front upgrade previews now include upgrade cost, immediate effects, level 2 weekly yield,
+  district Control yield, current/projected exposure, projected status, and weekly exposure gain.
+- `selectActionTargetOptions` now exposes:
+  - generated Front opportunities as establish targets
+  - owned active Fronts as upgrade targets
+  - level 2 Fronts as visible max-level disabled targets
+- Added unavailable reasons for:
+
+```text
+front_cap_reached
+front_already_owned
+front_already_max_level
+```
+
+- Establish targets become unavailable at the owned active Front cap.
+- Upgrade targets remain available while the Front cap is full.
+- Unaffordable Front investments are unavailable and display Resource shortfall copy.
+- The command card UI now renders a compact Front investment preview strip when a Front target
+  is selected.
+- Storage target parsing, harness target reporting, Ledger labels, and secret-discovery target
+  narrowing now tolerate the new Front target types.
+- Focused Phase 3 suite passed: 111 tests.
+- Full suite passed: 410 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed.
+- The production build with base href `/haunted-apex/` passed.
+- Both builds reported the same non-fatal Angular budget warning:
+
+```text
+initial bundle 503.52 kB, 3.52 kB over the 500.00 kB warning budget
+```
+
+- The structural documentation check passed for six release folders.
+- `git diff --check` passed.
+
 ## Phase 4: Invest in Front Resolution
 
 ### Objective

@@ -32,6 +32,7 @@ export type {
   ActionCardView,
   ActionPreview,
   ContactMetricDeltaView,
+  FrontInvestmentPreview,
   LocalImpactPreview,
   OperativeAssignmentPreview,
   OperativeOptionView,
@@ -57,6 +58,7 @@ export {
 export type {
   ActionTargetOption,
   DistrictTerritoryView,
+  FrontTargetOption,
   RecruitTargetOption,
   RivalTerritoryView,
   TerritoryTargetOption,

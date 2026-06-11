@@ -198,7 +198,12 @@ export class App {
     const unavailable = this.targetOptionUnavailableText(option);
     const suffix = unavailable ? ` (${unavailable})` : '';
 
-    if (option.targetType === 'venue' && option.districtName) {
+    if (
+      (option.targetType === 'venue' ||
+        option.targetType === 'front_opportunity' ||
+        option.targetType === 'front') &&
+      option.districtName
+    ) {
       return `${option.districtName} / ${option.label}${suffix}`;
     }
 
@@ -211,7 +216,10 @@ export class App {
 
   protected targetOptionDisabled(option: ActionTargetOption): boolean {
     return (
-      (option.targetType === 'ledger' || option.targetType === 'contact') &&
+      (option.targetType === 'ledger' ||
+        option.targetType === 'contact' ||
+        option.targetType === 'front_opportunity' ||
+        option.targetType === 'front') &&
       option.affordable === false
     );
   }
@@ -492,6 +500,16 @@ export class App {
         return 'This contact option requirement is not met.';
       case 'quiet_treatment_no_target':
         return 'No stressed operative is available for Quiet Treatment.';
+      case 'target_not_found':
+        return 'That target is no longer available.';
+      case 'target_not_allowed':
+        return 'That target is not legal for this order.';
+      case 'front_cap_reached':
+        return 'Front capacity is full.';
+      case 'front_already_owned':
+        return 'This Front is already owned.';
+      case 'front_already_max_level':
+        return 'This Front is already max level.';
       case 'ledger_target_required':
         return 'Select a Ledger entry and use option.';
       case 'ledger_entry_unknown':
@@ -507,9 +525,15 @@ export class App {
 
   private targetOptionUnavailableText(option: ActionTargetOption): string {
     if (
-      (option.targetType !== 'ledger' && option.targetType !== 'contact') ||
-      option.affordable
+      option.targetType !== 'ledger' &&
+      option.targetType !== 'contact' &&
+      option.targetType !== 'front_opportunity' &&
+      option.targetType !== 'front'
     ) {
+      return '';
+    }
+
+    if (option.affordable) {
       return '';
     }
 

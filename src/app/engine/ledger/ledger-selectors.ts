@@ -283,6 +283,9 @@ function getTargetLabel(target: ActionTarget): string | undefined {
       const contact = getContactDefinition(target.contactId);
       return contact ? `${contact.name} - ${target.optionId}` : target.contactId;
     }
+    case 'front_opportunity':
+    case 'front':
+      return target.id;
     case 'ledger':
       return target.entryId;
   }

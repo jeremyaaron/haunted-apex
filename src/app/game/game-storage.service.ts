@@ -23,6 +23,7 @@ import {
   type DistrictId,
   type FrontDefinitionId,
   type FrontId,
+  type FrontOpportunityId,
   type GameState,
   type LedgerEntryDefinitionId,
   type LedgerEntryKind,
@@ -975,6 +976,20 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
         ? {
             type: 'recruit',
             id: id as OperativeId,
+          }
+        : undefined;
+    case 'front_opportunity':
+      return id.startsWith('front_opportunity_')
+        ? {
+            type: 'front_opportunity',
+            id: id as FrontOpportunityId,
+          }
+        : undefined;
+    case 'front':
+      return getFrontDefinition(id as FrontDefinitionId)
+        ? {
+            type: 'front',
+            id: id as FrontId,
           }
         : undefined;
     default:
