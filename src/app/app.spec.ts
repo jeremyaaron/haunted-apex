@@ -214,6 +214,8 @@ describe('App', () => {
     expect(contactCard.textContent).toContain('+8 Volatility');
     expect(contactCard.textContent).toContain('Creates Debt: Owes the Liaison');
     expect(contactCard.textContent).toContain('Nyx Ardent Pressure +6');
+    expect(contactCard.querySelector('.rival-warning')?.textContent).toContain('Nyx Ardent');
+    expect(contactCard.querySelector('.rival-warning')?.textContent).toContain('Pressure +6');
     expect(findButton(contactCard, 'Queue Order').disabled).toBeFalse();
   });
 

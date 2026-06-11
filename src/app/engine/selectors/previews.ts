@@ -484,12 +484,15 @@ export function getActionPreview(
     targetLabel: getTargetLabel(target, state),
     riskChance,
     riskLabel: riskLabel(riskChance),
-    rivalAttention: getRivalAttentionPreview(
-      state,
-      action.id,
-      target,
-      modifiers.rivalPressureModifier,
-    ),
+    rivalAttention:
+      action.id === 'manage_contact'
+        ? getContactRivalAttentionPreview(state, contactUse)
+        : getRivalAttentionPreview(
+            state,
+            action.id,
+            target,
+            modifiers.rivalPressureModifier,
+          ),
     localImpact: getLocalImpactPreview(
       state,
       action.id,
@@ -779,6 +782,41 @@ function getRivalAttentionPreview(
   }
 
   const pressureGain = calculateRivalPressureGain(actionId, operativeModifier);
+  const projectedPressure = Math.min(100, Math.max(0, rivalState.pressure + pressureGain));
+
+  return {
+    rivalId,
+    rivalName: rival.name,
+    pressureGain,
+    currentPressure: rivalState.pressure,
+    projectedPressure,
+    projectedTier: getRivalPressureTier(projectedPressure),
+  };
+}
+
+function getContactRivalAttentionPreview(
+  state: GameState,
+  contactUse: ContactOptionPreview | undefined,
+): RivalAttentionPreview | undefined {
+  if (!contactUse?.ok) {
+    return undefined;
+  }
+
+  const [rivalId, pressureGain] =
+    (Object.entries(contactUse.rivalPressureEffects) as [RivalId, number][])
+      .find(([, value]) => value !== 0) ?? [];
+
+  if (!rivalId || pressureGain === undefined) {
+    return undefined;
+  }
+
+  const rival = getRivalDefinition(rivalId);
+  const rivalState = state.rivals[rivalId];
+
+  if (!rival || !rivalState) {
+    return undefined;
+  }
+
   const projectedPressure = Math.min(100, Math.max(0, rivalState.pressure + pressureGain));
 
   return {

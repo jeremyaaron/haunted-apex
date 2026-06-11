@@ -39,3 +39,4 @@
 - [`v0.5A.md`](releases/v0.5-entanglements/v0.5A.md): locked mechanical decisions.
 - [`Entanglements-TDD.md`](releases/v0.5-entanglements/Entanglements-TDD.md): technical design.
 - [`Entanglements-ImplementationPlan.md`](releases/v0.5-entanglements/Entanglements-ImplementationPlan.md): phased implementation plan.
+- [`Entanglements-ReleaseNotes.md`](releases/v0.5-entanglements/Entanglements-ReleaseNotes.md): release notes draft.

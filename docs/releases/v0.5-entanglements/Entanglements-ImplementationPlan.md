@@ -1351,6 +1351,55 @@ finish or force-end a run
 inspect run-end Contact report
 ```
 
+### Completion Record
+
+Completed June 10, 2026:
+
+- Added the v0.5 release notes draft:
+  - `docs/releases/v0.5-entanglements/Entanglements-ReleaseNotes.md`
+- Updated root and docs README links so the Entanglements release notes are discoverable.
+- Corrected the Manage Contact rival pressure preview so Contact service pressure effects
+  match the detailed Contact option preview.
+- Verified Contact debug data remains behind existing debug surfaces; normal play exposes
+  Contact state through the Contact panel, previews, Ledger links, event feed, Field Guide,
+  and run-end report.
+- Package metadata remains unchanged.
+- Captured the final deterministic 100-runs-per-agent harness snapshot using seed prefix
+  `V05-PHASE11-FINAL`:
+
+```text
+Random:           0% wins, 0 incomplete, avg 5.61 weeks, 1.90 Contact uses/run
+Aggressive:      54% wins, 0 incomplete, avg 5.20 weeks, 1.32 Contact uses/run
+Cautious:         0% wins, 0 incomplete, avg 7.84 weeks, 0.32 Contact uses/run
+Greedy:          45% wins, 0 incomplete, avg 7.64 weeks, 0.88 Contact uses/run
+Operator / Sane: 53% wins, 0 incomplete, avg 6.00 weeks, 2.09 Contact uses/run
+```
+
+- Contact metric averages from the same harness sample:
+
+```text
+Random:           0.00 burned, final Trust 40.09, Leverage 21.27, Volatility 49.68, Exposure 35.43
+Aggressive:      0.00 burned, final Trust 38.58, Leverage 18.39, Volatility 49.09, Exposure 36.29
+Cautious:         0.00 burned, final Trust 40.13, Leverage 19.29, Volatility 47.73, Exposure 35.81
+Greedy:          0.00 burned, final Trust 37.93, Leverage 19.81, Volatility 50.62, Exposure 36.68
+Operator / Sane: 0.00 burned, final Trust 38.35, Leverage 19.65, Volatility 49.34, Exposure 38.22
+```
+
+- Final validation:
+
+```text
+Full Angular suite:      383 passed.
+App TypeScript check:    passed.
+Spec TypeScript check:   passed.
+Standard build:          passed.
+GitHub Pages build:      passed with base href /haunted-apex/.
+Docs check:              passed for five release folders.
+Whitespace check:        passed.
+```
+
+- No development server, persistent Karma watcher, temporary harness file, or browser-debug
+  process from this Phase 11 pass was left running.
+
 ### Review Gate
 
 Merge to `main`, wait for Pages deployment, smoke test the deployed build, then tag
