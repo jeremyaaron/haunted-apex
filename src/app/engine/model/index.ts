@@ -26,12 +26,7 @@ export type {
   ContactStatus,
   UniversalContactOptionDefinition,
 } from './contacts';
-export type {
-  DistrictArchetype,
-  DistrictDefinition,
-  DistrictId,
-  DistrictState,
-} from './districts';
+export type { DistrictArchetype, DistrictDefinition, DistrictId, DistrictState } from './districts';
 export type {
   Difficulty,
   GameLogEntry,
@@ -42,6 +37,16 @@ export type {
   NewGameConfig,
   TurnPhase,
 } from './game-state';
+export type {
+  FactionArchetype,
+  FactionDefinition,
+  FactionId,
+  FactionInteraction,
+  FactionMetricDelta,
+  FactionRoleTag,
+  FactionState,
+  FactionStatus,
+} from './factions';
 export type {
   FrontArchetype,
   FrontDefinition,

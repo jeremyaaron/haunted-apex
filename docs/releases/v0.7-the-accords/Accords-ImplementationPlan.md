@@ -283,6 +283,73 @@ Unit tests:
 - `deriveFactionStatus` returns correct labels for major metric combinations.
 - Faction metric clamp helper keeps metrics between 0 and 100.
 
+### Completion Record
+
+Completed June 12, 2026:
+
+- Added Faction domain contracts in `src/app/engine/model/factions.ts`:
+  - `FactionId`
+  - `FactionStatus`
+  - `FactionArchetype`
+  - `FactionRoleTag`
+  - `FactionMetricDelta`
+  - `FactionInteraction`
+  - `FactionState`
+  - `FactionDefinition`
+- Added the five v0.7 Faction definitions in `src/app/engine/content/factions.ts`:
+  - Ashline Bureau
+  - Helix Meridian
+  - Velvet House
+  - Chrome Maw
+  - Ghostline Communion
+- Added the `getFactionDefinition` registry helper.
+- Added Faction helper APIs in `src/app/engine/factions/`:
+  - `deriveFactionStatus`
+  - `clampFactionMetric`
+- Added model, content, and engine barrel exports.
+- Added direct optional `associatedFactionId` fields to Rival and Contact definitions.
+- Wired the locked Phase 1 direct associations:
+
+```text
+Nyx Ardent -> Velvet House
+Knox Marrow -> Chrome Maw
+Captain Hollis -> Ashline Bureau
+Veyra Lux -> Velvet House
+Ciro Moth -> Ghostline Communion
+```
+
+- Faction definitions now hold authored associations to existing districts, venues, rivals,
+  contacts, and supported Front role tags.
+- Faction event hooks are present as empty arrays for now. Phase 9 owns faction event content.
+- Accord linkage is intentionally deferred. Phase 2 owns `AccordId`, Accord definitions, and
+  faction-to-accord content validation.
+- No Faction state was added to live `GameState`.
+- No save schema, storage key, action, new-game, UI, event, harness, or balance behavior changed.
+- Added focused tests for:
+  - faction content registry shape and lookups
+  - supported Faction archetypes and role tags
+  - valid base Standing, Suspicion, and Obligation values
+  - district, venue, rival, contact, and Front role-tag association resolution
+  - locked direct Rival and Contact faction associations
+  - `deriveFactionStatus` threshold priority
+  - faction metric clamping
+- Extended existing Contact and Rival Territory content specs to verify direct
+  `associatedFactionId` references resolve.
+- Focused Phase 1 suite passed: 22 tests.
+- Full suite passed: 460 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 554.00 kB, under the 600.00 kB warning budget
+```
+
+- The production build with base href `/haunted-apex/` passed without bundle-budget warnings.
+- The structural documentation check passed for seven release folders.
+- `git diff --check` passed.
+- No dev, Karma, or browser-debug process from this phase was left running. An existing
+  user-owned `ng serve` process with pid `31958` was detected and intentionally left alone.
+
 ### Review Gate
 
 Confirm the faction content slice before adding Accord definitions.

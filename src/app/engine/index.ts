@@ -1,5 +1,6 @@
 export * from './content';
 export * from './contacts';
+export * from './factions';
 export * from './fronts';
 export * from './ledger';
 export * from './model';

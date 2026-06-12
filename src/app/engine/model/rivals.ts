@@ -1,4 +1,5 @@
 import type { DistrictId } from './districts';
+import type { FactionId } from './factions';
 import type { PressureId } from './pressures';
 import type { VenueId } from './venues';
 
@@ -18,6 +19,7 @@ export type RivalDefinition = {
   socialControl: number;
   baseDisposition: number;
   preferredPressureAttack: Exclude<PressureId, 'ruin'>;
+  associatedFactionId?: FactionId;
   controlledDistrictIds: readonly DistrictId[];
   controlledVenueIds: readonly VenueId[];
   traits: readonly string[];

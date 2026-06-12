@@ -1,5 +1,6 @@
 import {
   getDistrictDefinition,
+  getFactionDefinition,
   getRivalDefinition,
   getVenueDefinition,
   RIVAL_TERRITORY_DISTRICTS,
@@ -55,6 +56,12 @@ describe('Rival Territory content', () => {
       for (const venueId of rival.controlledVenueIds) {
         expect(getVenueDefinition(venueId))
           .withContext(`${rival.id} controls ${venueId}`)
+          .toBeDefined();
+      }
+
+      if (rival.associatedFactionId) {
+        expect(getFactionDefinition(rival.associatedFactionId))
+          .withContext(`${rival.id} references faction ${rival.associatedFactionId}`)
           .toBeDefined();
       }
     }

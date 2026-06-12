@@ -1,8 +1,4 @@
-import type {
-  ContactDefinition,
-  ContactId,
-  UniversalContactOptionDefinition,
-} from '../model';
+import type { ContactDefinition, ContactId, UniversalContactOptionDefinition } from '../model';
 
 export const UNIVERSAL_CONTACT_OPTIONS = [
   {
@@ -46,6 +42,7 @@ export const CONTACT_DEFINITIONS = [
     associatedDistrictId: 'district_violet_ward',
     associatedVenueId: 'venue_glass_saint',
     associatedRivalId: 'rival_nyx_ardent',
+    associatedFactionId: 'faction_velvet_house',
     baseTrust: 42,
     baseLeverage: 18,
     baseVolatility: 55,
@@ -105,6 +102,7 @@ export const CONTACT_DEFINITIONS = [
     archetype: 'official',
     roleTags: ['heat_control', 'security', 'ledger', 'stability'],
     associatedDistrictId: 'district_chrome_narrows',
+    associatedFactionId: 'faction_ashline_bureau',
     baseTrust: 35,
     baseLeverage: 30,
     baseVolatility: 35,
@@ -219,6 +217,7 @@ export const CONTACT_DEFINITIONS = [
     roleTags: ['intel', 'weird', 'ruin', 'ledger'],
     associatedDistrictId: 'district_ghostline_market',
     associatedVenueId: 'venue_black_halo_exchange',
+    associatedFactionId: 'faction_ghostline_communion',
     baseTrust: 28,
     baseLeverage: 22,
     baseVolatility: 65,
@@ -318,7 +317,8 @@ export const CONTACT_DEFINITIONS = [
     eventIds: [],
     generationTags: ['nightlife', 'social', 'resources', 'intel'],
     flavor: {
-      dossier: 'Mina inherited a club, three enemies, and a guest list that could collapse a ministry.',
+      dossier:
+        'Mina inherited a club, three enemies, and a guest list that could collapse a ministry.',
       visualTags: ['guest_list', 'club_heir', 'ministry_money'],
     },
   },
@@ -351,7 +351,7 @@ export const CONTACT_DEFINITIONS = [
       {
         id: 'confession_leak',
         label: 'Confession Leak',
-        description: 'Turn someone else\'s confession into usable leverage before it turns back.',
+        description: "Turn someone else's confession into usable leverage before it turns back.",
         requirements: [
           {
             type: 'min_leverage',

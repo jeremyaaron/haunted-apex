@@ -2,6 +2,7 @@ import {
   CONTACT_DEFINITIONS,
   getContactDefinition,
   getDistrictDefinition,
+  getFactionDefinition,
   getLedgerEntryDefinition,
   getRivalDefinition,
   getVenueDefinition,
@@ -68,18 +69,14 @@ describe('Contact content', () => {
       expect(supportedArchetypes.has(definition.archetype))
         .withContext(`${definition.id} archetype ${definition.archetype}`)
         .toBeTrue();
-      expect(definition.name.trim())
-        .withContext(`${definition.id} name`)
-        .not.toBe('');
+      expect(definition.name.trim()).withContext(`${definition.id} name`).not.toBe('');
       expect(definition.roleTags.length)
         .withContext(`${definition.id} role tags`)
         .toBeGreaterThan(0);
       expect(definition.generationTags.length)
         .withContext(`${definition.id} generation tags`)
         .toBeGreaterThan(0);
-      expect(definition.flavor.dossier.trim())
-        .withContext(`${definition.id} dossier`)
-        .not.toBe('');
+      expect(definition.flavor.dossier.trim()).withContext(`${definition.id} dossier`).not.toBe('');
       expect(definition.services.length)
         .withContext(`${definition.id} services`)
         .toBeGreaterThanOrEqual(2);
@@ -124,6 +121,12 @@ describe('Contact content', () => {
       if (definition.associatedRivalId) {
         expect(getRivalDefinition(definition.associatedRivalId))
           .withContext(`${definition.id} rival ${definition.associatedRivalId}`)
+          .toBeDefined();
+      }
+
+      if (definition.associatedFactionId) {
+        expect(getFactionDefinition(definition.associatedFactionId))
+          .withContext(`${definition.id} faction ${definition.associatedFactionId}`)
           .toBeDefined();
       }
     }
@@ -175,9 +178,7 @@ describe('Contact content', () => {
         .toBe(serviceIds.length);
 
       for (const service of definition.services) {
-        expect(service.id.trim())
-          .withContext(`${definition.id} service id`)
-          .not.toBe('');
+        expect(service.id.trim()).withContext(`${definition.id} service id`).not.toBe('');
         expect(service.label.trim())
           .withContext(`${definition.id} ${service.id} label`)
           .not.toBe('');
