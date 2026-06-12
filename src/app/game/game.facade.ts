@@ -21,6 +21,7 @@ import {
   selectActiveContacts,
   selectAssignmentOptions,
   selectActionTargetOptions,
+  selectFrontPanelView,
   selectLedgerPanelView,
   selectDistrictTerritoryViews,
   selectHirePoolViews,
@@ -76,6 +77,7 @@ export class GameFacade {
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
+  readonly fronts = computed(() => selectFrontPanelView(this.stateSignal()));
   readonly contacts = computed<ContactView[]>(() => selectActiveContacts(this.stateSignal()));
   readonly runSummary = computed<RunSummaryReport | undefined>(() => {
     const state = this.stateSignal();

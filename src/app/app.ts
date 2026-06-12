@@ -24,6 +24,7 @@ import {
   type ContactServiceView,
   type EventChoiceDefinition,
   type FrontEffectPreviewRow,
+  type FrontInvestmentPanelView,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
   type HireCandidateView,
@@ -489,6 +490,33 @@ export class App {
       default:
         return option.unavailableReason ? this.displayToken(option.unavailableReason) : '';
     }
+  }
+
+  protected frontInvestmentUnavailableReason(investment: FrontInvestmentPanelView): string {
+    switch (investment.unavailableReason) {
+      case 'front_cap_reached':
+        return 'Front cap reached';
+      case 'front_already_owned':
+        return 'Already owned';
+      case 'front_already_max_level':
+        return 'Max Level';
+      case 'not_enough_resources':
+        return 'Not enough Resources';
+      case 'target_not_found':
+        return 'Target unavailable';
+      case 'target_required':
+        return 'Target required';
+      case 'target_not_allowed':
+        return 'Target not allowed';
+      default:
+        return investment.unavailableReason
+          ? this.displayToken(investment.unavailableReason)
+          : 'Unavailable';
+    }
+  }
+
+  protected frontInvestmentLabel(investment: FrontInvestmentPanelView): string {
+    return investment.mode === 'upgrade' ? 'Upgrade' : 'Establish';
   }
 
   protected contactServiceUnavailableReason(service: ContactServiceView): string {

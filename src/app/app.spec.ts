@@ -5,6 +5,8 @@ import {
   getOperativeDefinition,
   materializeOperativeState,
   newGame,
+  type FrontId,
+  type FrontState,
   type GameState,
 } from './engine';
 import {
@@ -66,6 +68,11 @@ describe('App', () => {
     expect(compiled.querySelectorAll('.hire-card').length).toBe(4);
     expect(compiled.textContent).toContain('Contact Network');
     expect(compiled.textContent).toContain('Available Recruits');
+    expect(compiled.textContent).toContain('Front Network');
+    expect(compiled.textContent).toContain('Owned Operations and Openings');
+    expect(compiled.textContent).toContain('The Pale Circuit');
+    expect(compiled.textContent).toContain('Weekly Infrastructure');
+    expect(compiled.textContent).toContain('Available Fronts');
     expect(compiled.textContent).toContain('Dominion target 90');
     expect(compiled.textContent).toContain('Win at 90');
     expect(compiled.textContent).toContain('Warning at 25');
@@ -76,7 +83,72 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Watching (0-24)');
     expect(compiled.textContent).toContain('do not modify actions in this release');
     expect(compiled.textContent).toContain('Rarity changes how often an operative appears');
+    expect(compiled.textContent).toContain('Fronts are owned operations');
+    expect(compiled.textContent).toContain('Lay Low can target an owned Front');
     expect(compiled.textContent).not.toContain('operative_stress_at_least');
+  });
+
+  it('renders Front panel ownership, yields, opportunities, and investment details', () => {
+    const state = newGame({ seed: 'PHASE-8-FRONT-PANEL' });
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const frontPanel = compiled.querySelector<HTMLElement>('.front-panel');
+
+    expect(frontPanel?.textContent).toContain('Front Network');
+    expect(frontPanel?.textContent).toContain('1 / 3');
+    expect(frontPanel?.textContent).toContain('The Pale Circuit');
+    expect(frontPanel?.textContent).toContain('Level');
+    expect(frontPanel?.textContent).toContain('1 / 2');
+    expect(frontPanel?.textContent).toContain('Exposure');
+    expect(frontPanel?.textContent).toContain('Violet Ward');
+    expect(frontPanel?.textContent).toContain('Nyx Ardent');
+    expect(frontPanel?.textContent).toContain('+250 Resources');
+    expect(frontPanel?.textContent).toContain('+1 Loyalty');
+    expect(frontPanel?.textContent).toContain('Control +1');
+    expect(frontPanel?.textContent).toContain('Upgrade');
+    expect(frontPanel?.textContent).toContain('1200 Resources');
+    expect(frontPanel?.querySelectorAll('.opportunity-card').length).toBeGreaterThan(0);
+    expect(frontPanel?.textContent).toContain('Establish Preview');
+  });
+
+  it('renders Front cap reached state in the panel', () => {
+    const base = newGame({ seed: 'PHASE-8-FRONT-CAP' });
+    const state: GameState = {
+      ...base,
+      fronts: {
+        front_pale_circuit: frontState('front_pale_circuit', {
+          districtId: 'district_violet_ward',
+          venueId: 'venue_pale_circuit',
+          relatedRivalId: 'rival_nyx_ardent',
+        }),
+        front_black_clinic: frontState('front_black_clinic', {
+          districtId: 'district_ghostline_market',
+        }),
+        front_courier_line: frontState('front_courier_line', {
+          districtId: 'district_chrome_narrows',
+        }),
+      },
+      frontOpportunities: base.frontOpportunities.filter(
+        (opportunity) =>
+          ![
+            'front_pale_circuit',
+            'front_black_clinic',
+            'front_courier_line',
+          ].includes(opportunity.definitionId),
+      ),
+    };
+    storeState(state);
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const frontPanel = compiled.querySelector<HTMLElement>('.front-panel');
+
+    expect(frontPanel?.textContent).toContain('3 / 3');
+    expect(frontPanel?.textContent).toContain('Front cap reached');
+    expect(frontPanel?.textContent).toContain('Black Clinic');
+    expect(frontPanel?.textContent).toContain('Courier Line');
   });
 
   it('renders active Contacts with display labels, metrics, and services', () => {
@@ -1085,5 +1157,25 @@ function buildGameOverState(result: 'victory' | 'loss'): GameState {
         title: 'Debt Comes Due: Owes the Liaison',
       },
     ],
+  };
+}
+
+function frontState(
+  id: FrontId,
+  overrides: Partial<FrontState> & Pick<FrontState, 'districtId'>,
+): FrontState {
+  return {
+    id,
+    definitionId: id,
+    districtId: overrides.districtId,
+    ...(overrides.venueId ? { venueId: overrides.venueId } : {}),
+    ...(overrides.relatedRivalId ? { relatedRivalId: overrides.relatedRivalId } : {}),
+    level: overrides.level ?? 1,
+    exposure: overrides.exposure ?? 12,
+    establishedWeek: overrides.establishedWeek ?? 1,
+    compromised: overrides.compromised ?? false,
+    active: overrides.active ?? true,
+    flags: overrides.flags ?? {},
+    yieldHistory: overrides.yieldHistory ?? [],
   };
 }

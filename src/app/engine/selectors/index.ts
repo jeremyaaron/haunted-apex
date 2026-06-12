@@ -11,6 +11,14 @@ export type {
   ContactServiceView,
   ContactView,
 } from './contacts';
+export { selectFrontPanelView } from './fronts';
+export type {
+  FrontInvestmentPanelView,
+  FrontOpportunityView,
+  FrontPanelView,
+  FrontYieldSummaryView,
+  OwnedFrontView,
+} from './fronts';
 export {
   calculateRiskChance,
   applyDistrictModifiers,

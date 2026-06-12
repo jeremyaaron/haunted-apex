@@ -1003,6 +1003,271 @@
     </div>
   </ng-template>
 
+  <section class="panel front-panel" aria-labelledby="front-network-title">
+    <div class="panel-heading">
+      <div>
+        <p class="panel-label">Front Network</p>
+        <h2 id="front-network-title">Owned Operations and Openings</h2>
+      </div>
+      <span class="panel-count">{{ game.fronts().ownedCount }} / {{ game.fronts().cap }}</span>
+    </div>
+
+    <div class="front-summary-strip status-strip">
+      <span>{{ game.fronts().ownedFronts.length }} Owned</span>
+      <span>{{ game.fronts().opportunities.length }} Openings</span>
+      @if (game.fronts().capReached) {
+        <span class="danger">Front cap reached</span>
+      } @else {
+        <span>{{ game.fronts().cap - game.fronts().ownedCount }} Slots Open</span>
+      }
+    </div>
+
+    <div class="front-network-grid">
+      <section class="front-section">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Owned Fronts</p>
+            <h3>Weekly Infrastructure</h3>
+          </div>
+          <span class="panel-count">{{ game.fronts().ownedFronts.length }}</span>
+        </div>
+
+        <div class="front-card-list">
+          @for (front of game.fronts().ownedFronts; track front.id) {
+            <article
+              class="front-card"
+              [class.front-status-quiet]="front.status === 'quiet'"
+              [class.front-status-noticed]="front.status === 'noticed'"
+              [class.front-status-hot]="front.status === 'hot'"
+              [class.front-status-compromised]="front.status === 'compromised'"
+            >
+              <div class="front-heading">
+                <div>
+                  <span>{{ displayToken(front.archetype) }}</span>
+                  <h3>{{ front.name }}</h3>
+                </div>
+                <b>{{ displayToken(front.status) }}</b>
+              </div>
+
+              <div class="identity-tags">
+                @for (tag of front.roleTags; track tag) {
+                  <span>{{ displayToken(tag) }}</span>
+                }
+              </div>
+
+              <dl class="front-meta">
+                <div>
+                  <dt>Level</dt>
+                  <dd>{{ front.level }} / {{ front.maxLevel }}</dd>
+                </div>
+                <div>
+                  <dt>Exposure</dt>
+                  <dd>{{ front.exposure }}</dd>
+                </div>
+                <div>
+                  <dt>District</dt>
+                  <dd>{{ front.districtName }}</dd>
+                </div>
+                @if (front.venueName) {
+                  <div>
+                    <dt>Venue</dt>
+                    <dd>{{ front.venueName }}</dd>
+                  </div>
+                }
+                @if (front.relatedRivalName) {
+                  <div>
+                    <dt>Rival</dt>
+                    <dd>{{ front.relatedRivalName }}</dd>
+                  </div>
+                }
+                <div>
+                  <dt>Established</dt>
+                  <dd>Week {{ front.establishedWeek }}</dd>
+                </div>
+              </dl>
+
+              <div class="front-exposure-line">
+                <span>Exposure</span>
+                <strong>{{ front.exposure }} / 100</strong>
+                <div class="meter" aria-hidden="true">
+                  <div class="meter-fill" [style.width.%]="front.exposure"></div>
+                </div>
+              </div>
+
+              <div class="front-yield-block">
+                <span>Weekly Yield</span>
+                <div class="ledger-preview-rows">
+                  @for (yield of front.weeklyYield; track yield.id) {
+                    <span [class.negative]="yield.value < 0">
+                      {{ signed(yield.value) }} {{ pressureLabel(yield.id) }}
+                    </span>
+                  }
+                  @if (front.districtControlYield > 0) {
+                    <span>Control +{{ front.districtControlYield }}</span>
+                  }
+                  <span class="negative">Exposure +{{ front.weeklyExposureGain }}</span>
+                </div>
+              </div>
+
+              @if (front.lastYieldSummary; as lastYield) {
+                <div class="front-last-yield">
+                  <span>Last Yield · Week {{ lastYield.week }}</span>
+                  <div>
+                    @for (effect of lastYield.effects; track effect.id) {
+                      <b [class.negative]="effect.value < 0">
+                        {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                      </b>
+                    }
+                    <b class="negative">Exposure +{{ lastYield.exposureDelta }}</b>
+                  </div>
+                </div>
+              }
+
+              <div class="front-investment-box" [class.unavailable]="!front.upgrade.available">
+                <div>
+                  <span>{{ frontInvestmentLabel(front.upgrade) }}</span>
+                  @if (front.upgrade.available) {
+                    <strong>{{ front.upgrade.cost }} Resources</strong>
+                  } @else {
+                    <strong>{{ frontInvestmentUnavailableReason(front.upgrade) }}</strong>
+                  }
+                </div>
+                @if (front.upgrade.available) {
+                  <div class="ledger-preview-rows">
+                    @for (effect of front.upgrade.immediateEffects; track effect.id) {
+                      <span [class.negative]="effect.value < 0">
+                        {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                      </span>
+                    }
+                    @for (yield of front.upgrade.weeklyYield; track yield.id) {
+                      <span [class.negative]="yield.value < 0">
+                        {{ signed(yield.value) }} {{ pressureLabel(yield.id) }} / Week
+                      </span>
+                    }
+                    @if (front.upgrade.districtControlYield > 0) {
+                      <span>Control +{{ front.upgrade.districtControlYield }} / Week</span>
+                    }
+                    @if (front.upgrade.exposureChange !== undefined) {
+                      <span class="negative">
+                        Exposure +{{ front.upgrade.exposureChange }}
+                        → {{ front.upgrade.projectedExposure }}
+                      </span>
+                    }
+                    @if (front.upgrade.projectedStatus) {
+                      <span>{{ displayToken(front.upgrade.projectedStatus) }}</span>
+                    }
+                    @if (front.upgrade.rivalPressureWarning; as warning) {
+                      <span class="negative">
+                        {{ warning.rivalName }} Pressure +{{ warning.pressureGain }}
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="front-section">
+        <div class="section-divider">
+          <div>
+            <p class="panel-label">Openings</p>
+            <h3>Available Fronts</h3>
+          </div>
+          <span class="panel-count">{{ game.fronts().opportunities.length }}</span>
+        </div>
+
+        <div class="front-card-list">
+          @for (opportunity of game.fronts().opportunities; track opportunity.id) {
+            <article class="front-card opportunity-card" [class.unavailable]="!opportunity.establish.available">
+              <div class="front-heading">
+                <div>
+                  <span>{{ displayToken(opportunity.archetype) }}</span>
+                  <h3>{{ opportunity.name }}</h3>
+                </div>
+                @if (opportunity.establish.available) {
+                  <b>{{ opportunity.establish.cost }} R</b>
+                } @else {
+                  <b>{{ frontInvestmentUnavailableReason(opportunity.establish) }}</b>
+                }
+              </div>
+
+              <div class="identity-tags">
+                @for (tag of opportunity.roleTags; track tag) {
+                  <span>{{ displayToken(tag) }}</span>
+                }
+              </div>
+
+              <dl class="front-meta">
+                <div>
+                  <dt>District</dt>
+                  <dd>{{ opportunity.districtName }}</dd>
+                </div>
+                @if (opportunity.venueName) {
+                  <div>
+                    <dt>Venue</dt>
+                    <dd>{{ opportunity.venueName }}</dd>
+                  </div>
+                }
+                @if (opportunity.relatedRivalName) {
+                  <div>
+                    <dt>Rival</dt>
+                    <dd>{{ opportunity.relatedRivalName }}</dd>
+                  </div>
+                }
+              </dl>
+
+              @if (opportunity.establish.available) {
+                <div class="front-yield-block">
+                  <span>Establish Preview</span>
+                  <div class="ledger-preview-rows">
+                    @for (effect of opportunity.establish.immediateEffects; track effect.id) {
+                      <span [class.negative]="effect.value < 0">
+                        {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                      </span>
+                    }
+                    @for (yield of opportunity.establish.weeklyYield; track yield.id) {
+                      <span [class.negative]="yield.value < 0">
+                        {{ signed(yield.value) }} {{ pressureLabel(yield.id) }} / Week
+                      </span>
+                    }
+                    @if (opportunity.establish.districtControlYield > 0) {
+                      <span>Control +{{ opportunity.establish.districtControlYield }} / Week</span>
+                    }
+                    @if (opportunity.establish.exposureChange !== undefined) {
+                      <span class="negative">
+                        Exposure +{{ opportunity.establish.exposureChange }}
+                        → {{ opportunity.establish.projectedExposure }}
+                      </span>
+                    }
+                    @if (opportunity.establish.projectedStatus) {
+                      <span>{{ displayToken(opportunity.establish.projectedStatus) }}</span>
+                    }
+                    @if (opportunity.establish.weeklyExposureGain !== undefined) {
+                      <span class="negative">
+                        +{{ opportunity.establish.weeklyExposureGain }} Exposure / Week
+                      </span>
+                    }
+                    @if (opportunity.establish.rivalPressureWarning; as warning) {
+                      <span class="negative">
+                        {{ warning.rivalName }} Pressure +{{ warning.pressureGain }}
+                      </span>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <p class="inline-warning">
+                  {{ frontInvestmentUnavailableReason(opportunity.establish) }}
+                </p>
+              }
+            </article>
+          }
+        </div>
+      </section>
+    </div>
+  </section>
+
   <section class="territory-rival-grid" aria-label="Territory and rival intelligence">
     <section class="panel territory-panel">
       <div class="panel-heading">
@@ -1296,6 +1561,26 @@
           Services can create Ledger entries, raise rival Pressure, or offer special help such as
           Quiet Treatment for a stressed operative. Unavailable Contact options stay visible when
           the relationship is not ready, but burned Contacts cannot be used.
+        </p>
+      </details>
+
+      <details>
+        <summary>Fronts and exposure</summary>
+        <p>
+          Fronts are owned operations that turn Resources into weekly infrastructure. Invest in
+          Front can establish an opening or upgrade an owned Front. Each Front has a Level,
+          location, role tags, weekly yield, and Exposure status.
+        </p>
+        <p>
+          Weekly yield can add pressures such as Resources, Loyalty, Intel, Dominion, Heat, Ruin,
+          or district Control. Exposure also rises each week, so strong Fronts become more visible
+          the longer they operate. Lay Low can target an owned Front to cool Exposure without
+          assigning an operative.
+        </p>
+        <p>
+          Front events use the normal weekly event slot. Higher Exposure makes a Front more likely
+          to be selected when an eligible Front event fires, and event choices preview their Front,
+          Ledger, and rival consequences before you respond.
         </p>
       </details>
 
