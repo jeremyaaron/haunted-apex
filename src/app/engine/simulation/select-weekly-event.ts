@@ -23,6 +23,11 @@ import {
   selectContactForEvent,
   type ContactEventEligibilityDiagnostics,
 } from './contact-events';
+import {
+  getFrontEventEligibility,
+  selectFrontForEvent,
+  type FrontEventEligibilityDiagnostics,
+} from './front-events';
 
 const MAJOR_NEGATIVE_TAGS = new Set<EventTag>([
   'HEAT',
@@ -81,7 +86,11 @@ export type EventWeightModifierId =
   | 'contact_pressured'
   | 'contact_volatile'
   | 'contact_exposed'
-  | 'contact_recent_interaction';
+  | 'contact_recent_interaction'
+  | 'front_eligible'
+  | 'front_exposed'
+  | 'front_hot'
+  | 'front_level_2';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -96,6 +105,7 @@ export type EventWeightDiagnostics = {
   finalWeight: number;
   operativeEligibility?: OperativeEventEligibilityDiagnostics;
   contactEligibility?: ContactEventEligibilityDiagnostics;
+  frontEligibility?: FrontEventEligibilityDiagnostics;
 };
 
 export function selectWeeklyEvent(state: GameState): EventSelection {
@@ -247,6 +257,9 @@ function calculateWeightedEvent(
       ...(event.contact
         ? { contactEligibility: getContactEventEligibility(state, event) }
         : {}),
+      ...(event.front
+        ? { frontEligibility: getFrontEventEligibility(state, event) }
+        : {}),
     },
   };
 }
@@ -301,6 +314,26 @@ function getContextModifiers(
       if (contact.recentInteractions.some((interaction) => interaction.week >= state.week - 2)) {
         modifiers.push({ id: 'contact_recent_interaction', amount: 3 });
       }
+    }
+  }
+
+  if (event.front) {
+    const frontEligibility = getFrontEventEligibility(state, event);
+    const eligibleFronts = Object.values(state.fronts).filter(
+      (front) => front && frontEligibility.eligibleFrontIds.includes(front.id),
+    );
+    modifiers.push({ id: 'front_eligible', amount: 0 });
+
+    if (frontEligibility.maxExposure >= 60) {
+      modifiers.push({ id: 'front_exposed', amount: 2 });
+    }
+
+    if (frontEligibility.maxExposure >= 80) {
+      modifiers.push({ id: 'front_hot', amount: 3 });
+    }
+
+    if (eligibleFronts.some((front) => front.level === 2)) {
+      modifiers.push({ id: 'front_level_2', amount: 2 });
     }
   }
 
@@ -380,6 +413,10 @@ function isEligibleEvent(state: GameState, event: EventDefinition): boolean {
     return false;
   }
 
+  if (event.front && !getFrontEventEligibility(state, event).eligible) {
+    return false;
+  }
+
   if (event.kind !== 'operative') {
     return true;
   }
@@ -398,17 +435,19 @@ function createSelection(
 ): EventSelection {
   const selectedLedgerEntry = selectLedgerEntryForEvent(state, selected.event);
   const selectedContactId = selectContactForEvent(state, selected.event);
+  const selectedFront = selectFrontForEvent(state, selected.event, rng);
 
   return {
     definition: selected.event,
-    rng,
+    rng: selectedFront.rng,
     diagnostics: selected.diagnostics,
     event: {
-      id: `event_${state.week}_${rng.cursor}`,
+      id: `event_${state.week}_${selectedFront.rng.cursor}`,
       definitionId: selected.event.id,
       week: state.week,
       ...(selectedLedgerEntry ? { selectedLedgerEntryId: selectedLedgerEntry.id } : {}),
       ...(selectedContactId ? { selectedContactId } : {}),
+      ...(selectedFront.frontId ? { selectedFrontId: selectedFront.frontId } : {}),
     },
   };
 }

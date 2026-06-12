@@ -8,6 +8,7 @@ import {
   getEventDefinition,
   getEventChoiceAvailability,
   getEventChoicePreview,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
@@ -291,10 +292,17 @@ function renderPendingEventText(state: GameState, text: string): string {
   const selectedContactDefinition = state.pendingEvent?.selectedContactId
     ? getContactDefinition(state.pendingEvent.selectedContactId)
     : undefined;
+  const selectedFront = state.pendingEvent?.selectedFrontId
+    ? state.fronts[state.pendingEvent.selectedFrontId]
+    : undefined;
+  const selectedFrontDefinition = selectedFront
+    ? getFrontDefinition(selectedFront.definitionId)
+    : undefined;
 
   return text
     .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
-    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact');
+    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact')
+    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front');
 }
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {

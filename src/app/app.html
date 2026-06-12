@@ -488,6 +488,15 @@
                       }
                     </small>
                   }
+                  @if (eventFrontRows(choice.id).length > 0) {
+                    <small class="choice-ledger-effects">
+                      @for (row of eventFrontRows(choice.id); track row.frontId + row.id) {
+                        <b [class.negative]="eventFrontEffectIsWarning(row)">
+                          {{ eventFrontEffectText(row) }}
+                        </b>
+                      }
+                    </small>
+                  }
                 </button>
               }
             </div>

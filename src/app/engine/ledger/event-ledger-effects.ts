@@ -66,6 +66,13 @@ export function applyEventLedgerEffects(
     }
 
     if (effect.type === 'create') {
+      const selectedFrontTarget = next.pendingEvent?.selectedFrontId
+        ? {
+            type: 'front' as const,
+            id: next.pendingEvent.selectedFrontId,
+          }
+        : undefined;
+
       next = addLedgerEntry(next, {
         definitionId: effect.definitionId,
         source: {
@@ -74,7 +81,9 @@ export function applyEventLedgerEffects(
           choiceId: choice.id,
         },
         ...(effect.potency ? { potency: effect.potency } : {}),
-        ...(effect.relatedTarget ? { relatedTarget: effect.relatedTarget } : {}),
+        ...(effect.relatedTarget || selectedFrontTarget
+          ? { relatedTarget: effect.relatedTarget ?? selectedFrontTarget }
+          : {}),
         ...(effect.relatedOperativeId
           ? { relatedOperativeId: effect.relatedOperativeId }
           : {}),

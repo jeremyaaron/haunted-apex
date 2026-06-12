@@ -1,7 +1,10 @@
 import {
+  FRONT_EVENTS,
   FRONT_DEFINITIONS,
   getDistrictDefinition,
+  getEventDefinition,
   getFrontDefinition,
+  getLedgerEntryDefinition,
   getVenueDefinition,
 } from './index';
 import { PRESSURE_IDS } from '../model';
@@ -136,6 +139,49 @@ describe('Front content', () => {
     for (const definition of definitions) {
       expect(getFrontDefinition(definition.id)).toBe(definition);
     }
+  });
+
+  it('connects Front event hooks to authored front events', () => {
+    const frontEventIds = FRONT_EVENTS.map((event) => event.id);
+
+    expect(frontEventIds).toEqual([
+      'front_inspection',
+      'front_staff_wants_protection',
+      'front_rival_leans_on_your_front',
+      'front_clean_money_dirty_hands',
+      'front_back_room_ledger',
+    ]);
+
+    for (const event of FRONT_EVENTS) {
+      expect(event.front).withContext(`${event.id} front metadata`).toBeDefined();
+      expect(event.tags).withContext(`${event.id} tags`).toContain('FRONT');
+      expect(event.title).withContext(`${event.id} title`).toContain('{frontName}');
+      expect(event.text).withContext(`${event.id} text`).toContain('{frontName}');
+      expect(getEventDefinition(event.id)).toBe(event);
+    }
+
+    for (const definition of definitions) {
+      for (const eventId of definition.eventIds) {
+        expect(getEventDefinition(eventId))
+          .withContext(`${definition.id} event ${eventId}`)
+          .toBeDefined();
+      }
+    }
+  });
+
+  it('defines the v0.6 Front Ledger entries', () => {
+    expect(getLedgerEntryDefinition('secret_back_room_guest_list')).toEqual(
+      jasmine.objectContaining({
+        kind: 'secret',
+        name: 'Back Room Guest List',
+      }),
+    );
+    expect(getLedgerEntryDefinition('debt_dirty_books')).toEqual(
+      jasmine.objectContaining({
+        kind: 'debt',
+        name: 'Dirty Books',
+      }),
+    );
   });
 
   function expectValidPressureDelta(delta: PressureDelta, label: string): void {

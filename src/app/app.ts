@@ -23,6 +23,7 @@ import {
   type ContactOptionPreview,
   type ContactServiceView,
   type EventChoiceDefinition,
+  type FrontEffectPreviewRow,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
   type HireCandidateView,
@@ -372,6 +373,28 @@ export class App {
     }
 
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.contactEffects ?? [];
+  }
+
+  protected eventFrontRows(choiceId: string): FrontEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.frontEffects ?? [];
+  }
+
+  protected eventFrontEffectText(row: FrontEffectPreviewRow): string {
+    if (row.id === 'exposure' && typeof row.value === 'number') {
+      return `${row.frontName} Exposure ${this.signed(row.value)}`;
+    }
+
+    return `${row.frontName} ${this.displayToken(row.id)} ${String(row.projected)}`;
+  }
+
+  protected eventFrontEffectIsWarning(row: FrontEffectPreviewRow): boolean {
+    return row.id === 'exposure' && typeof row.value === 'number' && row.value > 0;
   }
 
   protected formatLedgerEventRow(row: EventLedgerEffectPreviewRow): string {

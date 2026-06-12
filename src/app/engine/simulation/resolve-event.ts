@@ -22,6 +22,11 @@ import {
   resolveEventContactId,
   type ContactEffectPreviewRow,
 } from './contact-events';
+import {
+  getSelectedFront,
+  getSelectedFrontName,
+  resolveSelectedFrontRivalId,
+} from './front-events';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { applyWinLoss } from './win-loss';
 
@@ -45,6 +50,16 @@ export type EventChoicePreview = {
   label: string;
   ledgerEffects: EventLedgerEffectPreviewRow[];
   contactEffects: ContactEffectPreviewRow[];
+  frontEffects: FrontEffectPreviewRow[];
+};
+
+export type FrontEffectPreviewRow = {
+  frontId: string;
+  frontName: string;
+  id: 'exposure' | 'active' | 'compromised';
+  value: number | boolean;
+  current: number | boolean;
+  projected: number | boolean;
 };
 
 export type ResolveEventChoiceResult =
@@ -103,6 +118,7 @@ export function resolveEventChoice(
   };
   next = applyOperativeEffects(next, definition, choice);
   next = applyContactEffects(next, definition, choice);
+  next = applyFrontEffects(next, choice);
   next = applyRivalPressureEffects(next, choice.rivalPressure);
   next = {
     ...next,
@@ -122,6 +138,7 @@ export function resolveEventChoice(
       definition,
       ledgerApplication.appliedRows,
       previewEventContactEffects(state, definition, choice),
+      previewEventFrontEffects(state, choice),
     ),
     pressureDelta,
     tags: definition.tags,
@@ -190,11 +207,19 @@ function applyRivalPressureEffects(
 
   const rivals = { ...state.rivals };
 
-  for (const [rivalId, amount] of Object.entries(effects) as [
-    RivalId,
+  for (const [rawRivalId, amount] of Object.entries(effects) as [
+    RivalId | 'selected_front_rival',
     number | undefined,
   ][]) {
     if (amount === undefined) {
+      continue;
+    }
+
+    const rivalId = rawRivalId === 'selected_front_rival'
+      ? resolveSelectedFrontRivalId(state)
+      : rawRivalId;
+
+    if (!rivalId) {
       continue;
     }
 
@@ -208,6 +233,88 @@ function applyRivalPressureEffects(
     ...state,
     rivals,
   };
+}
+
+function applyFrontEffects(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): GameState {
+  if (!choice.frontEffects || !state.pendingEvent?.selectedFrontId) {
+    return state;
+  }
+
+  const selectedFrontId = state.pendingEvent.selectedFrontId;
+  const selectedFront = state.fronts[selectedFrontId];
+
+  if (!selectedFront) {
+    return state;
+  }
+
+  return {
+    ...state,
+    fronts: {
+      ...state.fronts,
+      [selectedFrontId]: {
+        ...selectedFront,
+        exposure: clampPercent(selectedFront.exposure + (choice.frontEffects?.exposure ?? 0)),
+        active: choice.frontEffects?.active ?? selectedFront.active,
+        compromised: choice.frontEffects?.compromised ?? selectedFront.compromised,
+        flags: {
+          ...selectedFront.flags,
+          ...(choice.frontEffects?.flags ?? {}),
+        },
+      },
+    },
+  };
+}
+
+export function previewEventFrontEffects(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): FrontEffectPreviewRow[] {
+  const selectedFront = getSelectedFront(state);
+
+  if (!selectedFront || !choice.frontEffects) {
+    return [];
+  }
+
+  const frontName = getSelectedFrontName(state);
+  const rows: FrontEffectPreviewRow[] = [];
+
+  if (choice.frontEffects.exposure !== undefined) {
+    rows.push({
+      frontId: selectedFront.id,
+      frontName,
+      id: 'exposure',
+      value: choice.frontEffects.exposure,
+      current: selectedFront.exposure,
+      projected: clampPercent(selectedFront.exposure + choice.frontEffects.exposure),
+    });
+  }
+
+  if (choice.frontEffects.active !== undefined) {
+    rows.push({
+      frontId: selectedFront.id,
+      frontName,
+      id: 'active',
+      value: choice.frontEffects.active,
+      current: selectedFront.active,
+      projected: choice.frontEffects.active,
+    });
+  }
+
+  if (choice.frontEffects.compromised !== undefined) {
+    rows.push({
+      frontId: selectedFront.id,
+      frontName,
+      id: 'compromised',
+      value: choice.frontEffects.compromised,
+      current: selectedFront.compromised,
+      projected: choice.frontEffects.compromised,
+    });
+  }
+
+  return rows;
 }
 
 function clampPercent(value: number): number {
@@ -276,6 +383,7 @@ export function getEventChoicePreview(
     label: choice.label,
     ledgerEffects: previewEventLedgerEffects(state, definition, choice),
     contactEffects: previewEventContactEffects(state, definition, choice),
+    frontEffects: previewEventFrontEffects(state, choice),
   };
 }
 
@@ -366,6 +474,7 @@ function createEventChoiceLogBody(
   definition: EventDefinition,
   ledgerRows: readonly EventLedgerEffectPreviewRow[],
   contactRows: readonly ContactEffectPreviewRow[],
+  frontRows: readonly FrontEffectPreviewRow[],
 ): string {
   const ledger = ledgerRows.length > 0
     ? ` Ledger: ${ledgerRows.map(formatLedgerEffectRow).join('; ')}.`
@@ -373,8 +482,11 @@ function createEventChoiceLogBody(
   const contact = contactRows.length > 0
     ? ` Contact: ${formatContactEffectRows(contactRows)}.`
     : '';
+  const front = frontRows.length > 0
+    ? ` Front: ${formatFrontEffectRows(frontRows)}.`
+    : '';
 
-  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}${contact}`;
+  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}${contact}${front}`;
 }
 
 function formatContactEffectRows(rows: readonly ContactEffectPreviewRow[]): string {
@@ -384,6 +496,21 @@ function formatContactEffectRows(rows: readonly ContactEffectPreviewRow[]): stri
     .join(', ');
 
   return `${contactName}: ${effects}`;
+}
+
+function formatFrontEffectRows(rows: readonly FrontEffectPreviewRow[]): string {
+  const frontName = rows[0]?.frontName ?? 'Front';
+  const effects = rows.map(formatFrontEffectRow).join(', ');
+
+  return `${frontName}: ${effects}`;
+}
+
+function formatFrontEffectRow(row: FrontEffectPreviewRow): string {
+  if (row.id === 'exposure' && typeof row.value === 'number') {
+    return `exposure ${row.value > 0 ? `+${row.value}` : row.value}`;
+  }
+
+  return `${row.id} ${String(row.projected)}`;
 }
 
 function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
@@ -418,7 +545,8 @@ function renderEventTitle(state: GameState, title: string): string {
 
   return title
     .replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry')
-    .replaceAll('{contactName}', selectedContact?.name ?? 'Contact');
+    .replaceAll('{contactName}', selectedContact?.name ?? 'Contact')
+    .replaceAll('{frontName}', getSelectedFrontName(state));
 }
 
 function clearTransientFlags(

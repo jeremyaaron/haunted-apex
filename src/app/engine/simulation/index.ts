@@ -23,12 +23,25 @@ export {
   selectContactForEvent,
 } from './contact-events';
 export {
+  getFrontEventEligibility,
+  getFrontEventTargetWeight,
+  getSelectedFront,
+  getSelectedFrontName,
+  resolveSelectedFrontRivalId,
+  selectFrontForEvent,
+} from './front-events';
+export {
   buildEventWeightContext,
   calculateEventWeight,
   getWeightedEvents,
   selectWeeklyEvent,
 } from './select-weekly-event';
-export { getEventChoiceAvailability, getEventChoicePreview, resolveEventChoice } from './resolve-event';
+export {
+  getEventChoiceAvailability,
+  getEventChoicePreview,
+  previewEventFrontEffects,
+  resolveEventChoice,
+} from './resolve-event';
 export {
   evaluateOperativeEventPredicate,
   evaluateOperativeEventTrigger,
@@ -55,6 +68,8 @@ export type {
   EventChoiceAvailability,
   EventChoicePreview,
   EventChoiceUnavailableReason,
+  FrontEffectPreviewRow,
   ResolveEventChoiceResult,
 } from './resolve-event';
+export type { FrontEventEligibilityDiagnostics } from './front-events';
 export type { OperativeEventEligibilityDiagnostics } from './operative-events';

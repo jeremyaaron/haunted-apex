@@ -80,6 +80,7 @@ export type {
   EventId,
   EventTag,
   EventWeightRule,
+  FrontEventDefinition,
   GameEventInstance,
   LedgerEntrySelector,
   OperativeEventDefinition,

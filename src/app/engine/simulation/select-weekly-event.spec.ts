@@ -1,8 +1,22 @@
 import { DISTRICT_ZERO_EVENTS } from '../content';
 import { addLedgerEntry } from '../ledger';
-import type { ContactId, GameLogEntry, GameState, RecentActivityEntry, RivalId } from '../model';
+import type {
+  ContactId,
+  FrontId,
+  FrontState,
+  GameLogEntry,
+  GameState,
+  RecentActivityEntry,
+  RivalId,
+} from '../model';
+import { createRng } from '../rng';
 import { materializeOperativeState } from '../roster';
 import { newGame } from './new-game';
+import {
+  getFrontEventEligibility,
+  getFrontEventTargetWeight,
+  selectFrontForEvent,
+} from './front-events';
 import {
   buildEventWeightContext,
   calculateEventWeight,
@@ -486,6 +500,94 @@ describe('weekly event selection', () => {
 
     expect(state.activeContactIds).toContain(selected.event.selectedContactId);
   });
+
+  it('keeps Front events in the normal weighted event pool only when eligible', () => {
+    const baseline = newGame({ seed: 'FRONT-EVENT-BASE' });
+    const exposed = withFronts(baseline, [
+      frontState('front_shell_gallery', {
+        exposure: 72,
+        districtId: 'district_violet_ward',
+      }),
+    ]);
+    const weighted = requireWeightedEvent(exposed, 'front_inspection');
+
+    expect(getWeightedEvents(baseline).some((candidate) => candidate.event.id === 'front_inspection'))
+      .withContext('starting front exposure too low')
+      .toBeFalse();
+    expect(weighted.diagnostics.frontEligibility).toEqual(
+      jasmine.objectContaining({
+        eligible: true,
+        eligibleFrontIds: ['front_shell_gallery'],
+        maxExposure: 72,
+      }),
+    );
+    expect(weighted.diagnostics.contextModifiers.map((modifier) => modifier.id)).toContain(
+      'front_exposed',
+    );
+  });
+
+  it('selects Front event targets deterministically with exposure-weighted randomness', () => {
+    const event = requireEvent('front_inspection');
+    const state = withFronts(newGame({ seed: 'FRONT-EVENT-SELECTION' }), [
+      frontState('front_black_clinic', {
+        exposure: 61,
+        districtId: 'district_ghostline_market',
+      }),
+      frontState('front_shell_gallery', {
+        exposure: 92,
+        districtId: 'district_violet_ward',
+        level: 2,
+      }),
+      frontState('front_surveillance_den', {
+        exposure: 75,
+        districtId: 'district_ghostline_market',
+      }),
+    ]);
+    const selection = selectFrontForEvent(state, event, createRng('FRONT-EVENT-SELECTION'));
+
+    expect(selection).toEqual(selectFrontForEvent(state, event, createRng('FRONT-EVENT-SELECTION')));
+    expect(selection.frontId).toBeDefined();
+    expect(
+      getFrontEventTargetWeight(state, event, state.fronts.front_shell_gallery!),
+    ).toBeGreaterThan(getFrontEventTargetWeight(state, event, state.fronts.front_black_clinic!));
+  });
+
+  it('stores selected Front ids on selected Front events', () => {
+    const state = withFronts(newGame({ seed: 'FRONT-EVENT-PENDING' }), [
+      frontState('front_shell_gallery', {
+        exposure: 85,
+        districtId: 'district_violet_ward',
+      }),
+    ]);
+    const selected = findSelection(state, 'front_inspection');
+
+    expect(selected.event.selectedFrontId).toBe('front_shell_gallery');
+  });
+
+  it('requires rival pressure for Rival Leans on Your Front', () => {
+    const lowPressure = withFronts(newGame({ seed: 'FRONT-RIVAL-LOW' }), [
+      frontState('front_zero_mercy_cut', {
+        exposure: 50,
+        districtId: 'district_chrome_narrows',
+        venueId: 'venue_zero_mercy',
+        relatedRivalId: 'rival_knox_marrow',
+      }),
+    ]);
+    const highPressure = {
+      ...lowPressure,
+      rivals: {
+        ...lowPressure.rivals,
+        rival_knox_marrow: {
+          ...lowPressure.rivals.rival_knox_marrow,
+          pressure: 45,
+        },
+      },
+    };
+    const event = requireEvent('front_rival_leans_on_your_front');
+
+    expect(getFrontEventEligibility(lowPressure, event).eligible).toBeFalse();
+    expect(getFrontEventEligibility(highPressure, event).eligible).toBeTrue();
+  });
 });
 
 function requireEvent(eventId: string) {
@@ -589,5 +691,32 @@ function withActiveContacts(state: GameState, activeContactIds: ContactId[]): Ga
   return {
     ...state,
     activeContactIds,
+  };
+}
+
+function withFronts(state: GameState, fronts: FrontState[]): GameState {
+  return {
+    ...state,
+    fronts: Object.fromEntries(fronts.map((front) => [front.id, front])) as GameState['fronts'],
+  };
+}
+
+function frontState(
+  id: FrontId,
+  overrides: Partial<FrontState> & Pick<FrontState, 'districtId'>,
+): FrontState {
+  return {
+    id,
+    definitionId: id,
+    districtId: overrides.districtId,
+    ...(overrides.venueId ? { venueId: overrides.venueId } : {}),
+    ...(overrides.relatedRivalId ? { relatedRivalId: overrides.relatedRivalId } : {}),
+    level: overrides.level ?? 1,
+    exposure: overrides.exposure ?? 30,
+    establishedWeek: overrides.establishedWeek ?? 1,
+    compromised: overrides.compromised ?? false,
+    active: overrides.active ?? true,
+    flags: overrides.flags ?? {},
+    yieldHistory: overrides.yieldHistory ?? [],
   };
 }

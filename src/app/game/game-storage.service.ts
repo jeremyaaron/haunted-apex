@@ -850,7 +850,10 @@ function isPendingEvent(value: unknown): boolean {
       typeof value['selectedLedgerEntryId'] === 'string') &&
     (value['selectedContactId'] === undefined ||
       (typeof value['selectedContactId'] === 'string' &&
-        getContactDefinition(value['selectedContactId'] as ContactId) !== undefined))
+        getContactDefinition(value['selectedContactId'] as ContactId) !== undefined)) &&
+    (value['selectedFrontId'] === undefined ||
+      (typeof value['selectedFrontId'] === 'string' &&
+        getFrontDefinition(value['selectedFrontId'] as FrontId) !== undefined))
   );
 }
 
