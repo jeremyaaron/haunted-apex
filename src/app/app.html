@@ -569,6 +569,35 @@
                   </div>
                 </dl>
               </section>
+
+              <section>
+                <h4>Fronts</h4>
+                <dl>
+                  <div>
+                    <dt>Owned</dt>
+                    <dd>{{ report.fronts.owned }}</dd>
+                  </div>
+                  <div>
+                    <dt>Established</dt>
+                    <dd>{{ report.fronts.established }}</dd>
+                  </div>
+                  <div>
+                    <dt>Upgrades</dt>
+                    <dd>{{ report.fronts.upgrades }}</dd>
+                  </div>
+                  <div>
+                    <dt>Exposure</dt>
+                    <dd>{{ report.fronts.averageFinalExposure.toFixed(1) }}</dd>
+                  </div>
+                </dl>
+                @if (report.fronts.entries.length > 0) {
+                  <p>
+                    @for (front of report.fronts.entries; track front.id) {
+                      <span>{{ front.name }} L{{ front.level }} / {{ displayToken(front.status) }} {{ front.exposure }}</span>
+                    }
+                  </p>
+                }
+              </section>
             </div>
 
             <div class="run-report-events">

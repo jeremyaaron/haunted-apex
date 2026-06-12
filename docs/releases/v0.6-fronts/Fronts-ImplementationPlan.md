@@ -1032,6 +1032,42 @@ Unit tests:
 
 Confirm the harness can answer whether fronts are being used and whether exposure matters.
 
+Completed June 11, 2026:
+
+- Added Front Network metrics to run-end summaries:
+  - owned fronts
+  - new fronts established
+  - upgrades
+  - front events triggered
+  - resource, Dominion, and Heat yield totals
+  - average final exposure
+  - per-front level/status/exposure rows
+- Added the same Front Network summary to the game-over UI.
+- Added deterministic harness run stats for:
+  - establish orders
+  - upgrade orders
+  - Front-targeted `Lay Low` orders
+  - final owned front count
+  - final average exposure and exposure band
+  - front event eligibility/selection counts
+  - per-front yield totals
+- Added harness CSV sections:
+  - `front_summary`
+  - `front_highlights`
+  - `front_outcomes`
+  - `front_events`
+  - `front_opportunity_sets`
+  - `front_exposure_bands`
+- Added run-summary and harness tests covering the new reporting surfaces.
+- Focused run-summary and harness suites passed: 25 tests.
+- Full suite passed: 444 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 548.45 kB, under the 600.00 kB warning budget
+```
+
 ## Phase 10: Agent Front Behavior
 
 ### Objective
@@ -1089,6 +1125,35 @@ Unit/harness tests:
 ### Review Gate
 
 Confirm the harness produces useful front behavior before tuning.
+
+Completed June 11, 2026:
+
+- Added front-aware order scoring for all strategy agents:
+  - `RandomBot` can select legal `Invest in Front` options.
+  - `OperatorBot` now invests early when reserves are healthy, prefers fronts that patch
+    strategic pressure gaps, avoids high-exposure investments under high Heat, and cools hot
+    owned fronts.
+  - `CautiousBot` prefers safer fronts such as Shell Gallery, Black Clinic, and Courier Line,
+    strongly avoids Zero Mercy Cut when safer choices exist, and cools Front Exposure earlier.
+  - `AggressiveBot` prefers Zero Mercy Cut, Dominion, rival pressure, and upgrades while only
+    braking for severe exposure or direct Heat loss.
+  - `GreedyBot` prefers resource-yielding fronts and tolerates exposure unless it threatens an
+    immediate loss.
+- Added deterministic harness tests for:
+  - Random selecting legal front options
+  - Operator early establishment
+  - Cautious avoiding Zero Mercy Cut
+  - Aggressive preferring high-Dominion front options
+  - Greedy preferring resource-yielding fronts
+  - Operator using Front-targeted `Lay Low`
+- Focused harness suite passed: 28 tests.
+- Full suite passed: 450 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 553.34 kB, under the 600.00 kB warning budget
+```
 
 ## Phase 11: Balance Pass and Tuning
 

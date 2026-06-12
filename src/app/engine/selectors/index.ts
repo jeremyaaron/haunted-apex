@@ -77,6 +77,7 @@ export type {
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
 export { buildRunSummary, formatRunSummary } from './run-summary';
 export type {
+  RunSummaryFront,
   RunSummaryLedgerEntry,
   RunSummaryOperative,
   RunSummaryReport,

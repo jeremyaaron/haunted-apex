@@ -680,6 +680,7 @@ describe('App', () => {
     expect(gameOverPanel?.textContent).toContain('Final Pressures');
     expect(gameOverPanel?.textContent).toContain('Roster');
     expect(gameOverPanel?.textContent).toContain('Ledger');
+    expect(gameOverPanel?.textContent).toContain('Fronts');
     expect(gameOverPanel?.textContent).toContain('Copy Run Report');
     expect(gameOverPanel?.textContent).toContain('Seed: UI-RUN-SUMMARY-VICTORY');
   });

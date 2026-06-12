@@ -3,6 +3,7 @@ import {
   CAUTIOUS_BOT,
   GREEDY_BOT,
   OPERATOR_BOT,
+  RANDOM_BOT,
   STRATEGY_AGENTS,
   type AgentDecisionContext,
   formatBatchReport,
@@ -15,7 +16,14 @@ import { CONTACT_DEFINITIONS } from '../content';
 import { materializeContactState } from '../contacts';
 import { addLedgerEntry } from '../ledger';
 import { materializeOperativeState } from '../roster';
-import type { ActionTarget, ContactId, GameState } from '../model';
+import type {
+  ActionTarget,
+  ContactId,
+  FrontDefinitionId,
+  FrontOpportunity,
+  FrontState,
+  GameState,
+} from '../model';
 import { newGame, queueOrder } from '../simulation';
 
 describe('simulation harness', () => {
@@ -41,6 +49,7 @@ describe('simulation harness', () => {
     expect(first.operativeStats).toEqual(second.operativeStats);
     expect(first.operativeEventStats).toEqual(second.operativeEventStats);
     expect(first.contactStats).toEqual(second.contactStats);
+    expect(first.frontStats).toEqual(second.frontStats);
     expect(first.trace.length).toBeGreaterThan(0);
   });
 
@@ -502,6 +511,104 @@ describe('simulation harness', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('lets RandomBot select front investment options when they are legal', () => {
+    const state = withFrontOpportunitySet(
+      withResources(newGame({ seed: 'HARNESS-RANDOM-FRONTS' }), 6000),
+      ['front_shell_gallery', 'front_zero_mercy_cut'],
+    );
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = RANDOM_BOT.chooseOrder(state, options, createTestContext('RANDOM-FRONT', 'bot'));
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(choice?.preview.frontInvestment?.ok).toBeTrue();
+  });
+
+  it('makes OperatorBot establish an early useful front when reserves allow', () => {
+    const state = withFrontOpportunitySet(
+      withResources(newGame({ seed: 'HARNESS-OPERATOR-FRONTS' }), 6500),
+      ['front_shell_gallery', 'front_black_clinic', 'front_zero_mercy_cut'],
+    );
+    const options = getLegalOrderOptions(state);
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'front'));
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(choice?.target?.type).toBe('front_opportunity');
+    expect(choice?.preview.frontInvestment?.ok ? choice.preview.frontInvestment.mode : undefined).toBe(
+      'establish',
+    );
+  });
+
+  it('makes CautiousBot avoid Zero Mercy Cut when safer front options exist', () => {
+    const state = withFrontOpportunitySet(
+      withResources(newGame({ seed: 'HARNESS-CAUTIOUS-FRONTS' }), 6500),
+      ['front_shell_gallery', 'front_courier_line', 'front_zero_mercy_cut'],
+    );
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = CAUTIOUS_BOT.chooseOrder(state, options, createTestContext('CAUTIOUS', 'front'));
+
+    expect(choice?.target).not.toEqual({
+      type: 'front_opportunity',
+      id: 'front_opportunity_front_zero_mercy_cut',
+    });
+    expect(choice?.preview.frontInvestment?.ok).toBeTrue();
+  });
+
+  it('makes AggressiveBot prefer high-Dominion front options', () => {
+    const state = withFrontOpportunitySet(
+      withResources(newGame({ seed: 'HARNESS-AGGRESSIVE-FRONTS' }), 6500),
+      ['front_shell_gallery', 'front_black_clinic', 'front_zero_mercy_cut'],
+    );
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'front'));
+
+    expect(choice?.target).toEqual({
+      type: 'front_opportunity',
+      id: 'front_opportunity_front_zero_mercy_cut',
+    });
+  });
+
+  it('makes GreedyBot prefer the strongest resource-yielding front', () => {
+    const state = withFrontOpportunitySet(
+      withResources(newGame({ seed: 'HARNESS-GREEDY-FRONTS' }), 6500),
+      ['front_black_clinic', 'front_courier_line', 'front_zero_mercy_cut'],
+    );
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = GREEDY_BOT.chooseOrder(state, options, createTestContext('GREEDY', 'front'));
+
+    expect(choice?.target).toEqual({
+      type: 'front_opportunity',
+      id: 'front_opportunity_front_zero_mercy_cut',
+    });
+  });
+
+  it('makes OperatorBot target front Lay Low when exposure is hot', () => {
+    const state = withHotFront(
+      withResources(newGame({ seed: 'HARNESS-FRONT-LAY-LOW' }), 6500),
+      'front_pale_circuit',
+      76,
+    );
+    state.pressures.heat = 76;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'lay_low',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'cool'));
+
+    expect(choice?.actionId).toBe('lay_low');
+    expect(choice?.target).toEqual({
+      type: 'front',
+      id: 'front_pale_circuit',
+    });
+    expect(choice?.preview.frontExposure?.projectedExposure).toBeLessThan(76);
+  });
+
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {
     const report = simulateBatch({
       agents: STRATEGY_AGENTS,
@@ -532,6 +639,12 @@ describe('simulation harness', () => {
     expect(output).toContain('contact_events');
     expect(output).toContain('contact_ledger');
     expect(output).toContain('contact_sets');
+    expect(output).toContain('front_summary');
+    expect(output).toContain('front_highlights');
+    expect(output).toContain('front_outcomes');
+    expect(output).toContain('front_events');
+    expect(output).toContain('front_opportunity_sets');
+    expect(output).toContain('front_exposure_bands');
     expect(output).toContain('roster_compositions');
     expect(output).toContain('operative_presence');
     expect(output).toContain('operative_recruitment');
@@ -578,6 +691,13 @@ describe('simulation harness', () => {
       expect(summary.contactSummary.averageBurnedContacts).toBeGreaterThanOrEqual(0);
       expect(summary.contactOutcomeReports.length).toBeGreaterThan(0);
       expect(summary.contactSetReports.length).toBeGreaterThan(0);
+      expect(summary.frontSummary.averageOwnedFronts).toBeGreaterThanOrEqual(1);
+      expect(summary.frontSummary.establishmentRate).toBeGreaterThanOrEqual(0);
+      expect(summary.frontSummary.upgradeRate).toBeGreaterThanOrEqual(0);
+      expect(summary.frontSummary.averageYieldResources).toBeGreaterThanOrEqual(0);
+      expect(summary.frontOutcomeReports.length).toBeGreaterThan(0);
+      expect(summary.frontOpportunitySetReports.length).toBeGreaterThan(0);
+      expect(summary.frontExposureBandReports.length).toBeGreaterThan(0);
     }
 
     expect(
@@ -652,6 +772,102 @@ function withActiveContacts(state: GameState, activeContactIds: ContactId[]): Ga
           return definition ? [[contactId, materializeContactState(definition)]] : [];
         }),
       ),
+    },
+  };
+}
+
+function withResources(state: GameState, resources: number): GameState {
+  return {
+    ...state,
+    pressures: {
+      ...state.pressures,
+      resources,
+    },
+  };
+}
+
+function withFrontOpportunitySet(
+  state: GameState,
+  definitionIds: FrontDefinitionId[],
+): GameState {
+  return {
+    ...state,
+    frontOpportunities: definitionIds.map(materializeFrontOpportunityForTest),
+  };
+}
+
+function materializeFrontOpportunityForTest(
+  definitionId: FrontDefinitionId,
+): FrontOpportunity {
+  const placement = getFrontPlacementForTest(definitionId);
+
+  return {
+    id: `front_opportunity_${definitionId}`,
+    definitionId,
+    districtId: placement.districtId,
+    ...(placement.venueId ? { venueId: placement.venueId } : {}),
+    ...(placement.relatedRivalId ? { relatedRivalId: placement.relatedRivalId } : {}),
+  };
+}
+
+function getFrontPlacementForTest(
+  definitionId: FrontDefinitionId,
+): Pick<FrontOpportunity, 'districtId' | 'venueId' | 'relatedRivalId'> {
+  switch (definitionId) {
+    case 'front_black_clinic':
+      return { districtId: 'district_ghostline_market' };
+    case 'front_courier_line':
+      return { districtId: 'district_chrome_narrows' };
+    case 'front_shell_gallery':
+      return {
+        districtId: 'district_violet_ward',
+        venueId: 'venue_glass_saint',
+        relatedRivalId: 'rival_nyx_ardent',
+      };
+    case 'front_surveillance_den':
+      return { districtId: 'district_ghostline_market' };
+    case 'front_zero_mercy_cut':
+      return {
+        districtId: 'district_chrome_narrows',
+        venueId: 'venue_zero_mercy',
+        relatedRivalId: 'rival_knox_marrow',
+      };
+    case 'front_pale_circuit':
+      return {
+        districtId: 'district_violet_ward',
+        venueId: 'venue_pale_circuit',
+        relatedRivalId: 'rival_nyx_ardent',
+      };
+  }
+}
+
+function withHotFront(
+  state: GameState,
+  frontId: FrontDefinitionId,
+  exposure: number,
+): GameState {
+  const existingFront = state.fronts[frontId];
+  const placement = getFrontPlacementForTest(frontId);
+  const front: FrontState = {
+    id: frontId,
+    definitionId: frontId,
+    districtId: placement.districtId,
+    ...(placement.venueId ? { venueId: placement.venueId } : {}),
+    ...(placement.relatedRivalId ? { relatedRivalId: placement.relatedRivalId } : {}),
+    level: existingFront?.level ?? 1,
+    exposure,
+    establishedWeek: existingFront?.establishedWeek ?? 1,
+    compromised: false,
+    active: true,
+    flags: existingFront?.flags ?? {},
+    yieldHistory: existingFront?.yieldHistory ?? [],
+  };
+
+  return {
+    ...state,
+    fronts: {
+      ...state.fronts,
+      [frontId]: front,
     },
   };
 }
