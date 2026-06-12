@@ -108,7 +108,8 @@ describe('App', () => {
     expect(frontPanel?.textContent).toContain('+1 Loyalty');
     expect(frontPanel?.textContent).toContain('Control +1');
     expect(frontPanel?.textContent).toContain('Upgrade');
-    expect(frontPanel?.textContent).toContain('1200 Resources');
+    expect(frontPanel?.textContent).toContain('2100 Resources');
+    expect(frontPanel?.textContent).toContain('Exposure 10');
     expect(frontPanel?.querySelectorAll('.opportunity-card').length).toBeGreaterThan(0);
     expect(frontPanel?.textContent).toContain('Establish Preview');
   });

@@ -25,7 +25,7 @@ describe('Front metrics', () => {
     expect(calculateFrontWeeklyYield({ ...front, level: 2 }, definition!)).toEqual({
       dominion: 1,
       loyalty: 2,
-      resources: 500,
+      resources: 350,
     });
   });
 });

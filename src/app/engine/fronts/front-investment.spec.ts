@@ -116,31 +116,31 @@ describe('Front investment previews', () => {
         districtId: 'district_chrome_narrows',
         venueId: 'venue_zero_mercy',
         relatedRivalId: 'rival_knox_marrow',
-        cost: 1200,
+        cost: 1900,
         effects: {
           dominion: 4,
-          heat: 4,
+          heat: 6,
         },
         weeklyYield: {
-          resources: 550,
+          resources: 400,
           dominion: 1,
-          heat: 1,
+          heat: 3,
         },
         districtControlYield: 2,
-        exposureChange: 20,
-        projectedExposure: 20,
-        projectedStatus: 'quiet',
-        weeklyExposureGain: 5,
+        exposureChange: 30,
+        projectedExposure: 30,
+        projectedStatus: 'noticed',
+        weeklyExposureGain: 8,
       }),
     );
     expect(preview.ok ? preview.rivalPressureWarning : undefined).toEqual({
       rivalId: 'rival_knox_marrow',
       rivalName: 'Knox Marrow',
-      pressureGain: 10,
+      pressureGain: 12,
       currentPressure: 0,
-      projectedPressure: 10,
+      projectedPressure: 12,
       projectedTier: 'watching',
-      weeklyPressureGain: 2,
+      weeklyPressureGain: 4,
     });
   });
 
@@ -153,10 +153,10 @@ describe('Front investment previews', () => {
 
     expect(preview).toEqual(
       jasmine.objectContaining({
-        adjustedResourceCost: 1200,
+        adjustedResourceCost: 2100,
         adjustedEffects: {
-          dominion: 3,
-          heat: 2,
+          dominion: 2,
+          heat: 3,
         },
       }),
     );
@@ -165,16 +165,16 @@ describe('Front investment previews', () => {
         ok: true,
         mode: 'upgrade',
         frontName: 'The Pale Circuit',
-        cost: 1200,
+        cost: 2100,
         weeklyYield: {
-          resources: 500,
+          resources: 350,
           loyalty: 2,
           dominion: 1,
         },
         districtControlYield: 1,
         currentExposure: 12,
-        exposureChange: 8,
-        projectedExposure: 20,
+        exposureChange: 14,
+        projectedExposure: 26,
         projectedStatus: 'quiet',
         weeklyExposureGain: 2,
       }),

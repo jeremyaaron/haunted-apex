@@ -530,7 +530,9 @@ describe('simulation harness', () => {
       withResources(newGame({ seed: 'HARNESS-OPERATOR-FRONTS' }), 6500),
       ['front_shell_gallery', 'front_black_clinic', 'front_zero_mercy_cut'],
     );
-    const options = getLegalOrderOptions(state);
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
     const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'front'));
 
     expect(choice?.actionId).toBe('invest_front');

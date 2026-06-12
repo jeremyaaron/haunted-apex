@@ -33,8 +33,8 @@ describe('front selectors', () => {
       jasmine.objectContaining({
         available: true,
         mode: 'upgrade',
-        cost: 1200,
-        projectedExposure: 20,
+        cost: 2100,
+        projectedExposure: 26,
         projectedStatus: 'quiet',
       }),
     );

@@ -1240,6 +1240,68 @@ front event counts
 front establishment/upgrade rates
 ```
 
+### Completion Record
+
+Completed June 11, 2026:
+
+- Tuned Front definitions so infrastructure remains useful without becoming the obvious
+  answer every week:
+  - Raised most setup and upgrade costs.
+  - Reduced safe resource yield on Courier Line, Shell Gallery, and upgraded Pale Circuit.
+  - Made Zero Mercy Cut louder through higher setup/upgrade cost, Heat, Exposure, and Knox
+    pressure.
+  - Reduced upgrade payback, especially on The Pale Circuit and Zero Mercy Cut.
+- Tuned harness Front scoring:
+  - AggressiveBot still values Dominion and noisy territory, but no longer upgrades every
+    front automatically.
+  - GreedyBot still chases resource yield, but upgrade appetite is materially lower.
+  - CautiousBot prefers safe stabilizing fronts and now avoids upgrades unless the rest of
+    its scoring overcomes a strong caution penalty.
+  - OperatorBot still establishes early useful fronts, but uses Fronts as one tool rather
+    than the whole strategy and cools exposed fronts more often.
+- Before tuning, deterministic seed prefix `PHASE11-BEFORE` produced:
+
+```text
+Random:           1% wins, avg 1.90 owned Fronts, 0.32 upgrades
+Aggressive:      72% wins, avg 1.97 owned Fronts, 1.89 upgrades
+Cautious:         0% wins, avg 3.00 owned Fronts, 1.65 upgrades
+Greedy:          88% wins, avg 3.00 owned Fronts, 3.00 upgrades
+Operator / Sane: 91% wins, avg 2.88 owned Fronts, 0.82 upgrades
+```
+
+- Final deterministic seed prefix `PHASE11-AFTER-2` produced:
+
+```text
+Random:           0% wins, avg 1.86 owned Fronts, 0.18 upgrades, 0.20 Front events
+Aggressive:      42% wins, avg 1.91 owned Fronts, 0.50 upgrades, 0.29 Front events
+Cautious:         0% wins, avg 2.00 owned Fronts, 0.00 upgrades, 0.08 Front events
+Greedy:          33% wins, avg 2.09 owned Fronts, 0.54 upgrades, 0.37 Front events
+Operator / Sane: 73% wins, avg 1.94 owned Fronts, 0.00 upgrades, 0.33 Front events
+```
+
+- A second deterministic seed prefix `PHASE11-AFTER-2B` confirmed the shape:
+
+```text
+Random:           0% wins
+Aggressive:      37% wins
+Cautious:         0% wins
+Greedy:          33% wins
+Operator / Sane: 70% wins
+```
+
+- Loss causes are now differentiated:
+  - AggressiveBot mainly dies to Heat lockdown.
+  - GreedyBot splits between out-of-time and Heat lockdown.
+  - CautiousBot reliably loses by Dominion shortfall.
+  - OperatorBot mostly wins, with losses from out-of-time and occasional Heat lockdown.
+- Zero Mercy Cut remains the most dangerous and profitable high-risk Front, but its final
+  exposure commonly reaches hot territory and no longer carries Greedy/Operator to trivial
+  win rates.
+- RandomBot finished below the aspirational 5-12% target. This is accepted for this pass
+  because the strategic bots now separate cleanly and the Front-specific targets landed
+  in range. Avoid broad softening solely to reward random play unless manual playtesting
+  shows the release is too punishing.
+
 ### Review Gate
 
 Manual and harness review: confirm Fronts are useful, risky, and not mandatory.
@@ -1305,6 +1367,41 @@ trigger or simulate a front event
 finish or force-end a run
 inspect front report output
 ```
+
+### Completion Record
+
+Completed June 11, 2026:
+
+- Added [`Fronts-ReleaseNotes.md`](./Fronts-ReleaseNotes.md).
+- Linked the release notes from the root README and development documentation index.
+- Left package version policy unchanged. Runtime release identity remains controlled by
+  `CURRENT_GAME_VERSION`, GitHub tags, and GitHub Releases.
+- Confirmed normal debug details remain hidden by default behind the debug panel toggle.
+- Preserved the existing Pages workflow and verified the production Pages subpath build.
+- Captured final harness seed prefix `PHASE12-FINAL`:
+
+```text
+Random:           0% wins, avg 1.79 owned Fronts, 0.25 upgrades, 0.17 Front events
+Aggressive:      32% wins, avg 1.93 owned Fronts, 0.60 upgrades, 0.25 Front events
+Cautious:         0% wins, avg 2.00 owned Fronts, 0.00 upgrades, 0.09 Front events
+Greedy:          29% wins, avg 2.05 owned Fronts, 0.54 upgrades, 0.38 Front events
+Operator / Sane: 71% wins, avg 1.94 owned Fronts, 0.00 upgrades, 0.32 Front events
+```
+
+- Final validation passed:
+
+```text
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- No dev, Karma, or browser-debug process from this phase was left running. An existing
+  user-owned `ng serve` process was detected and intentionally left alone.
 
 ### Review Gate
 

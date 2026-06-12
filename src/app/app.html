@@ -1264,10 +1264,9 @@
                     @if (opportunity.establish.districtControlYield > 0) {
                       <span>Control +{{ opportunity.establish.districtControlYield }} / Week</span>
                     }
-                    @if (opportunity.establish.exposureChange !== undefined) {
+                    @if (opportunity.establish.projectedExposure !== undefined) {
                       <span class="negative">
-                        Exposure +{{ opportunity.establish.exposureChange }}
-                        → {{ opportunity.establish.projectedExposure }}
+                        Exposure {{ opportunity.establish.projectedExposure }}
                       </span>
                     }
                     @if (opportunity.establish.projectedStatus) {

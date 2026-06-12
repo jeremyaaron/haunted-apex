@@ -47,3 +47,4 @@
 - [`v0.6A.md`](releases/v0.6-fronts/v0.6A.md): locked mechanical decisions.
 - [`Fronts-TDD.md`](releases/v0.6-fronts/Fronts-TDD.md): technical design.
 - [`Fronts-ImplementationPlan.md`](releases/v0.6-fronts/Fronts-ImplementationPlan.md): phased implementation plan.
+- [`Fronts-ReleaseNotes.md`](releases/v0.6-fronts/Fronts-ReleaseNotes.md): release notes draft.

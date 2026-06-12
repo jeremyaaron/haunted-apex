@@ -44,13 +44,13 @@ describe('applyWeeklyFrontYields', () => {
     const resolved = applyWeeklyFrontYields(state);
 
     expect(resolved.pressures.dominion).toBe(state.pressures.dominion + 1);
-    expect(resolved.pressures.resources).toBe(state.pressures.resources + 500);
+    expect(resolved.pressures.resources).toBe(state.pressures.resources + 350);
     expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty + 2);
     expect(resolved.fronts.front_pale_circuit?.exposure).toBe(23);
     expect(resolved.fronts.front_pale_circuit?.yieldHistory.at(-1)).toEqual({
       week: 1,
       effects: {
-        resources: 500,
+        resources: 350,
         loyalty: 2,
         dominion: 1,
       },
@@ -70,9 +70,9 @@ describe('applyWeeklyFrontYields', () => {
 
     const resolved = applyWeeklyFrontYields(state);
 
-    expect(resolved.pressures.resources).toBe(state.pressures.resources + 550);
+    expect(resolved.pressures.resources).toBe(state.pressures.resources + 400);
     expect(resolved.pressures.dominion).toBe(state.pressures.dominion + 1);
-    expect(resolved.pressures.heat).toBe(state.pressures.heat + 1);
+    expect(resolved.pressures.heat).toBe(state.pressures.heat + 3);
     expect(resolved.districts.district_chrome_narrows.control).toBe(100);
     expect(resolved.rivals.rival_knox_marrow.pressure).toBe(100);
     expect(resolved.fronts.front_zero_mercy_cut?.exposure).toBe(100);
