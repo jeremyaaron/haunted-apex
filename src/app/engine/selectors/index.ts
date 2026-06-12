@@ -11,10 +11,20 @@ export type {
   ContactServiceView,
   ContactView,
 } from './contacts';
+export { selectFrontPanelView } from './fronts';
+export type {
+  FrontInvestmentPanelView,
+  FrontOpportunityView,
+  FrontPanelView,
+  FrontYieldSummaryView,
+  OwnedFrontView,
+} from './fronts';
 export {
   calculateRiskChance,
   applyDistrictModifiers,
   applyVenueModifiers,
+  FRONT_LAY_LOW_EXPOSURE_DELTA,
+  FRONT_LAY_LOW_RESOURCE_COST,
   getActionPreview,
   getAdjustedEffects,
   getAdjustedResourceCost,
@@ -32,6 +42,7 @@ export type {
   ActionCardView,
   ActionPreview,
   ContactMetricDeltaView,
+  FrontInvestmentPreview,
   LocalImpactPreview,
   OperativeAssignmentPreview,
   OperativeOptionView,
@@ -57,6 +68,7 @@ export {
 export type {
   ActionTargetOption,
   DistrictTerritoryView,
+  FrontTargetOption,
   RecruitTargetOption,
   RivalTerritoryView,
   TerritoryTargetOption,
@@ -65,6 +77,7 @@ export type {
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
 export { buildRunSummary, formatRunSummary } from './run-summary';
 export type {
+  RunSummaryFront,
   RunSummaryLedgerEntry,
   RunSummaryOperative,
   RunSummaryReport,

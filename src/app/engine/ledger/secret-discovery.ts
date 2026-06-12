@@ -26,7 +26,7 @@ export type SecretDiscoveryPreview =
   | {
       eligible: true;
       chance: number;
-      target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>;
+      target: DiscoveryTarget;
       candidateDefinitionIds: LedgerEntryDefinitionId[];
       candidates: SecretDiscoveryCandidate[];
     }
@@ -45,6 +45,8 @@ export type ResolveSecretDiscoveryResult = {
   roll?: number;
   selectedDefinitionId?: LedgerEntryDefinitionId;
 };
+
+type DiscoveryTarget = Extract<ActionTarget, { type: 'district' | 'venue' | 'rival' }>;
 
 export function previewSecretDiscovery(
   state: GameState,
@@ -149,7 +151,7 @@ export function resolveSecretDiscovery(
 
 function getSecretDiscoveryCandidates(
   state: GameState,
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
+  target: DiscoveryTarget,
 ): SecretDiscoveryCandidate[] {
   return (LEDGER_ENTRY_DEFINITIONS as readonly LedgerEntryDefinition[]).flatMap((definition) => {
     if (definition.kind !== 'secret' || !definition.discovery) {
@@ -193,7 +195,7 @@ function getSecretDiscoveryCandidates(
 
 function getDefinitionAffinityWeight(
   definition: LedgerEntryDefinition,
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
+  target: DiscoveryTarget,
 ): number {
   const discovery = definition.discovery;
 
@@ -250,9 +252,7 @@ function selectWeightedCandidate(
   };
 }
 
-function getTargetIntelDiscoveryBonus(
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
-): number {
+function getTargetIntelDiscoveryBonus(target: DiscoveryTarget): number {
   switch (target.type) {
     case 'district':
       return Math.floor((getDistrictDefinition(target.id)?.secrecy ?? 0) / 20);
@@ -268,9 +268,7 @@ function getTargetIntelDiscoveryBonus(
   }
 }
 
-function resolveTargetDistrictId(
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
-) {
+function resolveTargetDistrictId(target: DiscoveryTarget) {
   switch (target.type) {
     case 'district':
       return getDistrictDefinition(target.id)?.id;
@@ -281,9 +279,7 @@ function resolveTargetDistrictId(
   }
 }
 
-function getTargetTags(
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
-): string[] {
+function getTargetTags(target: DiscoveryTarget): string[] {
   switch (target.type) {
     case 'district':
       return [...(getDistrictDefinition(target.id)?.tags ?? [])];
@@ -298,9 +294,7 @@ function getTargetTags(
   }
 }
 
-function getTargetControllerId(
-  target: Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }>,
-) {
+function getTargetControllerId(target: DiscoveryTarget) {
   switch (target.type) {
     case 'district':
       return getDistrictDefinition(target.id)?.rivalId;
@@ -346,7 +340,7 @@ function countActiveDefinitionInstances(
 
 function isDiscoveryTarget(
   target: ActionTarget | undefined,
-): target is Exclude<ActionTarget, { type: 'ledger' | 'recruit' | 'contact' }> {
+): target is DiscoveryTarget {
   return target?.type === 'district' || target?.type === 'venue' || target?.type === 'rival';
 }
 

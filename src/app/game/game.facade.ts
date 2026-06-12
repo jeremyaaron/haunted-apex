@@ -8,6 +8,7 @@ import {
   getEventDefinition,
   getEventChoiceAvailability,
   getEventChoicePreview,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
@@ -20,6 +21,7 @@ import {
   selectActiveContacts,
   selectAssignmentOptions,
   selectActionTargetOptions,
+  selectFrontPanelView,
   selectLedgerPanelView,
   selectDistrictTerritoryViews,
   selectHirePoolViews,
@@ -51,7 +53,7 @@ import {
 } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected an older save. v0.5.0 - Entanglements changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.6.0 - Fronts changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',
@@ -75,6 +77,7 @@ export class GameFacade {
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
+  readonly fronts = computed(() => selectFrontPanelView(this.stateSignal()));
   readonly contacts = computed<ContactView[]>(() => selectActiveContacts(this.stateSignal()));
   readonly runSummary = computed<RunSummaryReport | undefined>(() => {
     const state = this.stateSignal();
@@ -291,10 +294,17 @@ function renderPendingEventText(state: GameState, text: string): string {
   const selectedContactDefinition = state.pendingEvent?.selectedContactId
     ? getContactDefinition(state.pendingEvent.selectedContactId)
     : undefined;
+  const selectedFront = state.pendingEvent?.selectedFrontId
+    ? state.fronts[state.pendingEvent.selectedFrontId]
+    : undefined;
+  const selectedFrontDefinition = selectedFront
+    ? getFrontDefinition(selectedFront.definitionId)
+    : undefined;
 
   return text
     .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
-    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact');
+    .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact')
+    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front');
 }
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {

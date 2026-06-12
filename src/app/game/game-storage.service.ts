@@ -2,10 +2,12 @@ import { Injectable } from '@angular/core';
 import {
   ACTIVE_CONTACT_COUNT,
   CONTACT_DEFINITIONS,
+  FRONT_DEFINITIONS,
   getActionDefinition,
   getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
@@ -19,6 +21,9 @@ import {
   type ContactMetricDelta,
   type ContactOptionKind,
   type DistrictId,
+  type FrontDefinitionId,
+  type FrontId,
+  type FrontOpportunityId,
   type GameState,
   type LedgerEntryDefinitionId,
   type LedgerEntryKind,
@@ -31,9 +36,10 @@ import {
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 5;
-export const CURRENT_GAME_VERSION = '0.5.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 6;
+export const CURRENT_GAME_VERSION = '0.6.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.6:current-run';
+export const LEGACY_V05_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
 export const LEGACY_V04_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
 export const LEGACY_V03_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
 export const LEGACY_V02_STORAGE_KEY = 'haunted-apex:v0.2:current-run';
@@ -88,6 +94,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V05_STORAGE_KEY);
       storage.removeItem(LEGACY_V04_STORAGE_KEY);
       storage.removeItem(LEGACY_V03_STORAGE_KEY);
       storage.removeItem(LEGACY_V02_STORAGE_KEY);
@@ -118,6 +125,17 @@ export class GameStorageService implements GameStorage {
         storage.removeItem(CURRENT_RUN_STORAGE_KEY);
         return { status: 'invalid' };
       }
+    }
+
+    if (storage.getItem(LEGACY_V05_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V05_STORAGE_KEY);
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 5,
+      };
     }
 
     if (storage.getItem(LEGACY_V04_STORAGE_KEY) !== null) {
@@ -153,6 +171,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V05_STORAGE_KEY);
     storage?.removeItem(LEGACY_V04_STORAGE_KEY);
     storage?.removeItem(LEGACY_V03_STORAGE_KEY);
     storage?.removeItem(LEGACY_V02_STORAGE_KEY);
@@ -173,7 +192,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 5 &&
+    value['schemaVersion'] === 6 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -185,6 +204,7 @@ function isGameState(value: unknown): value is GameState {
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
     isContactNetwork(value['contacts'], value['activeContactIds']) &&
+    isFrontNetwork(value['fronts'], value['frontOpportunities']) &&
     isSeenSignatureEventIds(value['seenSignatureEventIds']) &&
     isLedgerState(value['ledger']) &&
     isQueuedOrders(value['queuedOrders'], value['operatives'], value['hirePool']) &&
@@ -388,6 +408,131 @@ function isContactMetricDelta(value: unknown): value is ContactMetricDelta {
       ['trust', 'leverage', 'volatility', 'exposure'].includes(metric) &&
       isFiniteNumber(amount),
   );
+}
+
+function isFrontNetwork(fronts: unknown, frontOpportunities: unknown): boolean {
+  if (!isRecord(fronts) || !Array.isArray(frontOpportunities)) {
+    return false;
+  }
+
+  const ownedDefinitionIds = new Set<FrontDefinitionId>();
+  const frontEntries = Object.entries(fronts);
+
+  if (frontEntries.length < 1 || frontEntries.length > 3 || !fronts['front_pale_circuit']) {
+    return false;
+  }
+
+  for (const [frontId, front] of frontEntries) {
+    if (!isFrontState(frontId, front)) {
+      return false;
+    }
+
+    const definitionId = front['definitionId'] as FrontDefinitionId;
+
+    if (ownedDefinitionIds.has(definitionId)) {
+      return false;
+    }
+
+    ownedDefinitionIds.add(definitionId);
+  }
+
+  if (frontOpportunities.length > FRONT_DEFINITIONS.length - ownedDefinitionIds.size) {
+    return false;
+  }
+
+  const opportunityIds = new Set<string>();
+  const opportunityDefinitionIds = new Set<FrontDefinitionId>();
+
+  for (const opportunity of frontOpportunities) {
+    if (!isFrontOpportunity(opportunity)) {
+      return false;
+    }
+
+    const opportunityId = opportunity['id'] as string;
+    const definitionId = opportunity['definitionId'] as FrontDefinitionId;
+
+    if (
+      opportunityIds.has(opportunityId) ||
+      opportunityDefinitionIds.has(definitionId) ||
+      ownedDefinitionIds.has(definitionId)
+    ) {
+      return false;
+    }
+
+    opportunityIds.add(opportunityId);
+    opportunityDefinitionIds.add(definitionId);
+  }
+
+  return true;
+}
+
+function isFrontState(frontId: string, front: unknown): front is Record<string, unknown> {
+  if (
+    !isRecord(front) ||
+    front['id'] !== frontId ||
+    typeof front['definitionId'] !== 'string' ||
+    front['definitionId'] !== frontId ||
+    !getFrontDefinition(front['definitionId'] as FrontDefinitionId) ||
+    typeof front['districtId'] !== 'string' ||
+    !getDistrictDefinition(front['districtId'] as DistrictId) ||
+    (front['venueId'] !== undefined &&
+      (typeof front['venueId'] !== 'string' ||
+        !getVenueDefinition(front['venueId'] as VenueId))) ||
+    (front['relatedRivalId'] !== undefined &&
+      (typeof front['relatedRivalId'] !== 'string' ||
+        !getRivalDefinition(front['relatedRivalId'] as RivalId))) ||
+    (front['level'] !== 1 && front['level'] !== 2) ||
+    !isFrontExposure(front['exposure']) ||
+    !isPositiveInteger(front['establishedWeek']) ||
+    typeof front['compromised'] !== 'boolean' ||
+    typeof front['active'] !== 'boolean' ||
+    !isFlags(front['flags']) ||
+    !isFrontYieldHistory(front['yieldHistory'])
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isFrontOpportunity(value: unknown): value is Record<string, unknown> {
+  if (
+    !isRecord(value) ||
+    typeof value['id'] !== 'string' ||
+    typeof value['definitionId'] !== 'string' ||
+    !getFrontDefinition(value['definitionId'] as FrontDefinitionId) ||
+    value['id'] !== `front_opportunity_${value['definitionId']}` ||
+    typeof value['districtId'] !== 'string' ||
+    !getDistrictDefinition(value['districtId'] as DistrictId) ||
+    (value['venueId'] !== undefined &&
+      (typeof value['venueId'] !== 'string' ||
+        !getVenueDefinition(value['venueId'] as VenueId))) ||
+    (value['relatedRivalId'] !== undefined &&
+      (typeof value['relatedRivalId'] !== 'string' ||
+        !getRivalDefinition(value['relatedRivalId'] as RivalId)))
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isFrontYieldHistory(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every(
+    (entry) =>
+      isRecord(entry) &&
+      isPositiveInteger(entry['week']) &&
+      isPressureDelta(entry['effects']) &&
+      isFiniteNumber(entry['exposureDelta']),
+  );
+}
+
+function isFrontExposure(value: unknown): boolean {
+  return isFiniteNumber(value) && value >= 0 && value <= 100;
 }
 
 function isQueuedOrders(value: unknown, operatives: unknown, hirePool: unknown): boolean {
@@ -705,7 +850,10 @@ function isPendingEvent(value: unknown): boolean {
       typeof value['selectedLedgerEntryId'] === 'string') &&
     (value['selectedContactId'] === undefined ||
       (typeof value['selectedContactId'] === 'string' &&
-        getContactDefinition(value['selectedContactId'] as ContactId) !== undefined))
+        getContactDefinition(value['selectedContactId'] as ContactId) !== undefined)) &&
+    (value['selectedFrontId'] === undefined ||
+      (typeof value['selectedFrontId'] === 'string' &&
+        getFrontDefinition(value['selectedFrontId'] as FrontId) !== undefined))
   );
 }
 
@@ -743,6 +891,7 @@ function isGameLogEntryType(value: unknown): boolean {
     value === 'ledger' ||
     value === 'operative_condition' ||
     value === 'complication' ||
+    value === 'front_yield' ||
     value === 'drift' ||
     value === 'rival_effect' ||
     value === 'event_presented' ||
@@ -831,6 +980,20 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
         ? {
             type: 'recruit',
             id: id as OperativeId,
+          }
+        : undefined;
+    case 'front_opportunity':
+      return id.startsWith('front_opportunity_')
+        ? {
+            type: 'front_opportunity',
+            id: id as FrontOpportunityId,
+          }
+        : undefined;
+    case 'front':
+      return getFrontDefinition(id as FrontDefinitionId)
+        ? {
+            type: 'front',
+            id: id as FrontId,
           }
         : undefined;
     default:

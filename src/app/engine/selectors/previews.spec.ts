@@ -388,6 +388,44 @@ describe('action previews', () => {
     ).toBe(45);
   });
 
+  it('previews Front-targeted Lay Low cost, effects, exposure cooling, and no assignment', () => {
+    const state = newGame({ seed: 'FRONT-LAY-LOW-PREVIEW' });
+    const target = {
+      type: 'front',
+      id: 'front_pale_circuit',
+    } as const;
+    const preview = getActionPreview(state, 'lay_low', undefined, target);
+
+    expect(preview).toEqual(
+      jasmine.objectContaining({
+        assignment: 'none',
+        adjustedResourceCost: 300,
+        adjustedEffects: {
+          heat: -6,
+          dominion: -1,
+        },
+        frontExposure: {
+          frontId: 'front_pale_circuit',
+          frontName: 'The Pale Circuit',
+          currentExposure: 12,
+          exposureDelta: -14,
+          projectedExposure: 0,
+        },
+      }),
+    );
+    expect(selectAssignmentOptions(state, 'lay_low', target)).toEqual([]);
+    expect(
+      getOrderAvailability(state, {
+        actionId: 'lay_low',
+        assignedOperativeId: state.operatives[0].id,
+        target,
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'operative_not_allowed',
+    });
+  });
+
   it('keeps Breaking operatives assignable and previews discrete Stress risk', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const mara = state.operatives.find((operative) => operative.id === 'op_mara_voss');
@@ -593,8 +631,9 @@ describe('action previews', () => {
     const recruitCard = cards.find((card) => card.actionId === 'recruit_operative');
     const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
     const contactCard = cards.find((card) => card.actionId === 'manage_contact');
+    const frontCard = cards.find((card) => card.actionId === 'invest_front');
 
-    expect(cards.length).toBe(8);
+    expect(cards.length).toBe(9);
     expect(recruitCard?.assignment).toBe('none');
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
@@ -607,6 +646,10 @@ describe('action previews', () => {
     expect(contactCard?.state).toBe('unavailable');
     expect(contactCard?.unavailableReason).toBe('target_required');
     expect(contactCard?.availableOperatives).toEqual([]);
+    expect(frontCard?.assignment).toBe('none');
+    expect(frontCard?.state).toBe('unavailable');
+    expect(frontCard?.unavailableReason).toBe('target_required');
+    expect(frontCard?.availableOperatives).toEqual([]);
   });
 
   it('converts pressure deltas into stable display rows', () => {

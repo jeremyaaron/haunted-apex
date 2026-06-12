@@ -18,13 +18,13 @@ import type {
 describe('Ledger content', () => {
   const definitions: readonly LedgerEntryDefinition[] = LEDGER_ENTRY_DEFINITIONS;
 
-  it('defines the v0.4 content slice', () => {
+  it('defines the current content slice', () => {
     const ids = definitions.map((definition) => definition.id);
 
-    expect(definitions.length).toBe(12);
+    expect(definitions.length).toBe(14);
     expect(new Set(ids).size).toBe(definitions.length);
-    expect(countByKind('secret')).toBe(6);
-    expect(countByKind('debt')).toBe(4);
+    expect(countByKind('secret')).toBe(7);
+    expect(countByKind('debt')).toBe(5);
     expect(countByKind('favor')).toBe(2);
   });
 

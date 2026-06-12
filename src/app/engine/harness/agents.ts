@@ -9,6 +9,7 @@ import type {
   ActionTarget,
   EventChoiceDefinition,
   EventChoiceLedgerEffect,
+  FrontRoleTag,
   GameState,
   LedgerEntryDefinitionId,
   OperativeId,
@@ -102,7 +103,8 @@ export const CAUTIOUS_BOT: StrategyAgent = {
         scoreCautiousTarget(state, option) +
         scoreCautiousRoster(state, option) +
         scoreCautiousLedgerOrder(state, option) +
-        scoreCautiousContactOrder(state, option),
+        scoreCautiousContactOrder(state, option) +
+        scoreCautiousFrontOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -129,7 +131,8 @@ export const GREEDY_BOT: StrategyAgent = {
         scoreGreedyTarget(state, option) +
         scoreGreedyRoster(state, option) +
         scoreGreedyLedgerOrder(state, option) +
-        scoreGreedyContactOrder(state, option),
+        scoreGreedyContactOrder(state, option) +
+        scoreGreedyFrontOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -158,7 +161,8 @@ export const OPERATOR_BOT: StrategyAgent = {
         scoreOperatorTarget(state, option) +
         scoreOperatorRoster(state, option) +
         scoreOperatorLedgerOrder(state, option) +
-        scoreOperatorContactOrder(state, option),
+        scoreOperatorContactOrder(state, option) +
+        scoreOperatorFrontOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
@@ -242,7 +246,8 @@ function scoreAggressiveTarget(state: GameState, option: LegalOrderOption): numb
     (option.preview.rivalAttention ? 2 : 0) +
     scoreAggressiveRoster(option) +
     scoreAggressiveLedgerOrder(state, option) +
-    scoreAggressiveContactOrder(state, option)
+    scoreAggressiveContactOrder(state, option) +
+    scoreAggressiveFrontOrder(state, option)
   );
 }
 
@@ -852,6 +857,290 @@ function scoreOperatorContactOrder(state: GameState, option: LegalOrderOption): 
   );
 }
 
+function scoreAggressiveFrontOrder(state: GameState, option: LegalOrderOption): number {
+  const investment = option.preview.frontInvestment;
+
+  if (investment?.ok) {
+    const totalDelta = getOrderNetDelta(option);
+    const next = applyDeltaForScoring(state.pressures, totalDelta);
+    const ownedFrontCount = getProjectedOwnedFrontCount(state, investment.mode);
+    const roleBias = scoreFrontRoles(investment.definition.roleTags, {
+      dominion: 48,
+      rival_pressure: 30,
+      resources: 18,
+      nightlife: 12,
+      ruin: 8,
+      intel: 6,
+    });
+    const zeroMercyBias = investment.definition.id === 'front_zero_mercy_cut' ? 72 : 0;
+    const modeBias =
+      investment.mode === 'upgrade'
+        ? investment.definition.id === 'front_zero_mercy_cut'
+          ? -40
+          : -70
+        : state.week <= 4
+          ? 26
+          : 4;
+    const weeklyDominion = (investment.weeklyYield.dominion ?? 0) * 42;
+    const immediateDominion = (investment.effects.dominion ?? 0) * 9;
+    const rivalPressureBias =
+      (investment.rivalPressureWarning?.pressureGain ?? 0) * 1.7 +
+      (investment.rivalPressureWarning?.weeklyPressureGain ?? 0) * 7;
+    const portfolioPenalty =
+      investment.mode === 'establish' && ownedFrontCount > 3 ? (ownedFrontCount - 3) * -80 : 0;
+    const severeExposurePenalty = investment.projectedExposure >= 80
+      ? (investment.projectedExposure - 79) * -5
+      : 0;
+    const heatBrake = next.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+      ? -10_000
+      : state.pressures.heat >= 88 && (investment.effects.heat ?? 0) > 0
+        ? -80
+        : 0;
+
+    return (
+      roleBias +
+      zeroMercyBias +
+      modeBias +
+      weeklyDominion +
+      immediateDominion +
+      rivalPressureBias +
+      portfolioPenalty +
+      severeExposurePenalty +
+      heatBrake
+    );
+  }
+
+  return scoreFrontCooling(option, {
+    minimumExposure: 82,
+    exposureScale: 1.5,
+    heatBias: state.pressures.heat >= 90 ? 50 : 0,
+    weekPenalty: state.week <= 5 ? -18 : 0,
+  });
+}
+
+function scoreCautiousFrontOrder(state: GameState, option: LegalOrderOption): number {
+  const investment = option.preview.frontInvestment;
+
+  if (investment?.ok) {
+    const totalDelta = getOrderNetDelta(option);
+    const next = applyDeltaForScoring(state.pressures, totalDelta);
+    const ownedFrontCount = getProjectedOwnedFrontCount(state, investment.mode);
+    const preferredBias = scoreFrontDefinitionId(investment.definition.id, {
+      front_shell_gallery: 76,
+      front_black_clinic: 68,
+      front_courier_line: 58,
+      front_surveillance_den: 12,
+      front_pale_circuit: 8,
+      front_zero_mercy_cut: -140,
+    });
+    const roleBias = scoreFrontRoles(investment.definition.roleTags, {
+      heat_control: 44,
+      stability: 38,
+      loyalty: 26,
+      resources: state.pressures.resources <= 2200 ? 22 : 8,
+      intel: 10,
+      dominion: state.week >= 6 ? 12 : 2,
+      rival_pressure: -45,
+      ruin: -55,
+    });
+    const reservePenalty = next.resources < 1700 ? (1700 - next.resources) * -0.035 : 0;
+    const exposurePenalty = investment.projectedExposure * -1.1;
+    const highExposurePenalty = investment.projectedExposure >= 60
+      ? (investment.projectedExposure - 59) * -5
+      : 0;
+    const rivalPenalty =
+      (investment.rivalPressureWarning?.pressureGain ?? 0) * -3 +
+      (investment.rivalPressureWarning?.weeklyPressureGain ?? 0) * -10;
+    const heatLossPenalty = next.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+      ? -10_000
+      : 0;
+    const upgradeCaution = investment.mode === 'upgrade' ? -90 : state.week <= 4 ? 14 : -12;
+    const portfolioPenalty =
+      investment.mode === 'establish' && ownedFrontCount > 2 ? (ownedFrontCount - 2) * -90 : 0;
+
+    return (
+      preferredBias +
+      roleBias +
+      reservePenalty +
+      exposurePenalty +
+      highExposurePenalty +
+      rivalPenalty +
+      heatLossPenalty +
+      upgradeCaution +
+      portfolioPenalty
+    );
+  }
+
+  return scoreFrontCooling(option, {
+    minimumExposure: 42,
+    exposureScale: 2.8,
+    heatBias: state.pressures.heat >= 62 ? 64 : 12,
+    weekPenalty: state.week >= state.maxWeeks ? -40 : 0,
+  });
+}
+
+function scoreGreedyFrontOrder(state: GameState, option: LegalOrderOption): number {
+  const investment = option.preview.frontInvestment;
+
+  if (investment?.ok) {
+    const totalDelta = getOrderNetDelta(option);
+    const next = applyDeltaForScoring(state.pressures, totalDelta);
+    const ownedFrontCount = getProjectedOwnedFrontCount(state, investment.mode);
+    const cashYield = (investment.weeklyYield.resources ?? 0) * 0.18;
+    const intelYield = (investment.weeklyYield.intel ?? 0) * 16;
+    const dominionYield = (investment.weeklyYield.dominion ?? 0) * 22;
+    const immediateCash = (investment.effects.resources ?? 0) * 0.04;
+    const roleBias = scoreFrontRoles(investment.definition.roleTags, {
+      resources: 55,
+      intel: 24,
+      dominion: 14,
+      rival_pressure: 6,
+      ruin: 4,
+      heat_control: 4,
+    });
+    const cheapEarlyBias =
+      investment.mode === 'establish' && state.week <= 4
+        ? Math.max(0, 1800 - investment.cost) * 0.025
+        : 0;
+    const modePenalty = investment.mode === 'upgrade' ? -145 : 0;
+    const portfolioPenalty =
+      investment.mode === 'establish' && ownedFrontCount > 2 ? (ownedFrontCount - 2) * -70 : 0;
+    const reservePenalty = next.resources < 450 ? (450 - next.resources) * -0.08 : 0;
+    const heatLossPenalty = next.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+      ? -10_000
+      : state.pressures.heat >= 92 && (investment.effects.heat ?? 0) > 0
+        ? -120
+        : 0;
+    const exposureTolerance = investment.projectedExposure >= 85
+      ? (investment.projectedExposure - 84) * -1.3
+      : 0;
+
+    return (
+      cashYield +
+      intelYield +
+      dominionYield +
+      immediateCash +
+      roleBias +
+      cheapEarlyBias +
+      modePenalty +
+      portfolioPenalty +
+      reservePenalty +
+      heatLossPenalty +
+      exposureTolerance
+    );
+  }
+
+  return scoreFrontCooling(option, {
+    minimumExposure: 88,
+    exposureScale: 0.9,
+    heatBias: state.pressures.heat >= 94 ? 38 : -22,
+    weekPenalty: -18,
+  });
+}
+
+function scoreOperatorFrontOrder(state: GameState, option: LegalOrderOption): number {
+  const investment = option.preview.frontInvestment;
+
+  if (investment?.ok) {
+    const totalDelta = getOrderNetDelta(option);
+    const next = applyDeltaForScoring(state.pressures, totalDelta);
+    const ownedFrontCount = getProjectedOwnedFrontCount(state, investment.mode);
+    const weeklyValue =
+      scoreDelta(investment.weeklyYield, operatorWeights(state.pressures)) +
+      (investment.weeklyYield.resources ?? 0) * (state.pressures.resources <= 2200 ? 0.035 : 0.012) +
+      (investment.weeklyYield.dominion ?? 0) * (state.week >= 5 ? 34 : 24) +
+      (investment.weeklyYield.heat ?? 0) * (state.pressures.heat >= 65 ? -8 : -2);
+    const gapFit = scoreFrontRoles(investment.definition.roleTags, {
+      heat_control: state.pressures.heat >= 60 ? 52 : 16,
+      stability: getWorstNormalizedSurvivalMargin(state.pressures) < 0.32 ? 34 : 10,
+      loyalty: state.pressures.loyalty <= 42 ? 34 : 10,
+      resources: state.pressures.resources <= 2200 ? 42 : 14,
+      intel: state.pressures.intel <= 22 ? 30 : 8,
+      dominion: state.week >= 5 ? 30 : 12,
+      rival_pressure: state.pressures.dominion >= 70 ? 12 : -8,
+      ruin: state.pressures.ruin >= 18 ? -28 : -8,
+    });
+    const earlyInvestmentBias =
+      investment.mode === 'establish' && state.week <= 4 && state.pressures.resources >= 3200
+        ? 85
+        : investment.mode === 'establish' && state.week <= 4
+          ? 30
+          : 0;
+    const upgradeBias =
+      investment.mode === 'upgrade'
+        ? weeklyValue >= 32 || (investment.effects.dominion ?? 0) > 0
+          ? -45
+          : -80
+        : 0;
+    const paybackPenalty =
+      investment.weeklyYield.resources && investment.weeklyYield.resources > 0
+        ? Math.min(45, investment.cost / Math.max(1, investment.weeklyYield.resources) * 4)
+        : investment.cost > 0
+          ? 34
+          : 0;
+    const reservePenalty = next.resources < 900 ? (900 - next.resources) * -0.08 : 0;
+    const exposurePenalty =
+      state.pressures.heat >= 70
+        ? Math.max(0, investment.projectedExposure - 45) * -3.2
+        : Math.max(0, investment.projectedExposure - 70) * -1.2;
+    const rivalPenalty =
+      state.pressures.heat >= 65
+        ? (investment.rivalPressureWarning?.pressureGain ?? 0) * -1.7 +
+          (investment.rivalPressureWarning?.weeklyPressureGain ?? 0) * -7
+        : 0;
+    const portfolioPenalty =
+      investment.mode === 'establish' && ownedFrontCount > 2 ? (ownedFrontCount - 2) * -115 : 0;
+    const loudFrontHeatPenalty =
+      state.pressures.heat >= 55 && investment.definition.id === 'front_zero_mercy_cut' ? -85 : 0;
+    const losingPenalty = isLosingProjection(next) ? -10_000 : 0;
+
+    return (
+      weeklyValue +
+      gapFit +
+      earlyInvestmentBias +
+      upgradeBias -
+      paybackPenalty +
+      reservePenalty +
+      exposurePenalty +
+      rivalPenalty +
+      portfolioPenalty +
+      loudFrontHeatPenalty +
+      losingPenalty
+    );
+  }
+
+  return scoreFrontCooling(option, {
+    minimumExposure: state.pressures.heat >= 70 ? 48 : 62,
+    exposureScale: state.pressures.heat >= 70 ? 3.2 : 1.8,
+    heatBias: state.pressures.heat >= 70 ? 90 : 18,
+    weekPenalty: state.week >= state.maxWeeks ? -70 : 0,
+  });
+}
+
+function scoreFrontCooling(
+  option: LegalOrderOption,
+  config: {
+    minimumExposure: number;
+    exposureScale: number;
+    heatBias: number;
+    weekPenalty: number;
+  },
+): number {
+  const exposure = option.preview.frontExposure;
+
+  if (!exposure) {
+    return 0;
+  }
+
+  const exposureNeed = Math.max(0, exposure.currentExposure - config.minimumExposure);
+  return (
+    exposureNeed * config.exposureScale +
+    Math.abs(exposure.exposureDelta) * 1.8 +
+    config.heatBias +
+    config.weekPenalty
+  );
+}
+
 function getContactRepeatPenalty(
   state: GameState,
   contactId: keyof GameState['contacts'],
@@ -1162,6 +1451,29 @@ function scoreRoles(
   roleValues: Partial<Record<OperativeRoleTag, number>>,
 ): number {
   return roles.reduce((score, role) => score + (roleValues[role] ?? 0), 0);
+}
+
+function scoreFrontRoles(
+  roles: readonly FrontRoleTag[],
+  roleValues: Partial<Record<FrontRoleTag, number>>,
+): number {
+  return roles.reduce((score, role) => score + (roleValues[role] ?? 0), 0);
+}
+
+function scoreFrontDefinitionId(
+  definitionId: string,
+  values: Record<string, number>,
+): number {
+  return values[definitionId] ?? 0;
+}
+
+function getProjectedOwnedFrontCount(
+  state: GameState,
+  investmentMode: 'establish' | 'upgrade',
+): number {
+  const activeFronts = Object.values(state.fronts).filter((front) => front?.active).length;
+
+  return investmentMode === 'establish' ? activeFronts + 1 : activeFronts;
 }
 
 function getRoleTags(operativeId: OperativeId): readonly OperativeRoleTag[] {

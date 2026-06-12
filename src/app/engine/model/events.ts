@@ -1,5 +1,6 @@
 import type { ActionId, ActionTarget } from './actions';
 import type { ContactId, ContactMetricDelta } from './contacts';
+import type { FrontId, FrontRoleTag } from './fronts';
 import type {
   LedgerEntryDefinitionId,
   LedgerEntryId,
@@ -35,7 +36,12 @@ export type EventId =
   | 'event_hollis_watched'
   | 'event_mercy_bill'
   | 'event_ciro_route_remembers'
-  | 'event_confession_leak';
+  | 'event_confession_leak'
+  | 'front_inspection'
+  | 'front_staff_wants_protection'
+  | 'front_rival_leans_on_your_front'
+  | 'front_clean_money_dirty_hands'
+  | 'front_back_room_ledger';
 
 export type EventTag =
   | 'HEAT'
@@ -52,7 +58,8 @@ export type EventTag =
   | 'BLACKMAIL'
   | 'OPERATIVE'
   | 'LEDGER'
-  | 'CONTACT';
+  | 'CONTACT'
+  | 'FRONT';
 
 export type EventWeightRule = {
   pressure?: PressureId;
@@ -98,8 +105,14 @@ export type EventChoiceDefinition = {
   operativeEffects?: OperativeStateDelta;
   contactId?: ContactId;
   contactEffects?: ContactMetricDelta;
-  rivalPressure?: Partial<Record<RivalId, number>>;
+  rivalPressure?: Partial<Record<RivalId | 'selected_front_rival', number>>;
   ledgerEffects?: readonly EventChoiceLedgerEffect[];
+  frontEffects?: {
+    exposure?: number;
+    compromised?: boolean;
+    active?: boolean;
+    flags?: Record<string, boolean | number | string>;
+  };
 };
 
 export type ContactEventDefinition = {
@@ -112,6 +125,13 @@ export type ContactEventDefinition = {
   minVolatility?: number;
   minExposure?: number;
   recentInteractionWithinWeeks?: number;
+};
+
+export type FrontEventDefinition = {
+  minExposure?: number;
+  roleTags?: readonly FrontRoleTag[];
+  requiresRelatedRival?: boolean;
+  minRelatedRivalPressure?: number;
 };
 
 export type OperativeEventPredicate =
@@ -144,6 +164,7 @@ type BaseEventDefinition = {
   baseWeight: number;
   weightRules?: EventWeightRule[];
   contact?: ContactEventDefinition;
+  front?: FrontEventDefinition;
   choices: EventChoiceDefinition[];
 };
 
@@ -166,4 +187,5 @@ export type GameEventInstance = {
   week: number;
   selectedLedgerEntryId?: LedgerEntryId;
   selectedContactId?: ContactId;
+  selectedFrontId?: FrontId;
 };

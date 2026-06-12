@@ -1,16 +1,19 @@
 import {
   DISTRICT_ZERO_ACTIONS,
+  FRONT_DEFINITIONS,
   ROSTER_OPERATIVES,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
   getDistrictDefinition,
   getContactDefinition,
   getEventDefinition,
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
+import { deriveFrontStatus } from '../fronts';
 import type {
   ActionId,
   ActionTarget,
@@ -19,6 +22,7 @@ import type {
   DistrictId,
   EventChoiceDefinition,
   EventId,
+  FrontDefinitionId,
   GameOverReason,
   GameState,
   LedgerEntryDefinitionId,
@@ -88,6 +92,7 @@ export type HarnessRunResult = {
   operativeEventStats: Partial<Record<EventId, OperativeEventRunStats>>;
   ledgerStats: LedgerRunStats;
   contactStats: ContactRunStats;
+  frontStats: FrontRunStats;
   trace: HarnessTraceEntry[];
 };
 
@@ -135,6 +140,11 @@ export type AgentBatchSummary = {
   contactEventReports: ContactEventReport[];
   contactLedgerReports: ContactLedgerReport[];
   contactSetReports: ContactSetReport[];
+  frontSummary: FrontSummaryReport;
+  frontOutcomeReports: FrontOutcomeReport[];
+  frontEventReports: FrontEventReport[];
+  frontOpportunitySetReports: FrontOpportunitySetReport[];
+  frontExposureBandReports: FrontExposureBandReport[];
 };
 
 export type HarnessBatchReport = {
@@ -418,6 +428,91 @@ export type ContactSetReport = {
   averageBurnedContacts: number;
 };
 
+export type FrontExposureBand = 'none' | 'quiet' | 'noticed' | 'hot' | 'compromised';
+
+export type FrontRunStats = {
+  opportunitySetKey: string;
+  establishOrders: number;
+  upgradeOrders: number;
+  layLowOrders: number;
+  finalOwnedFronts: number;
+  finalAverageExposure: number;
+  finalExposureBand: FrontExposureBand;
+  frontEventsEligible: Partial<Record<EventId, number>>;
+  frontEventsSelected: Partial<Record<EventId, number>>;
+  totalYield: Pressures;
+  fronts: Record<FrontDefinitionId, FrontOutcomeRunStats>;
+};
+
+export type FrontOutcomeRunStats = {
+  frontId: FrontDefinitionId;
+  frontName: string;
+  ownedAtStart: boolean;
+  ownedAtEnd: boolean;
+  established: boolean;
+  upgraded: boolean;
+  ignored: boolean;
+  finalExposure: number;
+  status: FrontExposureBand;
+  yieldTotals: Pressures;
+};
+
+export type FrontSummaryReport = {
+  averageOwnedFronts: number;
+  averageEstablishedFronts: number;
+  establishmentRate: number;
+  averageUpgrades: number;
+  upgradeRate: number;
+  averageLayLowOrders: number;
+  averageYieldResources: number;
+  averageYieldDominion: number;
+  averageYieldHeatDelta: number;
+  averageFinalExposure: number;
+  averageFrontEvents: number;
+};
+
+export type FrontOutcomeReport = {
+  frontId: FrontDefinitionId;
+  frontName: string;
+  ownedRuns: number;
+  establishedRuns: number;
+  upgradedRuns: number;
+  ignoredRuns: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageFinalExposure: number;
+  averageYieldResources: number;
+  averageYieldDominion: number;
+  averageYieldHeatDelta: number;
+};
+
+export type FrontEventReport = {
+  eventId: EventId;
+  eventTitle: string;
+  eligibleRuns: number;
+  selections: number;
+  selectionRate: number;
+};
+
+export type FrontOpportunitySetReport = {
+  opportunitySetKey: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageOwnedFronts: number;
+};
+
+export type FrontExposureBandReport = {
+  band: FrontExposureBand;
+  runs: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageOwnedFronts: number;
+};
+
 const MAX_HARNESS_STEPS = 64;
 const DANGEROUS_TARGET_MINIMUM_SELECTIONS = 5;
 const TARGET_TAG_MODIFIERS = new Set([
@@ -440,6 +535,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const contextualEvents = createEmptyContextualEventCounts();
   const ledgerStats = createEmptyLedgerRunStats();
   const contactStats = createEmptyContactRunStats(state);
+  const frontStats = createEmptyFrontRunStats(state);
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   let stalled = false;
@@ -454,6 +550,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         targetUsage,
         ledgerStats,
         contactStats,
+        frontStats,
         trace,
         options.collectTrace,
       );
@@ -495,6 +592,11 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         advanced.eventCandidates,
         advanced.eventSelection,
       );
+      recordFrontEventStats(
+        frontStats,
+        advanced.eventCandidates,
+        advanced.eventSelection,
+      );
       recordContextualEvent(contextualEvents, advanced.eventSelection);
       state = advanced.state;
       appendTrace(trace, options.collectTrace, state, 'Advanced week and presented event.');
@@ -528,6 +630,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   finalizeOperativeStats(operativeStats, state);
   finalizeLedgerRunStats(ledgerStats, state);
   finalizeContactRunStats(contactStats, state);
+  finalizeFrontRunStats(frontStats, state);
 
   return {
     agentId: options.agent.id,
@@ -547,6 +650,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     operativeEventStats,
     ledgerStats,
     contactStats,
+    frontStats,
     trace,
   };
 }
@@ -964,6 +1068,149 @@ export function formatBatchReport(report: HarnessBatchReport): string {
 
   lines.push(
     '',
+    'front_summary',
+    'agent,avgOwnedFronts,avgEstablishedFronts,establishmentRate,avgUpgrades,upgradeRate,avgLayLowOrders,avgYieldResources,avgYieldDominion,avgYieldHeatDelta,avgFinalExposure,avgFrontEvents',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.frontSummary.averageOwnedFronts.toFixed(2),
+        summary.frontSummary.averageEstablishedFronts.toFixed(2),
+        summary.frontSummary.establishmentRate.toFixed(3),
+        summary.frontSummary.averageUpgrades.toFixed(2),
+        summary.frontSummary.upgradeRate.toFixed(3),
+        summary.frontSummary.averageLayLowOrders.toFixed(2),
+        summary.frontSummary.averageYieldResources.toFixed(2),
+        summary.frontSummary.averageYieldDominion.toFixed(2),
+        summary.frontSummary.averageYieldHeatDelta.toFixed(2),
+        summary.frontSummary.averageFinalExposure.toFixed(2),
+        summary.frontSummary.averageFrontEvents.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'front_highlights',
+    'agent,mostProfitableFront,avgYieldResources,mostDangerousFront,avgFinalExposure,mostIgnoredFront,ignoredRuns',
+  );
+
+  for (const summary of report.summaries) {
+    const mostProfitable = selectMostProfitableFront(summary.frontOutcomeReports);
+    const mostDangerous = selectMostDangerousFront(summary.frontOutcomeReports);
+    const mostIgnored = selectMostIgnoredFront(summary.frontOutcomeReports);
+
+    lines.push(
+      [
+        summary.agentId,
+        csvCell(mostProfitable?.frontName ?? ''),
+        mostProfitable?.averageYieldResources.toFixed(2) ?? '',
+        csvCell(mostDangerous?.frontName ?? ''),
+        mostDangerous?.averageFinalExposure.toFixed(2) ?? '',
+        csvCell(mostIgnored?.frontName ?? ''),
+        mostIgnored?.ignoredRuns ?? '',
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'front_outcomes',
+    'agent,frontId,frontName,ownedRuns,establishedRuns,upgradedRuns,ignoredRuns,wins,losses,winRate,avgFinalExposure,avgYieldResources,avgYieldDominion,avgYieldHeatDelta',
+  );
+
+  for (const summary of report.summaries) {
+    for (const front of summary.frontOutcomeReports) {
+      lines.push(
+        [
+          summary.agentId,
+          front.frontId,
+          csvCell(front.frontName),
+          front.ownedRuns,
+          front.establishedRuns,
+          front.upgradedRuns,
+          front.ignoredRuns,
+          front.wins,
+          front.losses,
+          front.winRate.toFixed(3),
+          front.averageFinalExposure.toFixed(2),
+          front.averageYieldResources.toFixed(2),
+          front.averageYieldDominion.toFixed(2),
+          front.averageYieldHeatDelta.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'front_events',
+    'agent,eventId,eventTitle,eligibleRuns,selections,selectionRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const event of summary.frontEventReports) {
+      lines.push(
+        [
+          summary.agentId,
+          event.eventId,
+          csvCell(event.eventTitle),
+          event.eligibleRuns,
+          event.selections,
+          event.selectionRate.toFixed(3),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'front_opportunity_sets',
+    'agent,frontSetKey,runs,wins,losses,winRate,avgOwnedFronts',
+  );
+
+  for (const summary of report.summaries) {
+    for (const opportunitySet of summary.frontOpportunitySetReports) {
+      lines.push(
+        [
+          summary.agentId,
+          csvCell(opportunitySet.opportunitySetKey),
+          opportunitySet.runs,
+          opportunitySet.wins,
+          opportunitySet.losses,
+          opportunitySet.winRate.toFixed(3),
+          opportunitySet.averageOwnedFronts.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'front_exposure_bands',
+    'agent,band,runs,wins,losses,winRate,avgOwnedFronts',
+  );
+
+  for (const summary of report.summaries) {
+    for (const band of summary.frontExposureBandReports) {
+      lines.push(
+        [
+          summary.agentId,
+          band.band,
+          band.runs,
+          band.wins,
+          band.losses,
+          band.winRate.toFixed(3),
+          band.averageOwnedFronts.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
     'roster_compositions',
     'agent,rosterKey,runs,wins,losses,winRate,avgWeeks',
   );
@@ -1210,6 +1457,7 @@ function queueAgentOrders(
   targetUsage: Record<string, TargetRunStats>,
   ledgerStats: LedgerRunStats,
   contactStats: ContactRunStats,
+  frontStats: FrontRunStats,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
 ): GameState {
@@ -1239,6 +1487,7 @@ function queueAgentOrders(
     recordTargetSelection(targetUsage, decision.target);
     recordLedgerOrderStats(ledgerStats, decision);
     recordContactOrderStats(contactStats, decision);
+    recordFrontOrderStats(frontStats, decision);
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
@@ -1325,6 +1574,17 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
   const contactEventReports = new Map<EventId, ContactEventReport>();
   const contactLedgerReports = new Map<string, ContactLedgerReport>();
   const contactSetReports = new Map<string, ContactSetReport & { burnedContacts: number }>();
+  const frontSummaryTotals = createEmptyFrontSummaryTotals();
+  const frontOutcomeReports = new Map<FrontDefinitionId, FrontOutcomeReport>();
+  const frontEventReports = new Map<EventId, FrontEventReport>();
+  const frontOpportunitySetReports = new Map<
+    string,
+    FrontOpportunitySetReport & { ownedFronts: number }
+  >();
+  const frontExposureBandReports = new Map<
+    FrontExposureBand,
+    FrontExposureBandReport & { ownedFronts: number }
+  >();
   let weeksTotal = 0;
   let wins = 0;
   let losses = 0;
@@ -1409,6 +1669,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     addContactEventReports(contactEventReports, run.contactStats);
     addContactLedgerReports(contactLedgerReports, run);
     addContactSetReports(contactSetReports, run);
+    addFrontSummaryTotals(frontSummaryTotals, run.frontStats);
+    addFrontOutcomeReports(frontOutcomeReports, run);
+    addFrontEventReports(frontEventReports, run.frontStats);
+    addFrontOpportunitySetReports(frontOpportunitySetReports, run);
+    addFrontExposureBandReports(frontExposureBandReports, run);
   }
 
   const targetReports = [...targetReportsByKey.values()]
@@ -1457,6 +1722,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     contactEventReports: sortContactEventReports([...contactEventReports.values()]),
     contactLedgerReports: sortContactLedgerReports([...contactLedgerReports.values()]),
     contactSetReports: finalizeContactSetReports(contactSetReports),
+    frontSummary: finalizeFrontSummaryReport(frontSummaryTotals, runs.length),
+    frontOutcomeReports: sortFrontOutcomeReports([...frontOutcomeReports.values()]),
+    frontEventReports: sortFrontEventReports([...frontEventReports.values()]),
+    frontOpportunitySetReports: finalizeFrontOpportunitySetReports(frontOpportunitySetReports),
+    frontExposureBandReports: finalizeFrontExposureBandReports(frontExposureBandReports),
   };
 }
 
@@ -1659,7 +1929,9 @@ function recordLedgerOrderStats(stats: LedgerRunStats, decision: LegalOrderOptio
     decision.actionId === 'gather_intel' &&
     decision.target &&
     decision.target.type !== 'ledger' &&
-    decision.target.type !== 'recruit'
+    decision.target.type !== 'recruit' &&
+    decision.target.type !== 'front_opportunity' &&
+    decision.target.type !== 'front'
   ) {
     stats.targetedGatherIntelOrders += 1;
   }
@@ -2351,6 +2623,428 @@ function isContactEvent(event: WeightedEvent['event'] | EventSelection['definiti
   return event.tags.includes('CONTACT') || event.contact !== undefined;
 }
 
+function createEmptyFrontRunStats(state: GameState): FrontRunStats {
+  return {
+    opportunitySetKey: getFrontOpportunitySetKey(state),
+    establishOrders: 0,
+    upgradeOrders: 0,
+    layLowOrders: 0,
+    finalOwnedFronts: 0,
+    finalAverageExposure: 0,
+    finalExposureBand: 'none',
+    frontEventsEligible: {},
+    frontEventsSelected: {},
+    totalYield: createEmptyPressureTotals(),
+    fronts: FRONT_DEFINITIONS.reduce(
+      (fronts, definition) => {
+        const front = state.fronts[definition.id];
+
+        fronts[definition.id] = {
+          frontId: definition.id,
+          frontName: definition.name,
+          ownedAtStart: Boolean(front?.active),
+          ownedAtEnd: false,
+          established: false,
+          upgraded: false,
+          ignored: false,
+          finalExposure: 0,
+          status: 'none',
+          yieldTotals: createEmptyPressureTotals(),
+        };
+
+        return fronts;
+      },
+      {} as Record<FrontDefinitionId, FrontOutcomeRunStats>,
+    ),
+  };
+}
+
+function recordFrontOrderStats(stats: FrontRunStats, decision: LegalOrderOption): void {
+  if (decision.actionId === 'lay_low' && decision.target?.type === 'front') {
+    stats.layLowOrders += 1;
+    return;
+  }
+
+  const investment = decision.preview.frontInvestment;
+
+  if (!investment?.ok) {
+    return;
+  }
+
+  const frontStats = stats.fronts[investment.definition.id];
+
+  if (investment.mode === 'establish') {
+    stats.establishOrders += 1;
+    frontStats.established = true;
+  } else {
+    stats.upgradeOrders += 1;
+    frontStats.upgraded = true;
+  }
+}
+
+function recordFrontEventStats(
+  stats: FrontRunStats,
+  candidates: readonly WeightedEvent[],
+  selection: EventSelection,
+): void {
+  for (const candidate of candidates) {
+    if (!isFrontEvent(candidate.event)) {
+      continue;
+    }
+
+    stats.frontEventsEligible[candidate.event.id] =
+      (stats.frontEventsEligible[candidate.event.id] ?? 0) + 1;
+  }
+
+  if (isFrontEvent(selection.definition)) {
+    stats.frontEventsSelected[selection.definition.id] =
+      (stats.frontEventsSelected[selection.definition.id] ?? 0) + 1;
+  }
+}
+
+function finalizeFrontRunStats(stats: FrontRunStats, state: GameState): void {
+  const activeFronts = Object.values(state.fronts).filter((front) => front?.active);
+  const exposureTotal = activeFronts.reduce((sum, front) => sum + front.exposure, 0);
+
+  stats.finalOwnedFronts = activeFronts.length;
+  stats.finalAverageExposure = activeFronts.length > 0 ? exposureTotal / activeFronts.length : 0;
+  stats.finalExposureBand = getFrontExposureBand(stats.finalAverageExposure);
+
+  for (const front of activeFronts) {
+    const definition = getFrontDefinition(front.definitionId);
+
+    if (!definition) {
+      continue;
+    }
+
+    const frontStats = stats.fronts[front.definitionId];
+    const yieldTotals = sumFrontYieldHistory(front.yieldHistory);
+
+    frontStats.ownedAtEnd = true;
+    frontStats.established ||= front.establishedWeek > 1;
+    frontStats.upgraded ||= front.level > 1;
+    frontStats.finalExposure = front.exposure;
+    frontStats.status = getFrontExposureBand(front.exposure);
+    frontStats.yieldTotals = yieldTotals;
+
+    for (const pressure of PRESSURE_IDS) {
+      stats.totalYield[pressure] += yieldTotals[pressure];
+    }
+  }
+
+  for (const frontStats of Object.values(stats.fronts)) {
+    frontStats.ignored =
+      !frontStats.ownedAtStart &&
+      !frontStats.ownedAtEnd &&
+      !frontStats.established &&
+      !frontStats.upgraded;
+  }
+}
+
+function createEmptyFrontSummaryTotals(): FrontSummaryReport & {
+  frontEventTotal: number;
+  exposureSamples: number;
+} {
+  return {
+    averageOwnedFronts: 0,
+    averageEstablishedFronts: 0,
+    establishmentRate: 0,
+    averageUpgrades: 0,
+    upgradeRate: 0,
+    averageLayLowOrders: 0,
+    averageYieldResources: 0,
+    averageYieldDominion: 0,
+    averageYieldHeatDelta: 0,
+    averageFinalExposure: 0,
+    averageFrontEvents: 0,
+    frontEventTotal: 0,
+    exposureSamples: 0,
+  };
+}
+
+function addFrontSummaryTotals(
+  totals: FrontSummaryReport & { frontEventTotal: number; exposureSamples: number },
+  stats: FrontRunStats,
+): void {
+  totals.averageOwnedFronts += stats.finalOwnedFronts;
+  totals.averageEstablishedFronts += stats.establishOrders;
+  totals.establishmentRate += stats.establishOrders > 0 ? 1 : 0;
+  totals.averageUpgrades += stats.upgradeOrders;
+  totals.upgradeRate += stats.upgradeOrders > 0 ? 1 : 0;
+  totals.averageLayLowOrders += stats.layLowOrders;
+  totals.averageYieldResources += stats.totalYield.resources;
+  totals.averageYieldDominion += stats.totalYield.dominion;
+  totals.averageYieldHeatDelta += stats.totalYield.heat;
+  totals.frontEventTotal += Object.values(stats.frontEventsSelected).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+
+  if (stats.finalOwnedFronts > 0) {
+    totals.averageFinalExposure += stats.finalAverageExposure;
+    totals.exposureSamples += 1;
+  }
+}
+
+function finalizeFrontSummaryReport(
+  totals: FrontSummaryReport & { frontEventTotal: number; exposureSamples: number },
+  runs: number,
+): FrontSummaryReport {
+  return {
+    averageOwnedFronts: runs > 0 ? totals.averageOwnedFronts / runs : 0,
+    averageEstablishedFronts: runs > 0 ? totals.averageEstablishedFronts / runs : 0,
+    establishmentRate: runs > 0 ? totals.establishmentRate / runs : 0,
+    averageUpgrades: runs > 0 ? totals.averageUpgrades / runs : 0,
+    upgradeRate: runs > 0 ? totals.upgradeRate / runs : 0,
+    averageLayLowOrders: runs > 0 ? totals.averageLayLowOrders / runs : 0,
+    averageYieldResources: runs > 0 ? totals.averageYieldResources / runs : 0,
+    averageYieldDominion: runs > 0 ? totals.averageYieldDominion / runs : 0,
+    averageYieldHeatDelta: runs > 0 ? totals.averageYieldHeatDelta / runs : 0,
+    averageFinalExposure:
+      totals.exposureSamples > 0 ? totals.averageFinalExposure / totals.exposureSamples : 0,
+    averageFrontEvents: runs > 0 ? totals.frontEventTotal / runs : 0,
+  };
+}
+
+function addFrontOutcomeReports(
+  reports: Map<FrontDefinitionId, FrontOutcomeReport>,
+  run: HarnessRunResult,
+): void {
+  for (const front of Object.values(run.frontStats.fronts)) {
+    const report = reports.get(front.frontId) ?? {
+      frontId: front.frontId,
+      frontName: front.frontName,
+      ownedRuns: 0,
+      establishedRuns: 0,
+      upgradedRuns: 0,
+      ignoredRuns: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      averageFinalExposure: 0,
+      averageYieldResources: 0,
+      averageYieldDominion: 0,
+      averageYieldHeatDelta: 0,
+    };
+    report.ownedRuns += front.ownedAtEnd ? 1 : 0;
+    report.establishedRuns += front.established ? 1 : 0;
+    report.upgradedRuns += front.upgraded ? 1 : 0;
+    report.ignoredRuns += front.ignored ? 1 : 0;
+    report.averageFinalExposure += front.ownedAtEnd ? front.finalExposure : 0;
+    report.averageYieldResources += front.yieldTotals.resources;
+    report.averageYieldDominion += front.yieldTotals.dominion;
+    report.averageYieldHeatDelta += front.yieldTotals.heat;
+
+    if (front.ownedAtEnd || front.established || front.upgraded) {
+      report.wins += run.outcome === 'victory' ? 1 : 0;
+      report.losses += run.outcome === 'loss' ? 1 : 0;
+    }
+
+    reports.set(front.frontId, report);
+  }
+}
+
+function sortFrontOutcomeReports(reports: FrontOutcomeReport[]): FrontOutcomeReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      winRate:
+        report.wins + report.losses > 0 ? report.wins / (report.wins + report.losses) : 0,
+      averageFinalExposure:
+        report.ownedRuns > 0 ? report.averageFinalExposure / report.ownedRuns : 0,
+      averageYieldResources: report.averageYieldResources / Math.max(1, report.ownedRuns),
+      averageYieldDominion: report.averageYieldDominion / Math.max(1, report.ownedRuns),
+      averageYieldHeatDelta: report.averageYieldHeatDelta / Math.max(1, report.ownedRuns),
+    }))
+    .sort((left, right) => left.frontName.localeCompare(right.frontName));
+}
+
+function selectMostProfitableFront(
+  reports: readonly FrontOutcomeReport[],
+): FrontOutcomeReport | undefined {
+  return [...reports]
+    .filter((front) => front.ownedRuns > 0)
+    .sort(
+      (left, right) =>
+        right.averageYieldResources - left.averageYieldResources ||
+        right.averageYieldDominion - left.averageYieldDominion ||
+        left.frontName.localeCompare(right.frontName),
+    )[0];
+}
+
+function selectMostDangerousFront(
+  reports: readonly FrontOutcomeReport[],
+): FrontOutcomeReport | undefined {
+  return [...reports]
+    .filter((front) => front.ownedRuns > 0)
+    .sort(
+      (left, right) =>
+        right.averageFinalExposure - left.averageFinalExposure ||
+        left.frontName.localeCompare(right.frontName),
+    )[0];
+}
+
+function selectMostIgnoredFront(
+  reports: readonly FrontOutcomeReport[],
+): FrontOutcomeReport | undefined {
+  return [...reports].sort(
+    (left, right) =>
+      right.ignoredRuns - left.ignoredRuns || left.frontName.localeCompare(right.frontName),
+  )[0];
+}
+
+function addFrontEventReports(
+  reports: Map<EventId, FrontEventReport>,
+  stats: FrontRunStats,
+): void {
+  const eventIds = new Set<EventId>([
+    ...Object.keys(stats.frontEventsEligible),
+    ...Object.keys(stats.frontEventsSelected),
+  ] as EventId[]);
+
+  for (const eventId of eventIds) {
+    const report = reports.get(eventId) ?? {
+      eventId,
+      eventTitle: getEventTitle(eventId),
+      eligibleRuns: 0,
+      selections: 0,
+      selectionRate: 0,
+    };
+    report.eligibleRuns += stats.frontEventsEligible[eventId] ?? 0;
+    report.selections += stats.frontEventsSelected[eventId] ?? 0;
+    reports.set(eventId, report);
+  }
+}
+
+function sortFrontEventReports(reports: FrontEventReport[]): FrontEventReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      selectionRate: report.eligibleRuns > 0 ? report.selections / report.eligibleRuns : 0,
+    }))
+    .sort((left, right) => left.eventTitle.localeCompare(right.eventTitle));
+}
+
+function addFrontOpportunitySetReports(
+  reports: Map<string, FrontOpportunitySetReport & { ownedFronts: number }>,
+  run: HarnessRunResult,
+): void {
+  const key = run.frontStats.opportunitySetKey;
+  const report = reports.get(key) ?? {
+    opportunitySetKey: key,
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageOwnedFronts: 0,
+    ownedFronts: 0,
+  };
+  report.runs += 1;
+  report.wins += run.outcome === 'victory' ? 1 : 0;
+  report.losses += run.outcome === 'loss' ? 1 : 0;
+  report.ownedFronts += run.frontStats.finalOwnedFronts;
+  reports.set(key, report);
+}
+
+function finalizeFrontOpportunitySetReports(
+  reports: Map<string, FrontOpportunitySetReport & { ownedFronts: number }>,
+): FrontOpportunitySetReport[] {
+  return [...reports.values()]
+    .map((report) => ({
+      opportunitySetKey: report.opportunitySetKey,
+      runs: report.runs,
+      wins: report.wins,
+      losses: report.losses,
+      winRate: report.runs > 0 ? report.wins / report.runs : 0,
+      averageOwnedFronts: report.runs > 0 ? report.ownedFronts / report.runs : 0,
+    }))
+    .sort((left, right) => left.opportunitySetKey.localeCompare(right.opportunitySetKey));
+}
+
+function addFrontExposureBandReports(
+  reports: Map<FrontExposureBand, FrontExposureBandReport & { ownedFronts: number }>,
+  run: HarnessRunResult,
+): void {
+  const band = run.frontStats.finalExposureBand;
+  const report = reports.get(band) ?? {
+    band,
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageOwnedFronts: 0,
+    ownedFronts: 0,
+  };
+  report.runs += 1;
+  report.wins += run.outcome === 'victory' ? 1 : 0;
+  report.losses += run.outcome === 'loss' ? 1 : 0;
+  report.ownedFronts += run.frontStats.finalOwnedFronts;
+  reports.set(band, report);
+}
+
+function finalizeFrontExposureBandReports(
+  reports: Map<FrontExposureBand, FrontExposureBandReport & { ownedFronts: number }>,
+): FrontExposureBandReport[] {
+  return [...reports.values()]
+    .map((report) => ({
+      band: report.band,
+      runs: report.runs,
+      wins: report.wins,
+      losses: report.losses,
+      winRate: report.runs > 0 ? report.wins / report.runs : 0,
+      averageOwnedFronts: report.runs > 0 ? report.ownedFronts / report.runs : 0,
+    }))
+    .sort((left, right) => frontExposureBandRank(left.band) - frontExposureBandRank(right.band));
+}
+
+function isFrontEvent(event: WeightedEvent['event'] | EventSelection['definition']): boolean {
+  return event.tags.includes('FRONT');
+}
+
+function getFrontOpportunitySetKey(state: GameState): string {
+  return state.frontOpportunities
+    .map((opportunity) => getFrontDefinition(opportunity.definitionId)?.name ?? opportunity.definitionId)
+    .sort()
+    .join('+');
+}
+
+function sumFrontYieldHistory(
+  yieldHistory: readonly { effects: Partial<Pressures> }[],
+): Pressures {
+  const totals = createEmptyPressureTotals();
+
+  for (const entry of yieldHistory) {
+    for (const pressure of PRESSURE_IDS) {
+      totals[pressure] += entry.effects[pressure] ?? 0;
+    }
+  }
+
+  return totals;
+}
+
+function getFrontExposureBand(exposure: number): FrontExposureBand {
+  if (exposure <= 0) {
+    return 'none';
+  }
+
+  return deriveFrontStatus(exposure);
+}
+
+function frontExposureBandRank(band: FrontExposureBand): number {
+  switch (band) {
+    case 'none':
+      return 0;
+    case 'quiet':
+      return 1;
+    case 'noticed':
+      return 2;
+    case 'hot':
+      return 3;
+    case 'compromised':
+      return 4;
+  }
+}
+
 function addRosterCompositionReport(
   reports: Map<string, RosterCompositionReport>,
   run: HarnessRunResult,
@@ -2762,6 +3456,9 @@ function getTargetReportLabel(target: TargetRunStats): string {
     case 'ledger':
       return target.targetId;
     case 'contact':
+      return target.targetId;
+    case 'front_opportunity':
+    case 'front':
       return target.targetId;
   }
 }

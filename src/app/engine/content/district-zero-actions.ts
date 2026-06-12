@@ -99,7 +99,7 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     stressType: 'recovery',
     assignment: 'optional',
     requiresTarget: false,
-    allowedTargetTypes: ['district', 'venue'],
+    allowedTargetTypes: ['district', 'venue', 'front'],
   },
   {
     id: 'work_the_ledger',
@@ -124,6 +124,18 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     assignment: 'none',
     requiresTarget: true,
     allowedTargetTypes: ['contact'],
+  },
+  {
+    id: 'invest_front',
+    label: 'Invest in Front',
+    commandCost: 1,
+    resourceCost: 0,
+    effects: {},
+    baseRisk: 10,
+    stressType: 'none',
+    assignment: 'none',
+    requiresTarget: true,
+    allowedTargetTypes: ['front_opportunity', 'front'],
   },
 ] as const;
 

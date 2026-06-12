@@ -1,9 +1,13 @@
 import {
+  getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
 } from '../content';
+import { deriveFrontStatus } from '../fronts';
 import type {
+  FrontId,
+  FrontStatus,
   GameLogEntry,
   GameOverState,
   GameState,
@@ -39,6 +43,16 @@ export type RunSummaryLedgerEntry = {
   consumedWeek?: number;
 };
 
+export type RunSummaryFront = {
+  id: FrontId;
+  name: string;
+  level: number;
+  status: FrontStatus;
+  exposure: number;
+  establishedWeek: number;
+  weeklyYieldTotals: Partial<Pressures>;
+};
+
 export type RunSummaryReport = {
   title: string;
   seed: string;
@@ -59,6 +73,17 @@ export type RunSummaryReport = {
     activeFavors: number;
     entries: RunSummaryLedgerEntry[];
   };
+  fronts: {
+    owned: number;
+    established: number;
+    upgrades: number;
+    eventsTriggered: number;
+    resourcesGenerated: number;
+    dominionGenerated: number;
+    heatDelta: number;
+    averageFinalExposure: number;
+    entries: RunSummaryFront[];
+  };
   majorEvents: string[];
   epitaph: string;
   text: string;
@@ -76,6 +101,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
   const mostAssignedOperative = selectMostAssigned(finalRoster);
   const mvpOperative = selectMvp(finalRoster);
   const ledgerEntries = state.ledger.entries.map(toLedgerReportEntry);
+  const frontSummary = buildFrontSummary(state);
   const reportWithoutText = {
     title: `Haunted Apex Run Report - ${formatResult(gameOver.result)}`,
     seed: state.seed,
@@ -96,6 +122,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
       activeFavors: countActiveLedgerKind(state, 'favor'),
       entries: ledgerEntries,
     },
+    fronts: frontSummary,
     majorEvents: selectMajorEvents(state),
     epitaph: selectEpitaph(state, gameOver),
   };
@@ -133,6 +160,17 @@ export function formatRunSummary(
     `- Unresolved Debts: ${report.ledger.unresolvedDebts}`,
     `- Active Favors: ${report.ledger.activeFavors}`,
     ...formatLedgerEntries(report.ledger.entries),
+    '',
+    'Front Network:',
+    `- Owned Fronts: ${report.fronts.owned}`,
+    `- New Fronts Established: ${report.fronts.established}`,
+    `- Upgrades: ${report.fronts.upgrades}`,
+    `- Front Events Triggered: ${report.fronts.eventsTriggered}`,
+    `- Resources From Fronts: ${report.fronts.resourcesGenerated}`,
+    `- Dominion From Fronts: ${report.fronts.dominionGenerated}`,
+    `- Heat Delta From Fronts: ${formatSigned(report.fronts.heatDelta)}`,
+    `- Average Final Exposure: ${report.fronts.averageFinalExposure.toFixed(1)}`,
+    ...formatFrontEntries(report.fronts.entries),
     '',
     'Major Events:',
     ...formatMajorEvents(report.majorEvents),
@@ -217,6 +255,74 @@ function getLedgerStatus(entry: LedgerEntry): RunSummaryLedgerEntry['status'] {
   return entry.kind === 'debt' ? 'resolved' : 'spent';
 }
 
+function buildFrontSummary(state: GameState): RunSummaryReport['fronts'] {
+  const fronts = Object.values(state.fronts)
+    .filter((front) => front?.active)
+    .map((front) => {
+      const weeklyYieldTotals = sumYieldHistory(front.yieldHistory);
+
+      return {
+        id: front.id,
+        name: getFrontDefinition(front.definitionId)?.name ?? front.definitionId,
+        level: front.level,
+        status: deriveFrontStatus(front.exposure),
+        exposure: front.exposure,
+        establishedWeek: front.establishedWeek,
+        weeklyYieldTotals,
+      };
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const totals = fronts.reduce(
+    (summary, front) => ({
+      resourcesGenerated:
+        summary.resourcesGenerated + (front.weeklyYieldTotals.resources ?? 0),
+      dominionGenerated:
+        summary.dominionGenerated + (front.weeklyYieldTotals.dominion ?? 0),
+      heatDelta: summary.heatDelta + (front.weeklyYieldTotals.heat ?? 0),
+      exposure: summary.exposure + front.exposure,
+    }),
+    {
+      resourcesGenerated: 0,
+      dominionGenerated: 0,
+      heatDelta: 0,
+      exposure: 0,
+    },
+  );
+
+  return {
+    owned: fronts.length,
+    established: fronts.filter((front) => front.establishedWeek > 1).length,
+    upgrades: fronts.reduce((sum, front) => sum + Math.max(0, front.level - 1), 0),
+    eventsTriggered: state.eventLog.filter(
+      (entry) => entry.type === 'event_presented' && entry.tags?.includes('FRONT'),
+    ).length,
+    resourcesGenerated: totals.resourcesGenerated,
+    dominionGenerated: totals.dominionGenerated,
+    heatDelta: totals.heatDelta,
+    averageFinalExposure: fronts.length > 0 ? totals.exposure / fronts.length : 0,
+    entries: fronts,
+  };
+}
+
+function sumYieldHistory(
+  yieldHistory: readonly { effects: Partial<Pressures> }[],
+): Partial<Pressures> {
+  return yieldHistory.reduce(
+    (totals, entry) => {
+      for (const pressure of PRESSURE_IDS) {
+        const value = entry.effects[pressure];
+
+        if (value !== undefined) {
+          totals[pressure] = (totals[pressure] ?? 0) + value;
+        }
+      }
+
+      return totals;
+    },
+    {} as Partial<Pressures>,
+  );
+}
+
 function selectMajorEvents(state: GameState): string[] {
   const majorTypes = new Set<GameLogEntry['type']>([
     'event_presented',
@@ -272,6 +378,22 @@ function formatLedgerEntries(entries: readonly RunSummaryLedgerEntry[]): string[
   ];
 }
 
+function formatFrontEntries(entries: readonly RunSummaryFront[]): string[] {
+  if (entries.length === 0) {
+    return ['- Fronts: None'];
+  }
+
+  return [
+    '- Fronts:',
+    ...entries.map(
+      (front) =>
+        `  - ${front.name}: Level ${front.level}, ${formatToken(front.status)}, Exposure ${
+          front.exposure
+        }, Week ${front.establishedWeek}`,
+    ),
+  ];
+}
+
 function formatMajorEvents(events: readonly string[]): string[] {
   return events.length > 0 ? events.map((event) => `- ${event}`) : ['- None'];
 }
@@ -292,6 +414,10 @@ function formatRival(rival: RunSummaryRival | undefined): string {
 
 function formatResult(result: GameOverState['result']): string {
   return result === 'victory' ? 'Victory' : 'Loss';
+}
+
+function formatSigned(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
 }
 
 function formatToken(value: string): string {

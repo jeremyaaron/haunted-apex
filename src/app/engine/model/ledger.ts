@@ -16,10 +16,12 @@ export type LedgerEntryDefinitionId =
   | 'secret_knox_route_manifests'
   | 'secret_ghostline_buyer_list'
   | 'secret_dead_channel_trace'
+  | 'secret_back_room_guest_list'
   | 'debt_owes_liaison'
   | 'debt_unfunded_promise'
   | 'debt_contaminated_money'
   | 'debt_saints_payment_trail'
+  | 'debt_dirty_books'
   | 'favor_checkpoint_captain'
   | 'favor_hidden_route';
 

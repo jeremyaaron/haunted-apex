@@ -16,10 +16,12 @@ export {
   getActionDefinition,
 } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './event-registry';
+export { FRONT_EVENTS } from './front-events';
 export {
   getLedgerEntryDefinition,
   LEDGER_ENTRY_DEFINITIONS,
 } from './ledger-entries';
+export { FRONT_DEFINITIONS, getFrontDefinition } from './fronts';
 export { ROSTER_EVENTS } from './roster-events';
 export {
   getDistrictDefinition,

@@ -23,6 +23,8 @@ import {
   type ContactOptionPreview,
   type ContactServiceView,
   type EventChoiceDefinition,
+  type FrontEffectPreviewRow,
+  type FrontInvestmentPanelView,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
   type HireCandidateView,
@@ -187,6 +189,14 @@ export class App {
       ...selected,
       [actionId]: target,
     }));
+
+    if (actionId === 'lay_low' && target?.type === 'front') {
+      this.selectedOperatives.update((selected) => {
+        const next = { ...selected };
+        delete next[actionId];
+        return next;
+      });
+    }
   }
 
   protected selectedTarget(actionId: ActionId): string {
@@ -198,7 +208,12 @@ export class App {
     const unavailable = this.targetOptionUnavailableText(option);
     const suffix = unavailable ? ` (${unavailable})` : '';
 
-    if (option.targetType === 'venue' && option.districtName) {
+    if (
+      (option.targetType === 'venue' ||
+        option.targetType === 'front_opportunity' ||
+        option.targetType === 'front') &&
+      option.districtName
+    ) {
       return `${option.districtName} / ${option.label}${suffix}`;
     }
 
@@ -211,7 +226,10 @@ export class App {
 
   protected targetOptionDisabled(option: ActionTargetOption): boolean {
     return (
-      (option.targetType === 'ledger' || option.targetType === 'contact') &&
+      (option.targetType === 'ledger' ||
+        option.targetType === 'contact' ||
+        option.targetType === 'front_opportunity' ||
+        option.targetType === 'front') &&
       option.affordable === false
     );
   }
@@ -358,6 +376,28 @@ export class App {
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.contactEffects ?? [];
   }
 
+  protected eventFrontRows(choiceId: string): FrontEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.frontEffects ?? [];
+  }
+
+  protected eventFrontEffectText(row: FrontEffectPreviewRow): string {
+    if (row.id === 'exposure' && typeof row.value === 'number') {
+      return `${row.frontName} Exposure ${this.signed(row.value)}`;
+    }
+
+    return `${row.frontName} ${this.displayToken(row.id)} ${String(row.projected)}`;
+  }
+
+  protected eventFrontEffectIsWarning(row: FrontEffectPreviewRow): boolean {
+    return row.id === 'exposure' && typeof row.value === 'number' && row.value > 0;
+  }
+
   protected formatLedgerEventRow(row: EventLedgerEffectPreviewRow): string {
     const kind = this.capitalize(row.kind);
 
@@ -452,7 +492,38 @@ export class App {
     }
   }
 
+  protected frontInvestmentUnavailableReason(investment: FrontInvestmentPanelView): string {
+    switch (investment.unavailableReason) {
+      case 'front_cap_reached':
+        return 'Front cap reached';
+      case 'front_already_owned':
+        return 'Already owned';
+      case 'front_already_max_level':
+        return 'Max Level';
+      case 'not_enough_resources':
+        return 'Not enough Resources';
+      case 'target_not_found':
+        return 'Target unavailable';
+      case 'target_required':
+        return 'Target required';
+      case 'target_not_allowed':
+        return 'Target not allowed';
+      default:
+        return investment.unavailableReason
+          ? this.displayToken(investment.unavailableReason)
+          : 'Unavailable';
+    }
+  }
+
+  protected frontInvestmentLabel(investment: FrontInvestmentPanelView): string {
+    return investment.mode === 'upgrade' ? 'Upgrade' : 'Establish';
+  }
+
   protected contactServiceUnavailableReason(service: ContactServiceView): string {
+    if (service.unavailableDetail) {
+      return service.unavailableDetail;
+    }
+
     if (!service.unavailableReason) {
       return '';
     }
@@ -488,6 +559,16 @@ export class App {
         return 'This contact option requirement is not met.';
       case 'quiet_treatment_no_target':
         return 'No stressed operative is available for Quiet Treatment.';
+      case 'target_not_found':
+        return 'That target is no longer available.';
+      case 'target_not_allowed':
+        return 'That target is not legal for this order.';
+      case 'front_cap_reached':
+        return 'Front capacity is full.';
+      case 'front_already_owned':
+        return 'This Front is already owned.';
+      case 'front_already_max_level':
+        return 'This Front is already max level.';
       case 'ledger_target_required':
         return 'Select a Ledger entry and use option.';
       case 'ledger_entry_unknown':
@@ -503,9 +584,15 @@ export class App {
 
   private targetOptionUnavailableText(option: ActionTargetOption): string {
     if (
-      (option.targetType !== 'ledger' && option.targetType !== 'contact') ||
-      option.affordable
+      option.targetType !== 'ledger' &&
+      option.targetType !== 'contact' &&
+      option.targetType !== 'front_opportunity' &&
+      option.targetType !== 'front'
     ) {
+      return '';
+    }
+
+    if (option.affordable) {
       return '';
     }
 

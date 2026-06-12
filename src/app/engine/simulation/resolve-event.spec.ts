@@ -1,4 +1,4 @@
-import type { ContactId, EventId, GameState } from '../model';
+import type { ContactId, EventId, FrontId, FrontState, GameState } from '../model';
 import { materializeOperativeState } from '../roster';
 import { addLedgerEntry } from '../ledger';
 import { newGame } from './new-game';
@@ -489,6 +489,123 @@ describe('resolveEventChoice', () => {
 
     expect(irisResult.state.rivals.rival_nyx_ardent.pressure).toBe(100);
   });
+
+  it('previews and applies selected Front event effects', () => {
+    const state = withFronts(withPendingEvent('front_inspection'), [
+      frontState('front_shell_gallery', {
+        exposure: 70,
+        districtId: 'district_violet_ward',
+      }),
+    ]);
+    const selectedState: GameState = {
+      ...state,
+      pendingEvent: {
+        ...state.pendingEvent!,
+        selectedFrontId: 'front_shell_gallery',
+      },
+    };
+    const preview = getEventChoicePreview(
+      selectedState,
+      'event_1_1',
+      'pay_for_clean_paperwork',
+    );
+    const result = resolveEventChoice(
+      selectedState,
+      'event_1_1',
+      'pay_for_clean_paperwork',
+    );
+
+    if (!result.ok) {
+      fail(`Expected Front event resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(preview?.frontEffects).toEqual([
+      {
+        frontId: 'front_shell_gallery',
+        frontName: 'Shell Gallery',
+        id: 'exposure',
+        value: -12,
+        current: 70,
+        projected: 58,
+      },
+    ]);
+    expect(result.state.fronts.front_shell_gallery?.exposure).toBe(58);
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Response to Front Inspection: Shell Gallery.',
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Front: Shell Gallery: exposure -12.',
+    );
+  });
+
+  it('applies selected Front rival pressure from dynamic Front event choices', () => {
+    const state = withFronts(withPendingEvent('front_rival_leans_on_your_front'), [
+      frontState('front_zero_mercy_cut', {
+        exposure: 60,
+        districtId: 'district_chrome_narrows',
+        venueId: 'venue_zero_mercy',
+        relatedRivalId: 'rival_knox_marrow',
+      }),
+    ]);
+    const selectedState: GameState = {
+      ...state,
+      pendingEvent: {
+        ...state.pendingEvent!,
+        selectedFrontId: 'front_zero_mercy_cut',
+      },
+      rivals: {
+        ...state.rivals,
+        rival_knox_marrow: {
+          ...state.rivals.rival_knox_marrow,
+          pressure: 50,
+        },
+      },
+    };
+    const result = resolveEventChoice(selectedState, 'event_1_1', 'push_back_quietly');
+
+    if (!result.ok) {
+      fail(`Expected Front rival event resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(55);
+  });
+
+  it('creates front-linked Ledger entries from Front event choices', () => {
+    const state = withFronts(withPendingEvent('front_back_room_ledger'), [
+      frontState('front_pale_circuit', {
+        exposure: 42,
+        districtId: 'district_violet_ward',
+        venueId: 'venue_pale_circuit',
+        relatedRivalId: 'rival_nyx_ardent',
+      }),
+    ]);
+    const selectedState: GameState = {
+      ...state,
+      pendingEvent: {
+        ...state.pendingEvent!,
+        selectedFrontId: 'front_pale_circuit',
+      },
+    };
+    const result = resolveEventChoice(selectedState, 'event_1_1', 'keep_the_ledger');
+
+    if (!result.ok) {
+      fail(`Expected Front Ledger event resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        definitionId: 'secret_back_room_guest_list',
+        kind: 'secret',
+        relatedTarget: {
+          type: 'front',
+          id: 'front_pale_circuit',
+        },
+      }),
+    );
+  });
 });
 
 function withPendingEvent(definitionId: EventId): GameState {
@@ -507,5 +624,32 @@ function withActiveContacts(state: GameState, activeContactIds: ContactId[]): Ga
   return {
     ...state,
     activeContactIds,
+  };
+}
+
+function withFronts(state: GameState, fronts: FrontState[]): GameState {
+  return {
+    ...state,
+    fronts: Object.fromEntries(fronts.map((front) => [front.id, front])) as GameState['fronts'],
+  };
+}
+
+function frontState(
+  id: FrontId,
+  overrides: Partial<FrontState> & Pick<FrontState, 'districtId'>,
+): FrontState {
+  return {
+    id,
+    definitionId: id,
+    districtId: overrides.districtId,
+    ...(overrides.venueId ? { venueId: overrides.venueId } : {}),
+    ...(overrides.relatedRivalId ? { relatedRivalId: overrides.relatedRivalId } : {}),
+    level: overrides.level ?? 1,
+    exposure: overrides.exposure ?? 30,
+    establishedWeek: overrides.establishedWeek ?? 1,
+    compromised: overrides.compromised ?? false,
+    active: overrides.active ?? true,
+    flags: overrides.flags ?? {},
+    yieldHistory: overrides.yieldHistory ?? [],
   };
 }

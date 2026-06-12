@@ -18,6 +18,7 @@ import type {
   ContactMetricDelta,
   ContactRoleTag,
   ContactServiceDefinition,
+  ContactServiceRequirement,
   ContactState,
   ContactStatus,
   DistrictId,
@@ -43,6 +44,7 @@ export type ContactServiceView = {
   description: string;
   available: boolean;
   unavailableReason?: ContactOptionUnavailableReason;
+  unavailableDetail?: string;
   costSummary: string;
   effectSummary: string;
 };
@@ -182,7 +184,14 @@ function toServiceView(
     label: service.label,
     description: service.description,
     available: preview.ok,
-    ...(!preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
+    ...(!preview.ok
+      ? {
+          unavailableReason: preview.unavailableReason,
+          ...(preview.unavailableReason === 'requirement_not_met'
+            ? { unavailableDetail: formatUnmetRequirement(contact, service.requirements) }
+            : {}),
+        }
+      : {}),
     costSummary: formatCostSummary(preview.costRows),
     effectSummary: formatEffectSummary(preview.effects, preview.contactEffects),
   };
@@ -276,6 +285,31 @@ function labelMetric(id: keyof ContactMetricDelta): string {
 
 function metricTone(id: keyof ContactMetricDelta): ContactMetricView['tone'] {
   return id === 'volatility' ? 'volatile' : id === 'exposure' ? 'exposed' : 'positive';
+}
+
+function formatUnmetRequirement(
+  contact: ContactState,
+  requirements: readonly ContactServiceRequirement[] | undefined,
+): string | undefined {
+  if (!requirements) {
+    return undefined;
+  }
+
+  for (const requirement of requirements) {
+    if (requirement.type === 'min_trust' && contact.trust < requirement.value) {
+      return `Requires ${requirement.value} Trust - Current ${contact.trust}`;
+    }
+
+    if (requirement.type === 'min_leverage' && contact.leverage < requirement.value) {
+      return `Requires ${requirement.value} Leverage - Current ${contact.leverage}`;
+    }
+
+    if (requirement.type === 'operative_stress_available') {
+      return 'Requires a stressed operative';
+    }
+  }
+
+  return undefined;
 }
 
 function labelCost(id: string): string {
