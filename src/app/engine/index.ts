@@ -1,3 +1,4 @@
+export * from './accords';
 export * from './content';
 export * from './contacts';
 export * from './factions';

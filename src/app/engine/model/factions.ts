@@ -1,4 +1,5 @@
 import type { ContactId } from './contacts';
+import type { AccordId, ActiveAccordId } from './accords';
 import type { DistrictId } from './districts';
 import type { EventId } from './events';
 import type { FrontRoleTag } from './fronts';
@@ -65,8 +66,8 @@ export type FactionState = {
   standing: number;
   suspicion: number;
   obligation: number;
-  usedAccordIds: string[];
-  activeAccordIds: string[];
+  usedAccordIds: AccordId[];
+  activeAccordIds: ActiveAccordId[];
   flags: Record<string, boolean | number | string>;
   recentInteractions: FactionInteraction[];
 };
@@ -79,6 +80,7 @@ export type FactionDefinition = {
   baseStanding: number;
   baseSuspicion: number;
   baseObligation: number;
+  accordIds: readonly AccordId[];
   associatedDistrictIds?: readonly DistrictId[];
   associatedVenueIds?: readonly VenueId[];
   associatedRivalIds?: readonly RivalId[];

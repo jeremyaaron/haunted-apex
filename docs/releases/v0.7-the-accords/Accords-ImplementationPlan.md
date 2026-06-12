@@ -420,6 +420,85 @@ Unit tests:
 - Front hooks use supported hook types.
 - `Permit Shell` has no front-cost discount behavior.
 
+### Completion Record
+
+Completed June 12, 2026:
+
+- Added Accord domain contracts in `src/app/engine/model/accords.ts`:
+  - `AccordId`
+  - `ActiveAccordId`
+  - `AccordRequirement`
+  - `AccordFrontEffect`
+  - `AccordLedgerEffect`
+  - `AccordCost`
+  - `AccordDefinition`
+  - `ActiveAccord`
+- Added the ten v0.7 Accord definitions in `src/app/engine/content/accords.ts`:
+  - Clean Corridor
+  - Inspection Delay
+  - Quiet Capital
+  - Permit Shell
+  - Guest List Pact
+  - Velvet Silence
+  - Dockside Tithe
+  - Muscle on Retainer
+  - Dead Channel Access
+  - Mercy of Static
+- Added the `getAccordDefinition` registry helper.
+- Added Accord IDs to the five Faction definitions, with two accords per faction.
+- Updated `FactionState.usedAccordIds` and `FactionState.activeAccordIds` to use
+  `AccordId[]` and `ActiveAccordId[]`.
+- Added Accord helper APIs in `src/app/engine/accords/`:
+  - `ACTIVE_ACCORD_CAP`
+  - `FACTION_ACTIVE_ACCORD_CAP`
+  - `createActiveAccordId`
+  - `isAccordUsed`
+  - `hasTotalAccordCapacity`
+  - `hasFactionAccordCapacity`
+  - `isAccordRequirementMet`
+  - `getUnmetAccordRequirements`
+  - `selectHighestExposureFront`
+  - `previewAccordFrontEffect`
+- Added model, content, and engine barrel exports.
+- Implemented Ashline `Inspection Delay` as a static front hook declaration:
+
+```text
+cool_highest_exposure_front, Exposure -10
+```
+
+- Confirmed Helix `Permit Shell` has no front-cost discount or front effect in v0.7.
+- Accord-created Ledger hooks currently reference existing entries:
+  - `debt_dirty_books`
+  - `secret_dead_channel_trace`
+- `Institutional Favor` and `Compliance Blind Spot` remain deferred to Phase 8, as planned.
+- No Accord state was added to live `GameState`.
+- No save schema, storage key, action, new-game, UI, event, harness, or balance behavior changed.
+- Added focused tests for:
+  - accord content registry shape and lookups
+  - faction-to-accord and accord-to-faction linkage
+  - duration, cost, pressure effect, faction metric, role tag, Ledger, rival, and front-hook
+    content validity
+  - active accord cap constants and helpers
+  - deterministic active accord id creation
+  - used-accord checks
+  - metric and owned-front requirements
+  - highest-exposure Front selection and deterministic tie-breaking
+  - Ashline `Inspection Delay` preview clamping
+  - Helix `Permit Shell` front-discount deferral
+- Focused Phase 2 suite passed: 22 tests.
+- Full suite passed: 475 tests.
+- Both application and specification TypeScript projects passed `--noEmit` checks.
+- The standard production build passed without bundle-budget warnings:
+
+```text
+initial bundle 554.00 kB, under the 600.00 kB warning budget
+```
+
+- The production build with base href `/haunted-apex/` passed without bundle-budget warnings.
+- The structural documentation check passed for seven release folders.
+- `git diff --check` passed.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm accord content and availability primitives before changing `GameState`.
