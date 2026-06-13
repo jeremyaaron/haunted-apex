@@ -1083,6 +1083,12 @@
           <dd>{{ entry.relatedContactLabel }}</dd>
         </div>
       }
+      @if (entry.relatedFactionLabel) {
+        <div>
+          <dt>Faction</dt>
+          <dd>{{ entry.relatedFactionLabel }}</dd>
+        </div>
+      }
     </dl>
     <div class="identity-tags ledger-tags">
       @for (tag of entry.tags; track tag) {

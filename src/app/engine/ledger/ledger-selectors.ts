@@ -3,6 +3,7 @@ import {
   getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
+  getFactionDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
@@ -67,6 +68,7 @@ export type LedgerEntryView = {
   sourceLabel: string;
   relatedContextLabel?: string;
   relatedContactLabel?: string;
+  relatedFactionLabel?: string;
   tags: string[];
   useOptions: LedgerUseOptionView[];
 };
@@ -182,6 +184,7 @@ function toLedgerEntryView(state: GameState, entry: LedgerEntry): LedgerEntryVie
       sourceLabel: getSourceLabel(entry),
       relatedContextLabel: getRelatedContextLabel(entry),
       relatedContactLabel: getRelatedContactLabel(entry),
+      relatedFactionLabel: getRelatedFactionLabel(entry),
       tags: [...definition.tags],
       useOptions: definition.useOptions.map((option) =>
         toLedgerUseOptionView(state, entry, option),
@@ -276,6 +279,12 @@ function getRelatedContextLabel(entry: LedgerEntry): string | undefined {
 function getRelatedContactLabel(entry: LedgerEntry): string | undefined {
   return entry.relatedContactId
     ? getContactDefinition(entry.relatedContactId)?.name
+    : undefined;
+}
+
+function getRelatedFactionLabel(entry: LedgerEntry): string | undefined {
+  return entry.relatedFactionId
+    ? getFactionDefinition(entry.relatedFactionId)?.name
     : undefined;
 }
 

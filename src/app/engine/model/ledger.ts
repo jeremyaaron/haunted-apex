@@ -23,6 +23,8 @@ export type LedgerEntryDefinitionId =
   | 'debt_contaminated_money'
   | 'debt_saints_payment_trail'
   | 'debt_dirty_books'
+  | 'debt_institutional_favor'
+  | 'secret_compliance_blind_spot'
   | 'favor_checkpoint_captain'
   | 'favor_hidden_route';
 

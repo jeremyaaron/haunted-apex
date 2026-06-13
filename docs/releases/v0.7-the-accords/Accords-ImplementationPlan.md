@@ -944,6 +944,29 @@ Unit tests:
 - Using `Compliance Blind Spot` reduces Heat and faction Suspicion.
 - Consumed faction Ledger entries leave normal Ledger summaries intact.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added the v0.7 faction Ledger definitions:
+  - `Institutional Favor`, a faction-linked debt with Resource and Intel settlement paths.
+  - `Compliance Blind Spot`, a faction-linked secret that spends Intel for Heat and Suspicion
+    relief.
+- Updated accord-created Ledger hooks so Helix `Quiet Capital` creates `Institutional Favor`
+  and Ashline `Inspection Delay` creates `Compliance Blind Spot`, both with `relatedFactionId`.
+- Added related faction labels to Ledger entry view models and Ledger cards.
+- Preserved explicit-only faction Ledger effects: entries with related factions still only change
+  faction metrics when their selected use option declares faction effects.
+- Updated Ledger content validation so faction-only use options are valid when they declare
+  contact or faction effects instead of global pressure effects.
+- Added focused tests for new Ledger content, accord previews, broker-created faction entries,
+  faction labels, Resource/Intel settlement, Blind Spot use, and consumed-entry summaries.
+- Stabilized an app roster rendering test by giving it a deterministic liability-bearing roster.
+- Verification completed: app/spec TypeScript, focused Phase 8 suite, app spec, full suite,
+  local build, Pages production build, docs check, and `git diff --check` passed.
+- Build bundle check: initial bundle `586.84 kB`, under the current `600 kB` warning budget.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm accord Ledger hooks are complete before adding faction events.

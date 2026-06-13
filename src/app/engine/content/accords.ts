@@ -27,6 +27,13 @@ export const ACCORD_DEFINITIONS = [
     weeklyEffects: {},
     factionEffectsOnStart: { standing: -2, suspicion: 6, obligation: 10 },
     frontEffectsOnStart: [{ type: 'cool_highest_exposure_front', exposureDelta: -10 }],
+    ledgerEffectsOnStart: [
+      {
+        type: 'create',
+        definitionId: 'secret_compliance_blind_spot',
+        relatedFactionId: 'faction_ashline_bureau',
+      },
+    ],
     tags: ['fronts', 'security', 'heat_control'],
   },
   {
@@ -41,7 +48,7 @@ export const ACCORD_DEFINITIONS = [
     ledgerEffectsOnStart: [
       {
         type: 'create',
-        definitionId: 'debt_dirty_books',
+        definitionId: 'debt_institutional_favor',
         relatedFactionId: 'faction_helix_meridian',
       },
     ],

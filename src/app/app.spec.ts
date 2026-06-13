@@ -413,6 +413,15 @@ describe('App', () => {
   });
 
   it('renders roster identity, role, trait, liability, and Stress information', () => {
+    const state: GameState = {
+      ...newGame({ seed: 'APP-ROSTER-LIABILITY' }),
+      operatives: [
+        materializeOperativeState('op_mara_voss'),
+        materializeOperativeState('op_juno_hex'),
+        materializeOperativeState('op_rook_vale'),
+      ],
+    };
+    storeState(state);
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;

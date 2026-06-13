@@ -108,7 +108,7 @@ describe('resolveQueuedOrder Broker Accord', () => {
 
     expect(resolved.state.ledger.entries).toEqual([
       jasmine.objectContaining({
-        definitionId: 'debt_dirty_books',
+        definitionId: 'debt_institutional_favor',
         kind: 'debt',
         relatedFactionId: 'faction_helix_meridian',
         source: {
@@ -123,6 +123,28 @@ describe('resolveQueuedOrder Broker Accord', () => {
       }),
     ]);
     expect(resolved.state.ledger.discoveredCount).toBe(1);
+  });
+
+  it('creates Compliance Blind Spot from Inspection Delay with Ashline context', () => {
+    const state = newGame({ seed: 'BROKER-COMPLIANCE' });
+    const resolved = resolveQueuedOrder(
+      state,
+      order(ashlineTarget('accord_ashline_inspection_delay')),
+    );
+
+    expect(resolved.state.ledger.entries).toEqual([
+      jasmine.objectContaining({
+        definitionId: 'secret_compliance_blind_spot',
+        kind: 'secret',
+        relatedFactionId: 'faction_ashline_bureau',
+      }),
+    ]);
+    expect(resolved.state.eventLog.at(-2)).toEqual(
+      jasmine.objectContaining({
+        type: 'ledger',
+        title: 'Ledger entry added: Compliance Blind Spot',
+      }),
+    );
   });
 
   it('blocks the same accord after it has been brokered once', () => {

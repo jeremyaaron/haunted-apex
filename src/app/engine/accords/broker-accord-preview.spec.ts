@@ -51,8 +51,8 @@ describe('previewBrokerAccord', () => {
 
     expect(helix.ok && helix.ledgerEffectsOnStart).toEqual([
       jasmine.objectContaining({
-        definitionId: 'debt_dirty_books',
-        entryName: 'Dirty Books',
+        definitionId: 'debt_institutional_favor',
+        entryName: 'Institutional Favor',
         kind: 'debt',
         relatedFactionId: 'faction_helix_meridian',
       }),
@@ -72,6 +72,14 @@ describe('previewBrokerAccord', () => {
         currentExposure: 12,
         exposureDelta: -10,
         projectedExposure: 2,
+      }),
+    ]);
+    expect(ashline.ok && ashline.ledgerEffectsOnStart).toEqual([
+      jasmine.objectContaining({
+        definitionId: 'secret_compliance_blind_spot',
+        entryName: 'Compliance Blind Spot',
+        kind: 'secret',
+        relatedFactionId: 'faction_ashline_bureau',
       }),
     ]);
   });

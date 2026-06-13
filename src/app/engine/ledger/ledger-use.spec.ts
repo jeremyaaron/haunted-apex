@@ -361,6 +361,139 @@ describe('Ledger use preview and resolution', () => {
     );
   });
 
+  it('settles Institutional Favor with Resources and reduces faction Obligation', () => {
+    const withFaction = withActiveFaction(
+      newGame({ seed: 'LEDGER-INSTITUTIONAL-RESOURCES' }),
+      'faction_helix_meridian',
+    );
+    const withObligation: GameState = {
+      ...withFaction,
+      factions: {
+        ...withFaction.factions,
+        faction_helix_meridian: {
+          ...withFaction.factions.faction_helix_meridian!,
+          obligation: 16,
+        },
+      },
+    };
+    const state = addLedgerEntry(withObligation, {
+      definitionId: 'debt_institutional_favor',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_helix_meridian',
+          accordId: 'accord_helix_quiet_capital',
+        },
+      },
+      relatedFactionId: 'faction_helix_meridian',
+    });
+    const result = resolveLedgerUse(state, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'settle_with_resources',
+    });
+
+    expect(result.state.pressures.resources).toBe(state.pressures.resources - 1000);
+    expect(result.state.factions.faction_helix_meridian?.obligation).toBe(6);
+    expect(result.state.ledger.entries[0]).toEqual(
+      jasmine.objectContaining({
+        consumed: true,
+        consumedBy: {
+          type: 'action',
+          actionId: 'work_the_ledger',
+          useOptionId: 'settle_with_resources',
+        },
+      }),
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain('Helix Meridian: obligation -10.');
+  });
+
+  it('settles Institutional Favor with Intel and changes Suspicion and Obligation', () => {
+    const withFaction = withActiveFaction(
+      newGame({ seed: 'LEDGER-INSTITUTIONAL-INTEL' }),
+      'faction_helix_meridian',
+    );
+    const withMetrics: GameState = {
+      ...withFaction,
+      factions: {
+        ...withFaction.factions,
+        faction_helix_meridian: {
+          ...withFaction.factions.faction_helix_meridian!,
+          suspicion: 22,
+          obligation: 16,
+        },
+      },
+    };
+    const state = addLedgerEntry(withMetrics, {
+      definitionId: 'debt_institutional_favor',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_helix_meridian',
+          accordId: 'accord_helix_quiet_capital',
+        },
+      },
+      relatedFactionId: 'faction_helix_meridian',
+    });
+    const result = resolveLedgerUse(state, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'settle_with_intel',
+    });
+
+    expect(result.state.pressures.intel).toBe(state.pressures.intel - 6);
+    expect(result.state.factions.faction_helix_meridian?.suspicion).toBe(25);
+    expect(result.state.factions.faction_helix_meridian?.obligation).toBe(8);
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Helix Meridian: suspicion +3, obligation -8.',
+    );
+  });
+
+  it('uses Compliance Blind Spot to reduce Heat and faction Suspicion', () => {
+    const withFaction = withActiveFaction(
+      newGame({ seed: 'LEDGER-COMPLIANCE-BLIND-SPOT' }),
+      'faction_ashline_bureau',
+    );
+    const withSuspicion: GameState = {
+      ...withFaction,
+      factions: {
+        ...withFaction.factions,
+        faction_ashline_bureau: {
+          ...withFaction.factions.faction_ashline_bureau!,
+          suspicion: 43,
+        },
+      },
+    };
+    const state = addLedgerEntry(withSuspicion, {
+      definitionId: 'secret_compliance_blind_spot',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_ashline_bureau',
+          accordId: 'accord_ashline_inspection_delay',
+        },
+      },
+      relatedFactionId: 'faction_ashline_bureau',
+    });
+    const result = resolveLedgerUse(state, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'spend_blind_spot',
+    });
+
+    expect(result.state.pressures.heat).toBe(state.pressures.heat - 6);
+    expect(result.state.pressures.intel).toBe(state.pressures.intel - 2);
+    expect(result.state.factions.faction_ashline_bureau?.suspicion).toBe(35);
+    expect(result.state.ledger.consumedCount).toBe(state.ledger.consumedCount + 1);
+    expect(result.state.eventLog.at(-1)?.body).toContain('Ashline Bureau: suspicion -8.');
+  });
+
   it('does not change a linked faction when the use option declares no faction effects', () => {
     const withFaction = withActiveFaction(
       newGame({ seed: 'LEDGER-FACTION-NO-EFFECTS' }),
