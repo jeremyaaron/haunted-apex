@@ -147,10 +147,7 @@
                     <option value="">
                       {{ action.requiresTarget ? 'Select a target' : 'No target' }}
                     </option>
-                    @for (
-                      option of action.targetOptions;
-                      track targetOptionValue(option)
-                    ) {
+                    @for (option of action.targetOptions; track targetOptionValue(option)) {
                       <option
                         [value]="targetOptionValue(option)"
                         [disabled]="targetOptionDisabled(option)"
@@ -257,7 +254,9 @@
                   <div class="impact-strip secret-preview">
                     <span>Secret Chance</span>
                     <strong>{{ discovery.chance }}%</strong>
-                    <small>{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small>
+                    <small
+                      >{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small
+                    >
                   </div>
                 }
               }
@@ -287,10 +286,19 @@
                           {{ contactMetricText(effect) }}
                         </span>
                       }
-                      @for (ledgerEffect of contactUse.ledgerEffects; track ledgerEffect.definitionId) {
-                        <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      @for (
+                        ledgerEffect of contactUse.ledgerEffects;
+                        track ledgerEffect.definitionId
+                      ) {
+                        <span
+                          >Creates {{ displayToken(ledgerEffect.kind) }}:
+                          {{ ledgerEffect.entryName }}</span
+                        >
                       }
-                      @for (rivalPressure of contactRivalPressureRows(contactUse); track rivalPressure) {
+                      @for (
+                        rivalPressure of contactRivalPressureRows(contactUse);
+                        track rivalPressure
+                      ) {
                         <span class="negative">{{ rivalPressure }}</span>
                       }
                       @if (contactUse.quietTreatment) {
@@ -378,12 +386,14 @@
                         <span>Control +{{ frontInvestment.districtControlYield }} / Week</span>
                       }
                       <span>
-                        Exposure +{{ frontInvestment.exposureChange }}
-                        → {{ frontInvestment.projectedExposure }}
+                        Exposure +{{ frontInvestment.exposureChange }} →
+                        {{ frontInvestment.projectedExposure }}
                       </span>
                       <span>
-                        {{ displayToken(frontInvestment.projectedStatus) }} ·
-                        +{{ frontInvestment.weeklyExposureGain }} Exposure / Week
+                        {{ displayToken(frontInvestment.projectedStatus) }} · +{{
+                          frontInvestment.weeklyExposureGain
+                        }}
+                        Exposure / Week
                       </span>
                       @if (frontInvestment.rivalPressureWarning; as warning) {
                         <span class="negative">
@@ -420,8 +430,8 @@
                       </span>
                     }
                     <span class="negative">
-                      Exposure {{ frontExposure.currentExposure }}
-                      → {{ frontExposure.projectedExposure }}
+                      Exposure {{ frontExposure.currentExposure }} →
+                      {{ frontExposure.projectedExposure }}
                     </span>
                   </div>
                 </div>
@@ -452,34 +462,53 @@
                           {{ signed(effect.value) }} {{ pressureLabel(effect.id) }} / Week
                         </span>
                       }
-                      @for (effect of factionDeltaRows(accord.factionEffectsOnStart); track effect.id) {
+                      @for (
+                        effect of factionDeltaRows(accord.factionEffectsOnStart);
+                        track effect.id
+                      ) {
                         <span [class.negative]="effect.value < 0">
                           {{ signed(effect.value) }} {{ displayToken(effect.id) }}
                         </span>
                       }
-                      @for (effect of factionDeltaRows(accord.factionEffectsPerWeek); track effect.id) {
+                      @for (
+                        effect of factionDeltaRows(accord.factionEffectsPerWeek);
+                        track effect.id
+                      ) {
                         <span [class.negative]="effect.value < 0">
                           {{ signed(effect.value) }} {{ displayToken(effect.id) }} / Week
                         </span>
                       }
-                      @for (effect of factionDeltaRows(accord.factionEffectsOnExpire); track effect.id) {
+                      @for (
+                        effect of factionDeltaRows(accord.factionEffectsOnExpire);
+                        track effect.id
+                      ) {
                         <span [class.negative]="effect.value < 0">
                           {{ signed(effect.value) }} {{ displayToken(effect.id) }} on Expire
                         </span>
                       }
-                      @for (ledgerEffect of accord.ledgerEffectsOnStart; track ledgerEffect.definitionId) {
-                        <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      @for (
+                        ledgerEffect of accord.ledgerEffectsOnStart;
+                        track ledgerEffect.definitionId
+                      ) {
+                        <span
+                          >Creates {{ displayToken(ledgerEffect.kind) }}:
+                          {{ ledgerEffect.entryName }}</span
+                        >
                       }
-                      @for (rivalPressure of accord.rivalPressureEffectsOnStart; track rivalPressure.rivalId) {
+                      @for (
+                        rivalPressure of accord.rivalPressureEffectsOnStart;
+                        track rivalPressure.rivalId
+                      ) {
                         <span class="negative">
-                          {{ rivalPressure.rivalName }} Pressure +{{ rivalPressure.pressureGain }}
-                          → {{ rivalPressure.projectedPressure }}
+                          {{ rivalPressure.rivalName }} Pressure +{{ rivalPressure.pressureGain }} →
+                          {{ rivalPressure.projectedPressure }}
                         </span>
                       }
                       @for (frontEffect of accord.frontEffectsOnStart; track frontEffect.frontId) {
                         <span [class.negative]="frontEffect.exposureDelta < 0">
-                          {{ frontEffect.frontName }} Exposure {{ signed(frontEffect.exposureDelta) }}
-                          → {{ frontEffect.projectedExposure }}
+                          {{ frontEffect.frontName }} Exposure
+                          {{ signed(frontEffect.exposureDelta) }} →
+                          {{ frontEffect.projectedExposure }}
                         </span>
                       }
                     </div>
@@ -672,7 +701,10 @@
                 @if (report.fronts.entries.length > 0) {
                   <p>
                     @for (front of report.fronts.entries; track front.id) {
-                      <span>{{ front.name }} L{{ front.level }} / {{ displayToken(front.status) }} {{ front.exposure }}</span>
+                      <span
+                        >{{ front.name }} L{{ front.level }} / {{ displayToken(front.status) }}
+                        {{ front.exposure }}</span
+                      >
                     }
                   </p>
                 }
@@ -865,7 +897,10 @@
 
               <div class="contact-services">
                 @for (service of contact.services; track service.id) {
-                  <div class="contact-service" [class.unavailable]="!service.available || contact.burned">
+                  <div
+                    class="contact-service"
+                    [class.unavailable]="!service.available || contact.burned"
+                  >
                     <strong>{{ service.label }}</strong>
                     <span>{{ service.costSummary }} · {{ service.effectSummary }}</span>
                     @if (!service.available || contact.burned) {
@@ -885,7 +920,10 @@
                 <div class="contact-ledger-links">
                   <span>Linked Ledger</span>
                   @for (entry of contact.relatedLedgerEntries; track entry.id) {
-                    <b>{{ displayToken(entry.kind) }}: {{ entry.name }} / {{ displayToken(entry.status) }}</b>
+                    <b
+                      >{{ displayToken(entry.kind) }}: {{ entry.name }} /
+                      {{ displayToken(entry.status) }}</b
+                    >
                   }
                 </div>
               }
@@ -1263,8 +1301,8 @@
                     }
                     @if (front.upgrade.exposureChange !== undefined) {
                       <span class="negative">
-                        Exposure +{{ front.upgrade.exposureChange }}
-                        → {{ front.upgrade.projectedExposure }}
+                        Exposure +{{ front.upgrade.exposureChange }} →
+                        {{ front.upgrade.projectedExposure }}
                       </span>
                     }
                     @if (front.upgrade.projectedStatus) {
@@ -1294,7 +1332,10 @@
 
         <div class="front-card-list">
           @for (opportunity of game.fronts().opportunities; track opportunity.id) {
-            <article class="front-card opportunity-card" [class.unavailable]="!opportunity.establish.available">
+            <article
+              class="front-card opportunity-card"
+              [class.unavailable]="!opportunity.establish.available"
+            >
               <div class="front-heading">
                 <div>
                   <span>{{ displayToken(opportunity.archetype) }}</span>
@@ -1378,6 +1419,142 @@
           }
         </div>
       </section>
+    </div>
+  </section>
+
+  <section class="panel faction-panel" aria-labelledby="faction-network-title">
+    <div class="panel-heading">
+      <div>
+        <p class="panel-label">Faction Network</p>
+        <h2 id="faction-network-title">Accords and Institutional Pressure</h2>
+      </div>
+      <span class="panel-count">{{ game.factions().activeCount }} factions</span>
+    </div>
+
+    <div class="faction-summary-strip status-strip">
+      <span>{{ game.factions().activeAccordCount }} Active Accords</span>
+      <span>{{ game.factions().availableAccordCount }} Available Deals</span>
+      <span>Broker Accord from the Command Board</span>
+    </div>
+
+    <div class="faction-grid">
+      @for (faction of game.factions().factions; track faction.id) {
+        <article
+          class="faction-card"
+          [class.status-warning]="faction.status === 'watching' || faction.status === 'indebted'"
+          [class.status-danger]="faction.status === 'hostile' || faction.status === 'entangled'"
+        >
+          <div class="faction-heading">
+            <div>
+              <span>{{ displayToken(faction.archetype) }}</span>
+              <h3>{{ faction.name }}</h3>
+            </div>
+            <b>{{ displayToken(faction.status) }}</b>
+          </div>
+
+          <p class="faction-dossier">{{ faction.dossier }}</p>
+
+          <div class="identity-tags">
+            @for (tag of faction.roleTags; track tag) {
+              <span>{{ displayToken(tag) }}</span>
+            }
+          </div>
+
+          <div class="faction-metrics">
+            @for (metric of faction.metrics; track metric.id) {
+              <div [class]="factionMetricToneClass(metric)">
+                <span>{{ metric.label }}</span>
+                <strong>{{ metric.value }}</strong>
+              </div>
+            }
+          </div>
+
+          @if (faction.relatedEntities.length > 0) {
+            <div class="faction-related">
+              <span>Related Network</span>
+              <div>
+                @for (
+                  entity of faction.relatedEntities.slice(0, 7);
+                  track entity.id + entity.kind
+                ) {
+                  <b>{{ entity.kind }}: {{ entity.label }}</b>
+                }
+              </div>
+            </div>
+          }
+
+          @if (faction.activeAccords.length > 0) {
+            <div class="active-accords">
+              <span>Active Accords</span>
+              @for (accord of faction.activeAccords; track accord.id) {
+                <div class="active-accord">
+                  <strong>{{ accord.label }}</strong>
+                  <small>{{ accord.timingLabel }}</small>
+                  <div class="ledger-preview-rows">
+                    @for (effect of accord.weeklyEffects; track effect.id) {
+                      <span [class.negative]="effect.value < 0">
+                        {{ signed(effect.value) }} {{ pressureLabel(effect.id) }} / Week
+                      </span>
+                    }
+                    <span>{{ accord.factionWeeklySummary }} / Week</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="accord-option-list">
+            <span>Available Accords</span>
+            @for (accord of faction.accordOptions; track accord.id) {
+              <div class="accord-option" [class.unavailable]="!accord.available">
+                <div>
+                  <strong>{{ accord.label }}</strong>
+                  <b>{{
+                    accord.available
+                      ? accord.durationWeeks + ' weeks'
+                      : actionUnavailableReason(accord.unavailableReason)
+                  }}</b>
+                </div>
+                <p>{{ accord.description }}</p>
+                <div class="ledger-preview-rows">
+                  <span>{{ accord.requirementSummary }}</span>
+                  <span>{{ accord.costSummary }}</span>
+                  <span>{{ accord.immediateSummary }}</span>
+                  <span>{{ accord.weeklySummary }} / Week</span>
+                  <span>{{ accord.factionStartSummary }}</span>
+                  <span>{{ accord.factionWeeklySummary }} / Week</span>
+                  @if (accord.ledgerSummary !== 'No Ledger effect') {
+                    <span>{{ accord.ledgerSummary }}</span>
+                  }
+                  @if (accord.rivalSummary !== 'No rival pressure') {
+                    <span class="negative">{{ accord.rivalSummary }}</span>
+                  }
+                  @if (accord.frontSummary !== 'No Front effect') {
+                    <span>{{ accord.frontSummary }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          @if (faction.recentInteractions.length > 0) {
+            <div class="faction-interactions">
+              <span>Recent</span>
+              @for (interaction of faction.recentInteractions; track $index) {
+                <p>
+                  Week {{ interaction.week }} · {{ displayToken(interaction.sourceType) }} ·
+                  {{ interaction.sourceLabel }}
+                  @for (effect of interaction.effectRows; track effect.id) {
+                    <b [class.negative]="effect.value < 0">
+                      {{ signed(effect.value) }} {{ effect.label }}
+                    </b>
+                  }
+                </p>
+              }
+            </div>
+          }
+        </article>
+      }
     </div>
   </section>
 
@@ -1685,15 +1862,34 @@
           location, role tags, weekly yield, and Exposure status.
         </p>
         <p>
-          Weekly yield can add pressures such as Resources, Loyalty, Intel, Dominion, Heat, Ruin,
-          or district Control. Exposure also rises each week, so strong Fronts become more visible
-          the longer they operate. Lay Low can target an owned Front to cool Exposure without
-          assigning an operative.
+          Weekly yield can add pressures such as Resources, Loyalty, Intel, Dominion, Heat, Ruin, or
+          district Control. Exposure also rises each week, so strong Fronts become more visible the
+          longer they operate. Lay Low can target an owned Front to cool Exposure without assigning
+          an operative.
         </p>
         <p>
           Front events use the normal weekly event slot. Higher Exposure makes a Front more likely
           to be selected when an eligible Front event fires, and event choices preview their Front,
           Ledger, and rival consequences before you respond.
+        </p>
+      </details>
+
+      <details>
+        <summary>Factions, Accords, and institutional pressure</summary>
+        <p>
+          Factions are city institutions that can be negotiated with through Broker Accord. The
+          Faction Network lists the active institutions in the run, their related districts, venues,
+          rivals, contacts, and Front tags, plus the deals currently available from each one.
+        </p>
+        <p>
+          Standing is useful access. Suspicion is how closely that faction is watching you.
+          Obligation is what you owe them. High Suspicion and high Obligation make faction fallout
+          more likely, while low Standing can turn a relationship hostile.
+        </p>
+        <p>
+          Brokered Accords apply immediate effects when the order resolves, then their weekly
+          effects begin on the next Advance Week. Each Accord has a short duration, uses an active
+          Accord slot, and can only be brokered once per run.
         </p>
       </details>
 

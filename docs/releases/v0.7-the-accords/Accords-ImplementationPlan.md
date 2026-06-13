@@ -1119,6 +1119,23 @@ UI tests:
 - Field Guide explains the new concepts.
 - Existing Fronts, Contacts, Ledger, Roster, Rivals, Event Feed, and Debug access remains intact.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added `selectFactionPanelView` with Faction card, metric, related-entity, accord option,
+  active accord, and recent interaction view models.
+- Exposed `game.factions()` through `GameFacade`.
+- Added a full-width Faction Network panel to the existing one-screen dashboard.
+- Rendered active Factions, Standing, Suspicion, Obligation, status, related network labels,
+  available/unavailable Accords, active Accord timers, weekly Accord effects, and recent
+  interaction history.
+- Preserved Broker Accord command-card preview behavior and added panel context around the
+  same available deals.
+- Added Field Guide copy for Factions, Accords, institutional metrics, and weekly Accord
+  timing.
+- Added selector, facade, and app rendering coverage for the new Faction UI surface.
+
 ### Review Gate
 
 Manual UI review: confirm factions are legible, compact, and command consequences are clear.

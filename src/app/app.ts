@@ -404,9 +404,7 @@ export class App {
   }
 
   protected eventFactionEffectIsWarning(row: FactionEffectPreviewRow): boolean {
-    return (
-      (row.id === 'suspicion' || row.id === 'obligation') ? row.value > 0 : row.value < 0
-    );
+    return row.id === 'suspicion' || row.id === 'obligation' ? row.value > 0 : row.value < 0;
   }
 
   protected eventFrontEffectText(row: FrontEffectPreviewRow): string {
@@ -438,12 +436,7 @@ export class App {
 
   protected ledgerEntries(): LedgerEntryView[] {
     const panel = this.game.ledgerPanel();
-    return [
-      ...panel.secrets,
-      ...panel.debts,
-      ...panel.favors,
-      ...panel.consumed,
-    ];
+    return [...panel.secrets, ...panel.debts, ...panel.favors, ...panel.consumed];
   }
 
   protected ledgerDeltaText(row: LedgerDeltaRow): string {
@@ -494,12 +487,8 @@ export class App {
     const rows = [
       ...option.costRows.map((row) => this.ledgerDeltaText(row)),
       ...option.effectRows.map((row) => this.ledgerDeltaText(row)),
-      ...option.relatedContactEffectRows.map((row) =>
-        this.ledgerContactEffectText(row),
-      ),
-      ...option.relatedFactionEffectRows.map((row) =>
-        this.ledgerFactionEffectText(row),
-      ),
+      ...option.relatedContactEffectRows.map((row) => this.ledgerContactEffectText(row)),
+      ...option.relatedFactionEffectRows.map((row) => this.ledgerFactionEffectText(row)),
     ];
 
     if (option.consumesEntry) {
@@ -562,6 +551,10 @@ export class App {
   }
 
   protected contactMetricToneClass(metric: ContactMetricView): string {
+    return `tone-${metric.tone}`;
+  }
+
+  protected factionMetricToneClass(metric: { tone: string }): string {
     return `tone-${metric.tone}`;
   }
 

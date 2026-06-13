@@ -257,6 +257,7 @@ p {
 .fallout-panel,
 .black-ledger-panel,
 .front-panel,
+.faction-panel,
 .guide-panel,
 .debug-panel {
   padding: 16px;
@@ -937,14 +938,12 @@ dt {
   gap: 8px;
   padding: 10px;
   border: 1px solid rgba(232, 237, 242, 0.12);
-  background:
-    linear-gradient(180deg, rgba(129, 216, 208, 0.04), transparent), rgba(4, 7, 11, 0.5);
+  background: linear-gradient(180deg, rgba(129, 216, 208, 0.04), transparent), rgba(4, 7, 11, 0.5);
 }
 
 .contact-card.burned {
   border-color: rgba(255, 113, 113, 0.36);
-  background:
-    linear-gradient(90deg, rgba(255, 113, 113, 0.08), transparent), rgba(4, 7, 11, 0.58);
+  background: linear-gradient(90deg, rgba(255, 113, 113, 0.08), transparent), rgba(4, 7, 11, 0.58);
   opacity: 0.72;
 }
 
@@ -1186,8 +1185,7 @@ dd {
   padding: 11px;
   margin-bottom: 8px;
   border: 1px solid rgba(232, 237, 242, 0.12);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), rgba(4, 7, 11, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), rgba(4, 7, 11, 0.5);
 }
 
 .ledger-entry-card.consumed {
@@ -1328,8 +1326,7 @@ dd {
 
 .front-card.unavailable {
   border-color: rgba(229, 196, 107, 0.24);
-  background:
-    linear-gradient(90deg, rgba(229, 196, 107, 0.045), transparent), rgba(4, 7, 11, 0.5);
+  background: linear-gradient(90deg, rgba(229, 196, 107, 0.045), transparent), rgba(4, 7, 11, 0.5);
 }
 
 .front-status-noticed {
@@ -1339,8 +1336,7 @@ dd {
 .front-status-hot,
 .front-status-compromised {
   border-color: rgba(255, 113, 113, 0.42);
-  background:
-    linear-gradient(90deg, rgba(255, 113, 113, 0.065), transparent), rgba(4, 7, 11, 0.58);
+  background: linear-gradient(90deg, rgba(255, 113, 113, 0.065), transparent), rgba(4, 7, 11, 0.58);
 }
 
 .front-heading,
@@ -1457,6 +1453,182 @@ dd {
 .front-investment-box.unavailable {
   border-color: rgba(255, 113, 113, 0.2);
   background: rgba(255, 113, 113, 0.028);
+}
+
+.faction-panel {
+  margin-bottom: 14px;
+}
+
+.faction-summary-strip {
+  padding-top: 0;
+  margin-bottom: 12px;
+}
+
+.faction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.faction-card {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(232, 237, 242, 0.12);
+  background: linear-gradient(180deg, rgba(129, 216, 208, 0.04), transparent), rgba(4, 7, 11, 0.52);
+}
+
+.faction-card.status-warning {
+  border-color: rgba(229, 196, 107, 0.3);
+}
+
+.faction-card.status-danger {
+  border-color: rgba(255, 113, 113, 0.38);
+  background: linear-gradient(90deg, rgba(255, 113, 113, 0.055), transparent), rgba(4, 7, 11, 0.58);
+}
+
+.faction-heading,
+.accord-option > div {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.faction-heading > div,
+.accord-option > div > strong {
+  min-width: 0;
+}
+
+.faction-heading span,
+.faction-related > span,
+.active-accords > span,
+.accord-option-list > span,
+.faction-interactions > span {
+  color: #71808f;
+  font-size: 0.62rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.faction-heading h3 {
+  margin: 2px 0 0;
+}
+
+.faction-heading b,
+.accord-option b {
+  color: #d7fffb;
+  font-size: 0.72rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.faction-dossier,
+.accord-option p {
+  margin: 0;
+  font-size: 0.76rem;
+}
+
+.faction-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.faction-metrics div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid rgba(129, 216, 208, 0.13);
+  background: rgba(129, 216, 208, 0.035);
+}
+
+.faction-metrics span {
+  color: #8d9aa7;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+
+.faction-metrics strong {
+  color: #e8edf2;
+  font-size: 0.78rem;
+}
+
+.faction-metrics .tone-warning {
+  border-color: rgba(229, 196, 107, 0.24);
+  background: rgba(229, 196, 107, 0.04);
+}
+
+.faction-metrics .tone-danger {
+  border-color: rgba(255, 113, 113, 0.28);
+  background: rgba(255, 113, 113, 0.04);
+}
+
+.faction-related,
+.active-accords,
+.accord-option-list,
+.faction-interactions {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(232, 237, 242, 0.08);
+}
+
+.faction-related div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.faction-related b {
+  padding: 3px 5px;
+  border: 1px solid rgba(129, 216, 208, 0.14);
+  color: #a9b4c0;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.active-accord,
+.accord-option {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(229, 196, 107, 0.22);
+  background: rgba(229, 196, 107, 0.035);
+}
+
+.accord-option.unavailable {
+  border-color: rgba(255, 113, 113, 0.18);
+  background: rgba(255, 113, 113, 0.026);
+  opacity: 0.78;
+}
+
+.active-accord strong,
+.accord-option strong {
+  color: #d7fffb;
+  font-size: 0.76rem;
+}
+
+.active-accord small,
+.accord-option.unavailable b {
+  color: #e5c46b;
+}
+
+.faction-interactions p {
+  margin: 0;
+  color: #a9b4c0;
+  font-size: 0.68rem;
+}
+
+.faction-interactions b {
+  margin-left: 5px;
+  color: #d7fffb;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .guide-panel {
@@ -2017,6 +2189,10 @@ pre {
   .front-network-grid {
     grid-template-columns: 1fr;
   }
+
+  .faction-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 980px) {
@@ -2142,7 +2318,8 @@ pre {
 
   .ledger-section-grid,
   .spent-ledger-grid,
-  .front-meta {
+  .front-meta,
+  .faction-metrics {
     grid-template-columns: 1fr;
   }
 
