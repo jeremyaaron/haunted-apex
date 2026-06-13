@@ -55,3 +55,4 @@
 - [`v0.7A.md`](releases/v0.7-the-accords/v0.7A.md): locked mechanical decisions.
 - [`Accords-TDD.md`](releases/v0.7-the-accords/Accords-TDD.md): technical design.
 - [`Accords-ImplementationPlan.md`](releases/v0.7-the-accords/Accords-ImplementationPlan.md): phased implementation plan.
+- [`Accords-ReleaseNotes.md`](releases/v0.7-the-accords/Accords-ReleaseNotes.md): release notes draft.

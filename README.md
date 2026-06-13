@@ -11,7 +11,7 @@ Development documentation is organized under [`docs/`](docs/README.md):
 - [`docs/releases/v0.4-the-black-ledger/`](docs/releases/v0.4-the-black-ledger/) contains The Black Ledger direction, clarifications, TDD, implementation plan, and release notes.
 - [`docs/releases/v0.5-entanglements/`](docs/releases/v0.5-entanglements/) contains the Entanglements direction, clarifications, TDD, implementation plan, and release notes.
 - [`docs/releases/v0.6-fronts/`](docs/releases/v0.6-fronts/) contains the Fronts direction, clarifications, TDD, implementation plan, and release notes.
-- [`docs/releases/v0.7-the-accords/`](docs/releases/v0.7-the-accords/) contains The Accords direction, clarifications, TDD, and implementation plan.
+- [`docs/releases/v0.7-the-accords/`](docs/releases/v0.7-the-accords/) contains The Accords direction, clarifications, TDD, implementation plan, and release notes.
 
 ## Runtime
 

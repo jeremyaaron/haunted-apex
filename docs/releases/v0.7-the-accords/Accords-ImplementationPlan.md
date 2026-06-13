@@ -1473,6 +1473,60 @@ finish or force-end a run
 inspect faction and accord report output
 ```
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added the v0.7 release notes draft:
+  - `docs/releases/v0.7-the-accords/Accords-ReleaseNotes.md`
+- Updated root and docs README links so the Accords release notes are discoverable.
+- Confirmed README release wording still follows the project policy:
+  - GitHub tags and Releases remain the source of truth for release identity.
+  - README links the playable build and docs without claiming a mutable current development
+    target.
+- Confirmed debug-only data remains hidden in normal play:
+  - `debugVisible` defaults to `false`.
+  - The debug panel remains gated behind the existing `Cmd/Ctrl+Shift+D` shortcut.
+- Ran the final deterministic 100-runs-per-agent harness snapshot with seed prefix
+  `V07-PHASE13-FINAL`:
+
+```text
+agent      winRate  avgWeeks  avgDominion  avgHeat  avgLoyalty  avgResources  avgIntel  avgRuin
+random     0.000    6.89      46.43        26.35    59.87       1214.75       44.60     15.42
+aggressive 0.440    5.61      89.14        93.96    41.47       2001.90       32.56     13.40
+cautious   0.000    8.00      23.60        0.85     95.24       1596.80       25.86     11.98
+greedy     0.260    7.37      84.44        81.66    40.70       6018.00       77.88     32.86
+operator   0.600    7.20      88.93        80.42    47.04       1652.80       11.40     18.75
+```
+
+- Accord and Faction summary from the same harness run:
+
+```text
+agent      avgBrokerAccordUses  avgUsedAccords  avgMaxActiveAccords  avgActiveAccordsAtEnd  avgHighSuspicionFactions  avgHighObligationFactions  avgFactionEvents
+random     1.58                 1.58            1.08                 0.54                   0.00                      0.13                       0.17
+aggressive 1.57                 1.57            1.53                 0.04                   0.00                      0.02                       0.21
+cautious   1.00                 1.00            1.00                 0.00                   0.00                      0.00                       0.14
+greedy     1.52                 1.52            1.52                 0.01                   0.00                      0.00                       0.17
+operator   1.68                 1.68            1.27                 0.28                   0.00                      0.00                       0.28
+```
+
+- Ran a scripted engine smoke check for:
+  - new seeded run
+  - Faction panel selection
+  - Broker Accord target availability
+  - Broker Accord queueing
+  - week advance
+  - active Accord creation
+  - weekly Accord log generation
+- Validation completed under pinned Node `24.16.0`:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --progress=false`: 532 tests passed.
+  - `npm run build`
+  - `npm run build -- --configuration production --base-href /haunted-apex/`
+  - `npm run check:docs`
+  - `git diff --check`
+
 ### Review Gate
 
 Merge to `main`, wait for Pages deployment, smoke test the deployed build, then tag
