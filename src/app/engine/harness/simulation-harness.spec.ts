@@ -736,6 +736,10 @@ function targetKey(target: ActionTarget): string {
     return `contact:${target.contactId}:${target.optionId}`;
   }
 
+  if (target.type === 'faction') {
+    return `faction:${target.factionId}:${target.accordId}`;
+  }
+
   return `${target.type}:${target.id}`;
 }
 

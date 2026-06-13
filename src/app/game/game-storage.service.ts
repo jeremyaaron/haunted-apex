@@ -1188,6 +1188,19 @@ function parseActionTarget(value: unknown): ActionTarget | undefined {
       : undefined;
   }
 
+  if (value['type'] === 'faction') {
+    return typeof value['factionId'] === 'string' &&
+      typeof value['accordId'] === 'string' &&
+      getFactionDefinition(value['factionId'] as FactionId) &&
+      getAccordDefinition(value['accordId'] as AccordId)
+      ? {
+          type: 'faction',
+          factionId: value['factionId'] as FactionId,
+          accordId: value['accordId'] as AccordId,
+        }
+      : undefined;
+  }
+
   if (typeof value['id'] !== 'string') {
     return undefined;
   }

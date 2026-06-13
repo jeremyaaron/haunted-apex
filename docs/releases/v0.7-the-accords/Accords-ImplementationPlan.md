@@ -641,6 +641,23 @@ Unit tests:
 - Preview shows costs, immediate effects, weekly effects, duration, timing, faction deltas,
   Ledger labels, rival warnings, and front hook details.
 
+### Completion Record
+
+- Added the `Broker Accord` action as a command-costed, target-required, no-assignment order.
+- Extended action targets with Faction/Accord targets and wired target labels, target tags,
+  storage parsing, harness reporting, and generic target helpers.
+- Added reusable `previewBrokerAccord` support for active-faction targeting, accord ownership,
+  one-use checks, active accord caps, requirements, affordability, costs, pressure effects,
+  faction deltas, Ledger effects, rival pressure warnings, and front exposure hooks.
+- Added Broker Accord target options for active factions only, with disabled unavailable options
+  and stable unavailable reason copy.
+- Added command-card UI preview rows for selected accords.
+- Verification completed: focused Phase 4 suite passed with 85 specs; full suite passed with
+  492 specs; app/spec TypeScript, docs check, local build, Pages production build, and
+  `git diff --check` passed.
+- Build bundle check: initial bundle `573.97 kB`, under the current `600 kB` warning budget.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm preview accuracy before allowing accords to resolve.

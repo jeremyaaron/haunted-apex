@@ -288,6 +288,8 @@ function getTargetLabel(target: ActionTarget): string | undefined {
       return target.id;
     case 'ledger':
       return target.entryId;
+    case 'faction':
+      return `${target.factionId} - ${target.accordId}`;
   }
 }
 

@@ -10,6 +10,7 @@ const RIVAL_PRESSURE_BY_ACTION: Record<ActionId, number> = {
   work_the_ledger: 0,
   manage_contact: 0,
   invest_front: 0,
+  broker_accord: 0,
 };
 
 export function calculateRivalPressureGain(

@@ -1,4 +1,6 @@
+import type { AccordId } from './accords';
 import type { ContactId, ContactOptionId } from './contacts';
+import type { FactionId } from './factions';
 import type { FrontId, FrontOpportunityId } from './fronts';
 import type { OperativeId, OperativeSkill } from './operatives';
 import type { PressureDelta } from './pressures';
@@ -16,7 +18,8 @@ export type ActionId =
   | 'lay_low'
   | 'work_the_ledger'
   | 'manage_contact'
-  | 'invest_front';
+  | 'invest_front'
+  | 'broker_accord';
 
 export type ActionStressType = 'normal' | 'dangerous' | 'recovery' | 'none';
 
@@ -30,7 +33,8 @@ export type ActionTarget =
   | { type: 'ledger'; entryId: LedgerEntryId; useOptionId: LedgerUseOptionId }
   | { type: 'contact'; contactId: ContactId; optionId: ContactOptionId }
   | { type: 'front_opportunity'; id: FrontOpportunityId }
-  | { type: 'front'; id: FrontId };
+  | { type: 'front'; id: FrontId }
+  | { type: 'faction'; factionId: FactionId; accordId: AccordId };
 
 export type ActionDefinition = {
   id: ActionId;

@@ -421,6 +421,70 @@
                 </div>
               }
 
+              @if (action.brokerAccord; as accord) {
+                @if (accord.ok) {
+                  <div class="selection-strip ledger-use-preview">
+                    <div>
+                      <span>Broker accord</span>
+                      <strong>{{ accord.factionName }} · {{ accord.accordLabel }}</strong>
+                    </div>
+                    <p>{{ accord.description }}</p>
+                    <div class="ledger-preview-rows">
+                      @for (cost of accord.costRows; track cost.id) {
+                        <span class="negative">-{{ cost.value }} {{ pressureLabel(cost.id) }}</span>
+                      }
+                      @for (effect of deltaRows(accord.immediateEffects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }}
+                        </span>
+                      }
+                      @if (accord.durationWeeks) {
+                        <span>{{ accord.timingLabel }}</span>
+                      }
+                      @for (effect of deltaRows(accord.weeklyEffects); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ pressureLabel(effect.id) }} / Week
+                        </span>
+                      }
+                      @for (effect of factionDeltaRows(accord.factionEffectsOnStart); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ displayToken(effect.id) }}
+                        </span>
+                      }
+                      @for (effect of factionDeltaRows(accord.factionEffectsPerWeek); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ displayToken(effect.id) }} / Week
+                        </span>
+                      }
+                      @for (effect of factionDeltaRows(accord.factionEffectsOnExpire); track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ signed(effect.value) }} {{ displayToken(effect.id) }} on Expire
+                        </span>
+                      }
+                      @for (ledgerEffect of accord.ledgerEffectsOnStart; track ledgerEffect.definitionId) {
+                        <span>Creates {{ displayToken(ledgerEffect.kind) }}: {{ ledgerEffect.entryName }}</span>
+                      }
+                      @for (rivalPressure of accord.rivalPressureEffectsOnStart; track rivalPressure.rivalId) {
+                        <span class="negative">
+                          {{ rivalPressure.rivalName }} Pressure +{{ rivalPressure.pressureGain }}
+                          → {{ rivalPressure.projectedPressure }}
+                        </span>
+                      }
+                      @for (frontEffect of accord.frontEffectsOnStart; track frontEffect.frontId) {
+                        <span [class.negative]="frontEffect.exposureDelta < 0">
+                          {{ frontEffect.frontName }} Exposure {{ signed(frontEffect.exposureDelta) }}
+                          → {{ frontEffect.projectedExposure }}
+                        </span>
+                      }
+                    </div>
+                  </div>
+                } @else if (action.selectedTarget?.type === 'faction') {
+                  <p class="inline-warning">
+                    {{ actionUnavailableReason(accord.unavailableReason) }}
+                  </p>
+                }
+              }
+
               <button
                 type="button"
                 class="queue-button"

@@ -1931,7 +1931,8 @@ function recordLedgerOrderStats(stats: LedgerRunStats, decision: LegalOrderOptio
     decision.target.type !== 'ledger' &&
     decision.target.type !== 'recruit' &&
     decision.target.type !== 'front_opportunity' &&
-    decision.target.type !== 'front'
+    decision.target.type !== 'front' &&
+    decision.target.type !== 'faction'
   ) {
     stats.targetedGatherIntelOrders += 1;
   }
@@ -3428,6 +3429,10 @@ function getTargetKey(target: ActionTarget): string {
     return `contact:${target.contactId}:${target.optionId}`;
   }
 
+  if (target.type === 'faction') {
+    return `faction:${target.factionId}:${target.accordId}`;
+  }
+
   return `${target.type}:${target.id}`;
 }
 
@@ -3438,6 +3443,10 @@ function getTargetReportId(target: ActionTarget): string {
 
   if (target.type === 'contact') {
     return `${target.contactId}:${target.optionId}`;
+  }
+
+  if (target.type === 'faction') {
+    return `${target.factionId}:${target.accordId}`;
   }
 
   return target.id;
@@ -3459,6 +3468,8 @@ function getTargetReportLabel(target: TargetRunStats): string {
       return target.targetId;
     case 'front_opportunity':
     case 'front':
+      return target.targetId;
+    case 'faction':
       return target.targetId;
   }
 }
