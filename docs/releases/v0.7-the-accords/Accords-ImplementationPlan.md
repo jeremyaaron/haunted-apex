@@ -794,6 +794,31 @@ Unit tests:
 - Expiration effects and logs apply when present.
 - Used accord ids remain after expiration.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added `applyWeeklyAccordEffects` and wired it into `advanceWeek` after queued order
+  resolution/stress cleanup and before front weekly yields.
+- Weekly accord ticks now apply pressure effects, faction per-week effects, and deterministic
+  duration decrements starting on `firstWeeklyEffectWeek`.
+- Weekly ticks are idempotent for a given week by deriving the next scheduled tick from
+  `firstWeeklyEffectWeek + (durationWeeks - remainingWeeks)`.
+- Accords now expire after their final weekly tick, apply expiration faction effects when
+  defined, remove the active accord from global and faction-local active state, and preserve
+  `usedAccordIds`.
+- Added the `accord` log entry type for weekly and expiration logs, updated save validation to
+  accept it, and included accord logs in run-summary major events.
+- Added a small Clean Corridor expiration effect, `obligation: -2`, so expiration effects are
+  represented by live content and covered by tests.
+- Added focused weekly accord tests for broker-week skipping, next-week effects, one tick per
+  week, expiration cleanup, used-id preservation, expiration effects, and `advanceWeek` ordering.
+- Verification completed: focused weekly accord spec passed with 5 specs; focused Phase 6
+  adjacent suite passed with 66 specs; full suite passed with 505 specs; app/spec TypeScript,
+  docs check, local build, Pages production build, and `git diff --check` passed.
+- Build bundle check: initial bundle `581.03 kB`, under the current `600 kB` warning budget.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm active accords behave like timed bargains before adding faction touch.

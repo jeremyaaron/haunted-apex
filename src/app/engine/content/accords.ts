@@ -12,6 +12,7 @@ export const ACCORD_DEFINITIONS = [
     weeklyEffects: { heat: -3 },
     factionEffectsOnStart: { standing: 3, suspicion: 8, obligation: 8 },
     factionEffectsPerWeek: { suspicion: 3 },
+    factionEffectsOnExpire: { obligation: -2 },
     tags: ['heat_control', 'security'],
   },
   {

@@ -328,6 +328,7 @@ function selectMajorEvents(state: GameState): string[] {
     'event_presented',
     'event_choice',
     'ledger',
+    'accord',
     'complication',
     'rival_effect',
     'win_loss',

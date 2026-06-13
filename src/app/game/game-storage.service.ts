@@ -1132,6 +1132,7 @@ function isGameLogEntryType(value: unknown): boolean {
     value === 'ledger' ||
     value === 'operative_condition' ||
     value === 'complication' ||
+    value === 'accord' ||
     value === 'front_yield' ||
     value === 'drift' ||
     value === 'rival_effect' ||

@@ -8,6 +8,7 @@ export { applyFactionMetricDelta, resolveBrokerAccord } from './resolve-broker-a
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyFrontYields } from './front-yields';
 export { applyWeeklyDrift } from './weekly-drift';
+export { applyWeeklyAccordEffects, shouldApplyWeeklyTick } from './weekly-accords';
 export {
   applyLocalDistrictCooling,
   applyTargetedActionConsequences,
