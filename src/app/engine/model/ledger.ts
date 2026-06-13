@@ -2,6 +2,7 @@ import type { ActionId, ActionTarget } from './actions';
 import type { ContactId, ContactMetricDelta } from './contacts';
 import type { DistrictId } from './districts';
 import type { EventId } from './events';
+import type { FactionId } from './factions';
 import type { OperativeId } from './operatives';
 import type { PressureDelta, Pressures } from './pressures';
 import type { RivalId } from './rivals';
@@ -114,6 +115,7 @@ export type LedgerEntry = {
   relatedOperativeId?: OperativeId;
   relatedRivalId?: RivalId;
   relatedContactId?: ContactId;
+  relatedFactionId?: FactionId;
   flags?: Record<string, boolean | number | string>;
 };
 

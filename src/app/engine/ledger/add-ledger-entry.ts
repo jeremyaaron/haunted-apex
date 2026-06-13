@@ -9,6 +9,7 @@ export type AddLedgerEntryRequest = {
   relatedOperativeId?: LedgerEntry['relatedOperativeId'];
   relatedRivalId?: LedgerEntry['relatedRivalId'];
   relatedContactId?: LedgerEntry['relatedContactId'];
+  relatedFactionId?: LedgerEntry['relatedFactionId'];
   flags?: LedgerEntry['flags'];
 };
 
@@ -37,6 +38,7 @@ export function addLedgerEntry(
       : {}),
     ...(request.relatedRivalId ? { relatedRivalId: request.relatedRivalId } : {}),
     ...(request.relatedContactId ? { relatedContactId: request.relatedContactId } : {}),
+    ...(request.relatedFactionId ? { relatedFactionId: request.relatedFactionId } : {}),
     ...(request.flags ? { flags: request.flags } : {}),
   };
 

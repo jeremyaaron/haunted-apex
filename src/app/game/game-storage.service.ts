@@ -1,12 +1,18 @@
 import { Injectable } from '@angular/core';
 import {
+  ACTIVE_ACCORD_CAP,
   ACTIVE_CONTACT_COUNT,
+  ACTIVE_FACTION_COUNT,
+  ALWAYS_ACTIVE_FACTION_ID,
   CONTACT_DEFINITIONS,
+  FACTION_ACTIVE_ACCORD_CAP,
   FRONT_DEFINITIONS,
+  getAccordDefinition,
   getActionDefinition,
   getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
+  getFactionDefinition,
   getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
@@ -15,12 +21,15 @@ import {
   getVenueDefinition,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
+  type AccordId,
   type ActionId,
   type ActionTarget,
+  type ActiveAccordId,
   type ContactId,
   type ContactMetricDelta,
   type ContactOptionKind,
   type DistrictId,
+  type FactionId,
   type FrontDefinitionId,
   type FrontId,
   type FrontOpportunityId,
@@ -36,9 +45,10 @@ import {
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 6;
-export const CURRENT_GAME_VERSION = '0.6.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.6:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 7;
+export const CURRENT_GAME_VERSION = '0.7.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.7:current-run';
+export const LEGACY_V06_STORAGE_KEY = 'haunted-apex:v0.6:current-run';
 export const LEGACY_V05_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
 export const LEGACY_V04_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
 export const LEGACY_V03_STORAGE_KEY = 'haunted-apex:v0.3:current-run';
@@ -94,6 +104,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V06_STORAGE_KEY);
       storage.removeItem(LEGACY_V05_STORAGE_KEY);
       storage.removeItem(LEGACY_V04_STORAGE_KEY);
       storage.removeItem(LEGACY_V03_STORAGE_KEY);
@@ -125,6 +136,18 @@ export class GameStorageService implements GameStorage {
         storage.removeItem(CURRENT_RUN_STORAGE_KEY);
         return { status: 'invalid' };
       }
+    }
+
+    if (storage.getItem(LEGACY_V06_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V06_STORAGE_KEY);
+      storage.removeItem(LEGACY_V05_STORAGE_KEY);
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 6,
+      };
     }
 
     if (storage.getItem(LEGACY_V05_STORAGE_KEY) !== null) {
@@ -171,6 +194,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V06_STORAGE_KEY);
     storage?.removeItem(LEGACY_V05_STORAGE_KEY);
     storage?.removeItem(LEGACY_V04_STORAGE_KEY);
     storage?.removeItem(LEGACY_V03_STORAGE_KEY);
@@ -192,7 +216,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 6 &&
+    value['schemaVersion'] === 7 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -204,6 +228,7 @@ function isGameState(value: unknown): value is GameState {
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
     isContactNetwork(value['contacts'], value['activeContactIds']) &&
+    isFactionNetwork(value['factions'], value['activeFactionIds'], value['activeAccords']) &&
     isFrontNetwork(value['fronts'], value['frontOpportunities']) &&
     isSeenSignatureEventIds(value['seenSignatureEventIds']) &&
     isLedgerState(value['ledger']) &&
@@ -376,6 +401,219 @@ function isContactNetwork(contacts: unknown, activeContactIds: unknown): boolean
 
 function isContactMetric(value: unknown): boolean {
   return isFiniteNumber(value) && value >= 0 && value <= 100;
+}
+
+function isFactionNetwork(
+  factions: unknown,
+  activeFactionIds: unknown,
+  activeAccords: unknown,
+): boolean {
+  if (
+    !isRecord(factions) ||
+    !isStringArray(activeFactionIds) ||
+    !isRecord(activeAccords) ||
+    activeFactionIds.length !== ACTIVE_FACTION_COUNT ||
+    new Set(activeFactionIds).size !== activeFactionIds.length ||
+    !activeFactionIds.includes(ALWAYS_ACTIVE_FACTION_ID)
+  ) {
+    return false;
+  }
+
+  const activeFactionIdSet = new Set(activeFactionIds);
+  const factionEntries = Object.entries(factions);
+
+  if (
+    factionEntries.length !== activeFactionIds.length ||
+    activeFactionIds.some((factionId) => !getFactionDefinition(factionId as FactionId)) ||
+    factionEntries.some(
+      ([factionId]) =>
+        !activeFactionIdSet.has(factionId) ||
+        !getFactionDefinition(factionId as FactionId),
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    factionEntries.every(([factionId, faction]) =>
+      isFactionState(factionId, faction, activeAccords),
+    ) &&
+    isActiveAccordNetwork(factions, activeFactionIdSet, activeAccords)
+  );
+}
+
+function isFactionState(
+  factionId: string,
+  faction: unknown,
+  activeAccords: Record<string, unknown>,
+): faction is Record<string, unknown> {
+  if (
+    !isRecord(faction) ||
+    faction['id'] !== factionId ||
+    !isFactionMetric(faction['standing']) ||
+    !isFactionMetric(faction['suspicion']) ||
+    !isFactionMetric(faction['obligation']) ||
+    !isStringArray(faction['usedAccordIds']) ||
+    new Set(faction['usedAccordIds']).size !== faction['usedAccordIds'].length ||
+    !isStringArray(faction['activeAccordIds']) ||
+    new Set(faction['activeAccordIds']).size !== faction['activeAccordIds'].length ||
+    faction['activeAccordIds'].length > FACTION_ACTIVE_ACCORD_CAP ||
+    !isFlags(faction['flags']) ||
+    !isRecentFactionInteractions(faction['recentInteractions'])
+  ) {
+    return false;
+  }
+
+  const definition = getFactionDefinition(factionId as FactionId);
+
+  if (!definition) {
+    return false;
+  }
+
+  return (
+    faction['usedAccordIds'].every((accordId) =>
+      isAccordOwnedByFaction(accordId, definition.id),
+    ) &&
+    faction['activeAccordIds'].every((activeAccordId) => activeAccords[activeAccordId])
+  );
+}
+
+function isFactionMetric(value: unknown): boolean {
+  return isFiniteNumber(value) && value >= 0 && value <= 100;
+}
+
+function isRecentFactionInteractions(value: unknown): boolean {
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every(
+    (interaction) =>
+      isRecord(interaction) &&
+      isPositiveInteger(interaction['week']) &&
+      isFactionInteractionSourceType(interaction['sourceType']) &&
+      typeof interaction['sourceId'] === 'string' &&
+      (interaction['standingDelta'] === undefined ||
+        isFiniteNumber(interaction['standingDelta'])) &&
+      (interaction['suspicionDelta'] === undefined ||
+        isFiniteNumber(interaction['suspicionDelta'])) &&
+      (interaction['obligationDelta'] === undefined ||
+        isFiniteNumber(interaction['obligationDelta'])),
+  );
+}
+
+function isFactionInteractionSourceType(value: unknown): boolean {
+  return (
+    value === 'accord' ||
+    value === 'event' ||
+    value === 'action' ||
+    value === 'front' ||
+    value === 'contact' ||
+    value === 'ledger'
+  );
+}
+
+function isActiveAccordNetwork(
+  factions: Record<string, unknown>,
+  activeFactionIdSet: Set<string>,
+  activeAccords: unknown,
+): boolean {
+  if (!isRecord(activeAccords)) {
+    return false;
+  }
+
+  const activeAccordEntries = Object.entries(activeAccords);
+
+  if (activeAccordEntries.length > ACTIVE_ACCORD_CAP) {
+    return false;
+  }
+
+  const activeAccordCountsByFaction = new Map<string, number>();
+
+  for (const [activeAccordId, activeAccord] of activeAccordEntries) {
+    if (!isActiveAccord(activeAccordId, activeAccord, activeFactionIdSet)) {
+      return false;
+    }
+
+    const factionId = activeAccord['factionId'] as string;
+    activeAccordCountsByFaction.set(
+      factionId,
+      (activeAccordCountsByFaction.get(factionId) ?? 0) + 1,
+    );
+
+    if ((activeAccordCountsByFaction.get(factionId) ?? 0) > FACTION_ACTIVE_ACCORD_CAP) {
+      return false;
+    }
+  }
+
+  for (const [factionId, faction] of Object.entries(factions)) {
+    if (!isRecord(faction) || !isStringArray(faction['activeAccordIds'])) {
+      return false;
+    }
+
+    const expectedActiveAccordIds = activeAccordEntries
+      .filter(
+        ([, activeAccord]) =>
+          isRecord(activeAccord) && activeAccord['factionId'] === factionId,
+      )
+      .map(([activeAccordId]) => activeAccordId)
+      .sort();
+
+    if ([...faction['activeAccordIds']].sort().join('|') !== expectedActiveAccordIds.join('|')) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isActiveAccord(
+  activeAccordId: string,
+  activeAccord: unknown,
+  activeFactionIdSet: Set<string>,
+): activeAccord is Record<string, unknown> {
+  if (
+    !isRecord(activeAccord) ||
+    activeAccord['id'] !== activeAccordId ||
+    typeof activeAccord['definitionId'] !== 'string' ||
+    typeof activeAccord['factionId'] !== 'string' ||
+    !activeFactionIdSet.has(activeAccord['factionId']) ||
+    !isPositiveInteger(activeAccord['startedWeek']) ||
+    !isNonNegativeInteger(activeAccord['remainingWeeks']) ||
+    !isPositiveInteger(activeAccord['firstWeeklyEffectWeek']) ||
+    !isRecord(activeAccord['source']) ||
+    activeAccord['source']['type'] !== 'broker_accord'
+  ) {
+    return false;
+  }
+
+  const definition = getAccordDefinition(activeAccord['definitionId'] as AccordId);
+
+  return (
+    definition?.factionId === activeAccord['factionId'] &&
+    isActiveAccordIdForDefinition(
+      activeAccordId as ActiveAccordId,
+      activeAccord['definitionId'] as AccordId,
+    )
+  );
+}
+
+function isActiveAccordIdForDefinition(
+  activeAccordId: ActiveAccordId,
+  accordId: AccordId,
+): boolean {
+  const prefix = `active_${accordId}_`;
+  const sequence = activeAccordId.startsWith(prefix)
+    ? activeAccordId.slice(prefix.length)
+    : '';
+
+  return /^\d+$/.test(sequence);
+}
+
+function isAccordOwnedByFaction(accordId: string, factionId: FactionId): boolean {
+  const definition = getAccordDefinition(accordId as AccordId);
+
+  return definition?.factionId === factionId;
 }
 
 function isRecentContactInteractions(value: unknown): boolean {
@@ -742,6 +980,9 @@ function isLedgerState(value: unknown): boolean {
       (entry['relatedContactId'] !== undefined &&
         (typeof entry['relatedContactId'] !== 'string' ||
           !getContactDefinition(entry['relatedContactId'] as ContactId))) ||
+      (entry['relatedFactionId'] !== undefined &&
+        (typeof entry['relatedFactionId'] !== 'string' ||
+          !getFactionDefinition(entry['relatedFactionId'] as FactionId))) ||
       (entry['flags'] !== undefined && !isFlags(entry['flags']))
     ) {
       return false;

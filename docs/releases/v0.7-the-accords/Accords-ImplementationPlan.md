@@ -553,6 +553,23 @@ Unit tests:
 - v0.6 saves are rejected with the compatibility notice.
 - Malformed Faction or Active Accord state is rejected.
 
+### Completion Record
+
+- Added seeded Faction generation with Ashline Bureau always active, three optional active
+  factions, initialized Faction state, and empty Active Accord state.
+- Extended `GameState` to schema version 7 with `factions`, `activeFactionIds`, and
+  `activeAccords`.
+- Bumped persistence to `0.7.0` and `haunted-apex:v0.7:current-run`, added v0.6 legacy save
+  invalidation, and updated the compatibility notice.
+- Extended storage validation for active Faction shape, Faction metric bounds, accord ownership,
+  active accord caps, Active Accord timing/source fields, and optional Ledger Faction references.
+- Added focused specs for Faction generation, new-game Faction initialization, v0.7 save
+  round-trips, v0.6 invalidation, and malformed Faction/Active Accord save rejection.
+- Verification completed: focused Phase 3 suite passed with 42 specs; full suite passed with
+  484 specs; app/spec TypeScript, docs check, local build, Pages production build, and
+  `git diff --check` passed.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm v0.7 new runs and persistence before adding player-facing action targets.
