@@ -24,9 +24,11 @@ import {
   type ContactServiceView,
   type EventChoiceDefinition,
   type FrontEffectPreviewRow,
+  type FactionEffectPreviewRow,
   type FrontInvestmentPanelView,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
+  type LedgerFactionDeltaRow,
   type HireCandidateView,
   type LedgerDeltaRow,
   type LedgerEntryView,
@@ -229,7 +231,8 @@ export class App {
       (option.targetType === 'ledger' ||
         option.targetType === 'contact' ||
         option.targetType === 'front_opportunity' ||
-        option.targetType === 'front') &&
+        option.targetType === 'front' ||
+        option.targetType === 'faction') &&
       option.affordable === false
     );
   }
@@ -386,6 +389,24 @@ export class App {
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.frontEffects ?? [];
   }
 
+  protected eventFactionRows(choiceId: string): FactionEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.factionEffects ?? [];
+  }
+
+  protected eventFactionEffectText(row: FactionEffectPreviewRow): string {
+    return `${row.factionName} ${this.displayToken(row.id)} ${this.signed(row.value)}`;
+  }
+
+  protected eventFactionEffectIsWarning(row: FactionEffectPreviewRow): boolean {
+    return row.id === 'suspicion' || row.id === 'obligation' ? row.value > 0 : row.value < 0;
+  }
+
   protected eventFrontEffectText(row: FrontEffectPreviewRow): string {
     if (row.id === 'exposure' && typeof row.value === 'number') {
       return `${row.frontName} Exposure ${this.signed(row.value)}`;
@@ -415,12 +436,7 @@ export class App {
 
   protected ledgerEntries(): LedgerEntryView[] {
     const panel = this.game.ledgerPanel();
-    return [
-      ...panel.secrets,
-      ...panel.debts,
-      ...panel.favors,
-      ...panel.consumed,
-    ];
+    return [...panel.secrets, ...panel.debts, ...panel.favors, ...panel.consumed];
   }
 
   protected ledgerDeltaText(row: LedgerDeltaRow): string {
@@ -463,13 +479,16 @@ export class App {
     return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
 
+  protected ledgerFactionEffectText(row: LedgerFactionDeltaRow): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
   protected ledgerUseSummary(option: LedgerUseOptionView): string {
     const rows = [
       ...option.costRows.map((row) => this.ledgerDeltaText(row)),
       ...option.effectRows.map((row) => this.ledgerDeltaText(row)),
-      ...option.relatedContactEffectRows.map((row) =>
-        this.ledgerContactEffectText(row),
-      ),
+      ...option.relatedContactEffectRows.map((row) => this.ledgerContactEffectText(row)),
+      ...option.relatedFactionEffectRows.map((row) => this.ledgerFactionEffectText(row)),
     ];
 
     if (option.consumesEntry) {
@@ -535,6 +554,10 @@ export class App {
     return `tone-${metric.tone}`;
   }
 
+  protected factionMetricToneClass(metric: { tone: string }): string {
+    return `tone-${metric.tone}`;
+  }
+
   protected runOperativeNames(operatives: readonly RunSummaryOperative[]): string {
     return operatives.map((operative) => operative.name).join(', ') || 'None';
   }
@@ -569,6 +592,22 @@ export class App {
         return 'This Front is already owned.';
       case 'front_already_max_level':
         return 'This Front is already max level.';
+      case 'faction_inactive':
+        return 'That faction is not active in this run.';
+      case 'accord_not_found':
+        return 'That accord is no longer available.';
+      case 'accord_wrong_faction':
+        return 'That accord does not belong to the selected faction.';
+      case 'accord_already_used':
+        return 'This accord has already been brokered in this run.';
+      case 'accord_already_active':
+        return 'This accord is already active.';
+      case 'accord_cap_reached':
+        return 'Active Accord capacity is full.';
+      case 'faction_accord_cap_reached':
+        return 'This faction already has an active accord.';
+      case 'accord_requirement_not_met':
+        return 'This accord requirement is not met.';
       case 'ledger_target_required':
         return 'Select a Ledger entry and use option.';
       case 'ledger_entry_unknown':
@@ -587,7 +626,8 @@ export class App {
       option.targetType !== 'ledger' &&
       option.targetType !== 'contact' &&
       option.targetType !== 'front_opportunity' &&
-      option.targetType !== 'front'
+      option.targetType !== 'front' &&
+      option.targetType !== 'faction'
     ) {
       return '';
     }
@@ -697,6 +737,15 @@ export class App {
     }
   }
 
+  protected factionDeltaRows(
+    delta: Partial<Record<'standing' | 'suspicion' | 'obligation', number>>,
+  ): Array<{ id: 'standing' | 'suspicion' | 'obligation'; value: number }> {
+    return (['standing', 'suspicion', 'obligation'] as const).flatMap((id) => {
+      const value = delta[id];
+      return value === undefined || value === 0 ? [] : [{ id, value }];
+    });
+  }
+
   protected initials(name: string): string {
     return name
       .split(' ')
@@ -739,6 +788,10 @@ export class App {
 
     if (target.type === 'contact') {
       return `${target.type}:${target.contactId}:${target.optionId}`;
+    }
+
+    if (target.type === 'faction') {
+      return `${target.type}:${target.factionId}:${target.accordId}`;
     }
 
     return `${target.type}:${target.id}`;

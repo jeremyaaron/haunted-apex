@@ -1,4 +1,6 @@
-import type { ContactId, EventId, FrontId, FrontState, GameState } from '../model';
+import { getFactionDefinition } from '../content';
+import { materializeFactionState } from '../factions';
+import type { ContactId, EventId, FactionId, FrontId, FrontState, GameState } from '../model';
 import { materializeOperativeState } from '../roster';
 import { addLedgerEntry } from '../ledger';
 import { newGame } from './new-game';
@@ -606,6 +608,87 @@ describe('resolveEventChoice', () => {
       }),
     );
   });
+
+  it('previews and applies faction effects from Faction event choices', () => {
+    const state = withSelectedFactionEvent(
+      withFactionMetrics(withPendingEvent('faction_demand'), 'faction_ashline_bureau', {
+        standing: 45,
+        suspicion: 35,
+        obligation: 60,
+      }),
+      'faction_ashline_bureau',
+    );
+    const preview = getEventChoicePreview(state, 'event_1_1', 'pay_what_they_ask');
+    const result = resolveEventChoice(state, 'event_1_1', 'pay_what_they_ask');
+
+    expect(preview?.factionEffects).toEqual([
+      {
+        factionId: 'faction_ashline_bureau',
+        factionName: 'Ashline Bureau',
+        id: 'standing',
+        value: 4,
+      },
+      {
+        factionId: 'faction_ashline_bureau',
+        factionName: 'Ashline Bureau',
+        id: 'obligation',
+        value: -15,
+      },
+    ]);
+
+    if (!result.ok) {
+      fail(`Expected event choice resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.pressures.resources).toBe(state.pressures.resources - 1000);
+    expect(result.state.factions.faction_ashline_bureau?.standing).toBe(49);
+    expect(result.state.factions.faction_ashline_bureau?.obligation).toBe(45);
+    expect(result.state.factions.faction_ashline_bureau?.recentInteractions.at(-1)).toEqual(
+      jasmine.objectContaining({
+        sourceType: 'event',
+        sourceId: 'faction_demand',
+        standingDelta: 4,
+        obligationDelta: -15,
+      }),
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Faction: Ashline Bureau: standing +4, obligation -15.',
+    );
+  });
+
+  it('applies selected faction rival pressure from Proxy Conflict choices', () => {
+    const base = withActiveFaction(
+      withPendingEvent('proxy_conflict'),
+      'faction_velvet_house',
+    );
+    const withMetrics = withFactionMetrics(base, 'faction_velvet_house', {
+      standing: 48,
+    });
+    const state = withSelectedFactionEvent(
+      {
+        ...withMetrics,
+        rivals: {
+          ...withMetrics.rivals,
+          rival_nyx_ardent: {
+            ...withMetrics.rivals.rival_nyx_ardent,
+            pressure: 55,
+          },
+        },
+      },
+      'faction_velvet_house',
+    );
+    const result = resolveEventChoice(state, 'event_1_1', 'act_through_intermediaries');
+
+    if (!result.ok) {
+      fail(`Expected event choice resolution, got ${result.error}`);
+      return;
+    }
+
+    expect(result.state.rivals.rival_nyx_ardent.pressure).toBe(61);
+    expect(result.state.factions.faction_velvet_house?.standing).toBe(52);
+    expect(result.state.factions.faction_velvet_house?.obligation).toBe(0);
+  });
 });
 
 function withPendingEvent(definitionId: EventId): GameState {
@@ -618,6 +701,65 @@ function withPendingEvent(definitionId: EventId): GameState {
       week: 1,
     },
   };
+}
+
+function withSelectedFactionEvent(state: GameState, factionId: FactionId): GameState {
+  return {
+    ...state,
+    pendingEvent: state.pendingEvent
+      ? {
+          ...state.pendingEvent,
+          selectedFactionId: factionId,
+        }
+      : undefined,
+  };
+}
+
+function withFactionMetrics(
+  state: GameState,
+  factionId: FactionId,
+  metrics: Partial<Pick<NonNullable<GameState['factions'][FactionId]>, 'standing' | 'suspicion' | 'obligation'>>,
+): GameState {
+  const faction = state.factions[factionId];
+
+  if (!faction) {
+    return state;
+  }
+
+  return {
+    ...state,
+    factions: {
+      ...state.factions,
+      [factionId]: {
+        ...faction,
+        ...metrics,
+      },
+    },
+  };
+}
+
+function withActiveFaction(state: GameState, factionId: FactionId): GameState {
+  if (state.activeFactionIds.includes(factionId)) {
+    return state;
+  }
+
+  const replaceableId = state.activeFactionIds.find(
+    (activeFactionId) => activeFactionId !== 'faction_ashline_bureau',
+  );
+  const definition = getFactionDefinition(factionId);
+
+  if (!replaceableId || !definition) {
+    return state;
+  }
+
+  const next = structuredClone(state);
+  next.activeFactionIds = next.activeFactionIds.map((activeFactionId) =>
+    activeFactionId === replaceableId ? factionId : activeFactionId,
+  );
+  delete next.factions[replaceableId];
+  next.factions[factionId] = materializeFactionState(definition);
+
+  return next;
 }
 
 function withActiveContacts(state: GameState, activeContactIds: ContactId[]): GameState {

@@ -1,9 +1,17 @@
 import { TestBed } from '@angular/core/testing';
-import { addLedgerEntry, newGame, queueOrder, type GameState } from '../engine';
+import {
+  addLedgerEntry,
+  createActiveAccordId,
+  newGame,
+  queueOrder,
+  type FactionId,
+  type GameState,
+} from '../engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V06_STORAGE_KEY,
   LEGACY_V05_STORAGE_KEY,
   LEGACY_V04_STORAGE_KEY,
   LEGACY_V03_STORAGE_KEY,
@@ -25,7 +33,7 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips a complete v0.6 envelope through localStorage', () => {
+  it('round-trips a complete v0.7 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
@@ -43,6 +51,7 @@ describe('GameStorageService', () => {
 
   it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V06_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V05_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V04_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V03_STORAGE_KEY, '{}');
@@ -51,6 +60,7 @@ describe('GameStorageService', () => {
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V06_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V05_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V04_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V03_STORAGE_KEY)).toBeNull();
@@ -73,6 +83,19 @@ describe('GameStorageService', () => {
       foundVersion: 2,
     });
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.6 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V06_STORAGE_KEY,
+      JSON.stringify(newGame({ seed: 'LEGACY' })),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 6,
+    });
+    expect(localStorage.getItem(LEGACY_V06_STORAGE_KEY)).toBeNull();
   });
 
   it('removes the v0.5 key and reports it incompatible', () => {
@@ -297,6 +320,7 @@ describe('GameStorageService', () => {
         id: 'district_violet_ward',
       },
       relatedRivalId: 'rival_nyx_ardent',
+      relatedFactionId: 'faction_velvet_house',
     });
     const state: GameState = {
       ...withEntry,
@@ -313,6 +337,50 @@ describe('GameStorageService', () => {
           },
         })),
         consumedCount: 1,
+      },
+    };
+
+    service.saveCurrentRun(state);
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'loaded',
+      state,
+    });
+  });
+
+  it('round-trips Faction state and active Accords', () => {
+    const state = structuredClone(newGame({ seed: 'FACTION-STORAGE' }));
+    const activeAccordId = createActiveAccordId('accord_ashline_clean_corridor', 1);
+    state.factions.faction_ashline_bureau = {
+      ...state.factions.faction_ashline_bureau!,
+      standing: 51,
+      suspicion: 42,
+      obligation: 9,
+      usedAccordIds: ['accord_ashline_clean_corridor'],
+      activeAccordIds: [activeAccordId],
+      flags: {
+        storage_spec: true,
+      },
+      recentInteractions: [
+        {
+          week: 2,
+          sourceType: 'accord',
+          sourceId: activeAccordId,
+          standingDelta: 3,
+          suspicionDelta: 8,
+          obligationDelta: 8,
+        },
+      ],
+    };
+    state.activeAccords[activeAccordId] = {
+      id: activeAccordId,
+      definitionId: 'accord_ashline_clean_corridor',
+      factionId: 'faction_ashline_bureau',
+      startedWeek: 2,
+      remainingWeeks: 1,
+      firstWeeklyEffectWeek: 3,
+      source: {
+        type: 'broker_accord',
       },
     };
 
@@ -583,6 +651,110 @@ describe('GameStorageService', () => {
     expectLoadInvalid(inactiveMissingState);
     expectLoadInvalid(badMetric);
     expectLoadInvalid(malformedInteraction);
+  });
+
+  it('rejects malformed Faction state', () => {
+    const missingFactions = structuredClone(newGame()) as Partial<GameState>;
+    const missingAshline = structuredClone(newGame());
+    const inactiveState = structuredClone(newGame());
+    const badMetric = structuredClone(newGame());
+    const unknownAccord = structuredClone(newGame());
+    const malformedInteraction = structuredClone(newGame());
+    const inactiveFactionId = [
+      'faction_helix_meridian',
+      'faction_velvet_house',
+      'faction_chrome_maw',
+      'faction_ghostline_communion',
+    ].find((factionId) => !inactiveState.activeFactionIds.includes(factionId as FactionId))!;
+    delete missingFactions.factions;
+    missingAshline.activeFactionIds = missingAshline.activeFactionIds.filter(
+      (factionId) => factionId !== 'faction_ashline_bureau',
+    );
+    missingAshline.activeFactionIds.push('faction_helix_meridian');
+    inactiveState.factions[inactiveFactionId as FactionId] = {
+      id: inactiveFactionId as FactionId,
+      standing: 38,
+      suspicion: 30,
+      obligation: 0,
+      usedAccordIds: [],
+      activeAccordIds: [],
+      flags: {},
+      recentInteractions: [],
+    };
+    badMetric.factions[badMetric.activeFactionIds[0]]!.standing = 101;
+    (
+      unknownAccord.factions[unknownAccord.activeFactionIds[0]] as { usedAccordIds: string[] }
+    ).usedAccordIds = ['accord_missing'];
+    (
+      malformedInteraction.factions[malformedInteraction.activeFactionIds[0]] as {
+        recentInteractions: Array<{ week: number; sourceType: string; sourceId: string }>;
+      }
+    ).recentInteractions = [
+      {
+        week: 1,
+        sourceType: 'missing',
+        sourceId: 'test',
+      },
+    ];
+
+    expectLoadInvalid(missingFactions as GameState);
+    expectLoadInvalid(missingAshline);
+    expectLoadInvalid(inactiveState);
+    expectLoadInvalid(badMetric);
+    expectLoadInvalid(unknownAccord);
+    expectLoadInvalid(malformedInteraction);
+  });
+
+  it('rejects malformed active Accords', () => {
+    const missingActiveRecord = structuredClone(newGame()) as Partial<GameState>;
+    const activeWithoutFactionReference = structuredClone(newGame());
+    const mismatchedFaction = structuredClone(newGame());
+    const invalidRemainingWeeks = structuredClone(newGame());
+    const activeAccordId = createActiveAccordId('accord_ashline_clean_corridor', 1);
+    const mismatchedActiveFactionId = mismatchedFaction.activeFactionIds.find(
+      (factionId) => factionId !== 'faction_ashline_bureau',
+    )!;
+    delete missingActiveRecord.activeAccords;
+    activeWithoutFactionReference.activeAccords[activeAccordId] = {
+      id: activeAccordId,
+      definitionId: 'accord_ashline_clean_corridor',
+      factionId: 'faction_ashline_bureau',
+      startedWeek: 1,
+      remainingWeeks: 1,
+      firstWeeklyEffectWeek: 2,
+      source: {
+        type: 'broker_accord',
+      },
+    };
+    mismatchedFaction.factions.faction_ashline_bureau!.activeAccordIds = [activeAccordId];
+    mismatchedFaction.activeAccords[activeAccordId] = {
+      id: activeAccordId,
+      definitionId: 'accord_ashline_clean_corridor',
+      factionId: mismatchedActiveFactionId,
+      startedWeek: 1,
+      remainingWeeks: 1,
+      firstWeeklyEffectWeek: 2,
+      source: {
+        type: 'broker_accord',
+      },
+    };
+    invalidRemainingWeeks.factions.faction_ashline_bureau!.activeAccordIds = [activeAccordId];
+    invalidRemainingWeeks.activeAccords[activeAccordId] = {
+      id: activeAccordId,
+      definitionId: 'accord_ashline_clean_corridor',
+      factionId: 'faction_ashline_bureau',
+      startedWeek: 1,
+      remainingWeeks: -1,
+      firstWeeklyEffectWeek: 2,
+      source: {
+        type: 'broker_accord',
+      },
+    };
+
+    expectLoadInvalid(missingActiveRecord as GameState);
+    expectLoadInvalid(activeWithoutFactionReference);
+    expectLoadInvalid(mismatchedFaction);
+    expectLoadInvalid(invalidRemainingWeeks);
   });
 
   it('rejects malformed Front state', () => {

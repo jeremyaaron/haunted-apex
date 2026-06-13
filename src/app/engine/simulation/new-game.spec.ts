@@ -3,6 +3,7 @@ import {
   DISTRICT_ZERO_COMMAND_POINTS,
   DISTRICT_ZERO_INITIAL_PRESSURES,
   DISTRICT_ZERO_MAX_WEEKS,
+  FACTION_DEFINITIONS,
   FRONT_DEFINITIONS,
   getDistrictDefinition,
   getVenueDefinition,
@@ -11,6 +12,11 @@ import {
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
 import { ACTIVE_CONTACT_COUNT, satisfiesContactCoverage } from '../contacts';
+import {
+  ACTIVE_FACTION_COUNT,
+  ALWAYS_ACTIVE_FACTION_ID,
+  materializeFactionState,
+} from '../factions';
 import {
   FRONT_OPPORTUNITY_COUNT,
   satisfiesFrontOpportunityCoverage,
@@ -23,7 +29,7 @@ describe('newGame', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(6);
+    expect(state.schemaVersion).toBe(7);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
@@ -115,6 +121,23 @@ describe('newGame', () => {
     }
   });
 
+  it('creates the active faction network', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+
+    expect(state.activeFactionIds.length).toBe(ACTIVE_FACTION_COUNT);
+    expect(new Set(state.activeFactionIds).size).toBe(ACTIVE_FACTION_COUNT);
+    expect(state.activeFactionIds).toContain(ALWAYS_ACTIVE_FACTION_ID);
+    expect(Object.keys(state.factions).sort()).toEqual([...state.activeFactionIds].sort());
+    expect(state.activeAccords).toEqual({});
+
+    for (const factionId of state.activeFactionIds) {
+      const definition = FACTION_DEFINITIONS.find((candidate) => candidate.id === factionId);
+
+      expect(definition).toBeDefined();
+      expect(state.factions[factionId]).toEqual(materializeFactionState(definition!));
+    }
+  });
+
   it('creates the starting Front and fixed Front opportunities', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
     const opportunityDefinitionIds = state.frontOpportunities.map(
@@ -180,6 +203,9 @@ describe('newGame', () => {
     first.activeContactIds.pop();
     first.contacts[first.activeContactIds[0]].trust = 99;
     first.contacts[first.activeContactIds[0]].flags['test_mutation'] = true;
+    first.activeFactionIds.pop();
+    first.factions[first.activeFactionIds[0]]!.standing = 99;
+    first.factions[first.activeFactionIds[0]]!.flags['test_mutation'] = true;
     first.districts['district_violet_ward'].control = 99;
     first.rivals['rival_nyx_ardent'].pressure = 99;
     first.recentActivity.push({
@@ -198,6 +224,9 @@ describe('newGame', () => {
     expect(second.activeContactIds.length).toBe(ACTIVE_CONTACT_COUNT);
     expect(second.contacts[second.activeContactIds[0]].trust).not.toBe(99);
     expect(second.contacts[second.activeContactIds[0]].flags['test_mutation']).toBeUndefined();
+    expect(second.activeFactionIds.length).toBe(ACTIVE_FACTION_COUNT);
+    expect(second.factions[second.activeFactionIds[0]]!.standing).not.toBe(99);
+    expect(second.factions[second.activeFactionIds[0]]!.flags['test_mutation']).toBeUndefined();
     expect(second.districts['district_violet_ward'].control).toBe(12);
     expect(second.rivals['rival_nyx_ardent'].pressure).toBe(0);
     expect(second.recentActivity).toEqual([]);

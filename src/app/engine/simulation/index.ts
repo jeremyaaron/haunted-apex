@@ -4,9 +4,16 @@ export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
 export { resolveContactOption } from './resolve-contact';
 export { resolveInvestFront } from './resolve-front-investment';
+export { resolveBrokerAccord } from './resolve-broker-accord';
+export {
+  applyFactionMetricDelta,
+  getContactFactionTouch,
+  getFrontFactionTouches,
+} from './faction-effects';
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyFrontYields } from './front-yields';
 export { applyWeeklyDrift } from './weekly-drift';
+export { applyWeeklyAccordEffects, shouldApplyWeeklyTick } from './weekly-accords';
 export {
   applyLocalDistrictCooling,
   applyTargetedActionConsequences,
@@ -30,6 +37,14 @@ export {
   resolveSelectedFrontRivalId,
   selectFrontForEvent,
 } from './front-events';
+export {
+  getFactionEventEligibility,
+  getFactionEventTargetWeight,
+  getSelectedFactionName,
+  previewEventFactionEffects,
+  resolveSelectedFactionRivalId,
+  selectFactionForEvent,
+} from './faction-events';
 export {
   buildEventWeightContext,
   calculateEventWeight,
@@ -72,4 +87,8 @@ export type {
   ResolveEventChoiceResult,
 } from './resolve-event';
 export type { FrontEventEligibilityDiagnostics } from './front-events';
+export type {
+  FactionEffectPreviewRow,
+  FactionEventEligibilityDiagnostics,
+} from './faction-events';
 export type { OperativeEventEligibilityDiagnostics } from './operative-events';

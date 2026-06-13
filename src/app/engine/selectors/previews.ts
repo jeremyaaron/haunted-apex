@@ -9,6 +9,15 @@ import {
   getVenueDefinition,
 } from '../content';
 import {
+  previewBrokerAccord,
+  type BrokerAccordCostRow,
+  type BrokerAccordPreview,
+  type BrokerAccordUnavailableReason,
+  type BrokerAccordRivalPressurePreview,
+  type BrokerAccordLedgerPreview,
+  type AccordFrontEffectPreview,
+} from '../accords';
+import {
   previewContactOption,
   type ContactCostRow,
   type ContactOptionPreview,
@@ -25,6 +34,7 @@ import type {
   ActionTarget,
   DistrictDefinition,
   DistrictId,
+  FactionMetricDelta,
   GameState,
   LedgerUseOptionDefinition,
   OperativeDefinition,
@@ -100,7 +110,8 @@ export type QueueOrderUnavailableReason =
   | 'quiet_treatment_no_target'
   | 'front_cap_reached'
   | 'front_already_owned'
-  | 'front_already_max_level';
+  | 'front_already_max_level'
+  | BrokerAccordUnavailableReason;
 
 export const FRONT_LAY_LOW_RESOURCE_COST = 300;
 export const FRONT_LAY_LOW_EXPOSURE_DELTA = -14;
@@ -171,8 +182,16 @@ export type ActionPreview = {
   contactResolvedEffects?: ContactMetricDeltaView[];
   frontInvestment?: FrontInvestmentPreview;
   frontExposure?: FrontExposurePreview;
+  brokerAccord?: BrokerAccordPreview;
   secretDiscovery?: SecretDiscoveryPreview;
 };
+
+export type { BrokerAccordCostRow, BrokerAccordLedgerPreview, BrokerAccordRivalPressurePreview };
+export type FactionMetricDeltaView = {
+  id: keyof FactionMetricDelta;
+  value: number;
+};
+export type { AccordFrontEffectPreview };
 
 export type FrontExposurePreview = {
   frontId: Extract<ActionTarget, { type: 'front' }>['id'];
@@ -246,7 +265,8 @@ export function getQueuedResourceCost(state: GameState): number {
       getAdjustedResourceCost(action, order.assignedOperativeId, state, order.target) +
       getLedgerUseCost(state, order.target, 'resources') +
       getContactUseCost(state, order.target, 'resources') +
-      getFrontInvestmentCost(state, order.actionId, order.target)
+      getFrontInvestmentCost(state, order.actionId, order.target) +
+      getBrokerAccordCost(state, order.actionId, order.target, 'resources')
     );
   }, 0);
 }
@@ -256,7 +276,8 @@ export function getQueuedIntelCost(state: GameState): number {
     (cost, order) =>
       cost +
       getLedgerUseCost(state, order.target, 'intel') +
-      getContactUseCost(state, order.target, 'intel'),
+      getContactUseCost(state, order.target, 'intel') +
+      getBrokerAccordCost(state, order.actionId, order.target, 'intel'),
     0,
   );
 }
@@ -371,7 +392,26 @@ function getTargetAvailability(
     case 'front_opportunity':
     case 'front':
       return getFrontTargetAvailability(state, action, target);
+    case 'faction':
+      return getFactionTargetAvailability(state, action, target);
   }
+}
+
+function getFactionTargetAvailability(
+  state: GameState,
+  action: ActionDefinition,
+  target: Extract<ActionTarget, { type: 'faction' }>,
+): OrderAvailability {
+  if (action.id !== 'broker_accord') {
+    return unavailable('target_not_allowed');
+  }
+
+  const preview = previewBrokerAccord(state, target, {
+    availableResources: state.pressures.resources - getQueuedResourceCost(state),
+    availableIntel: state.pressures.intel - getQueuedIntelCost(state),
+  });
+
+  return preview.ok ? { available: true } : unavailable(preview.unavailableReason);
 }
 
 function getFrontTargetAvailability(
@@ -512,6 +552,9 @@ export function getActionPreview(
   const frontInvestment = action.id === 'invest_front'
     ? previewFrontInvestment(state, target)
     : undefined;
+  const brokerAccord = action.id === 'broker_accord'
+    ? previewBrokerAccord(state, target)
+    : undefined;
   const frontExposure = action.id === 'lay_low' && target?.type === 'front'
     ? previewFrontLayLow(state, target)
     : undefined;
@@ -526,15 +569,17 @@ export function getActionPreview(
       ? ledgerUse.effects
       : frontInvestment?.ok
         ? frontInvestment.effects
-        : frontExposure
-          ? FRONT_LAY_LOW_EFFECTS
-          : getAdjustedEffects(
-              action,
-              assignedOperativeId,
-              state,
-              target,
-              modifiers,
-            );
+        : brokerAccord?.ok
+          ? brokerAccord.immediateEffects
+          : frontExposure
+            ? FRONT_LAY_LOW_EFFECTS
+            : getAdjustedEffects(
+                action,
+                assignedOperativeId,
+                state,
+                target,
+                modifiers,
+              );
   const riskChance = contactUse?.riskChance ?? ledgerUse?.riskChance ?? baseRiskChance;
 
   return {
@@ -550,15 +595,17 @@ export function getActionPreview(
         ? ledgerUse.cost.resources
         : frontInvestment?.ok
           ? frontInvestment.cost
-          : frontExposure
-            ? FRONT_LAY_LOW_RESOURCE_COST
-          : getAdjustedResourceCost(
-              action,
-              assignedOperativeId,
-              state,
-              target,
-              modifiers,
-            ),
+          : brokerAccord?.ok
+            ? brokerAccord.cost.resources
+            : frontExposure
+              ? FRONT_LAY_LOW_RESOURCE_COST
+            : getAdjustedResourceCost(
+                action,
+                assignedOperativeId,
+                state,
+                target,
+                modifiers,
+              ),
     baseEffects: { ...action.effects },
     adjustedEffects,
     selectedOperativeId: assignedOperativeId,
@@ -602,6 +649,7 @@ export function getActionPreview(
       : undefined,
     frontInvestment,
     frontExposure,
+    brokerAccord,
     secretDiscovery,
   };
 }
@@ -617,6 +665,7 @@ export function selectActionCards(state: GameState): ActionCardView[] {
     'work_the_ledger',
     'manage_contact',
     'invest_front',
+    'broker_accord',
   ] satisfies ActionId[];
 
   return actionIds.map((actionId) => {
@@ -1193,6 +1242,20 @@ function getFrontInvestmentCost(
 
   const preview = previewFrontInvestment(state, target);
   return preview.ok ? preview.cost : 0;
+}
+
+function getBrokerAccordCost(
+  state: GameState,
+  actionId: ActionId,
+  target: ActionTarget | undefined,
+  costId: 'resources' | 'intel',
+): number {
+  if (actionId !== 'broker_accord' || target?.type !== 'faction') {
+    return 0;
+  }
+
+  const preview = previewBrokerAccord(state, target);
+  return preview.ok ? preview.cost[costId] : 0;
 }
 
 function getEffectiveAssignment(

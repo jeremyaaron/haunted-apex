@@ -48,3 +48,11 @@
 - [`Fronts-TDD.md`](releases/v0.6-fronts/Fronts-TDD.md): technical design.
 - [`Fronts-ImplementationPlan.md`](releases/v0.6-fronts/Fronts-ImplementationPlan.md): phased implementation plan.
 - [`Fronts-ReleaseNotes.md`](releases/v0.6-fronts/Fronts-ReleaseNotes.md): release notes draft.
+
+## v0.7.0: The Accords
+
+- [`v0.7.md`](releases/v0.7-the-accords/v0.7.md): release direction and product scope.
+- [`v0.7A.md`](releases/v0.7-the-accords/v0.7A.md): locked mechanical decisions.
+- [`Accords-TDD.md`](releases/v0.7-the-accords/Accords-TDD.md): technical design.
+- [`Accords-ImplementationPlan.md`](releases/v0.7-the-accords/Accords-ImplementationPlan.md): phased implementation plan.
+- [`Accords-ReleaseNotes.md`](releases/v0.7-the-accords/Accords-ReleaseNotes.md): release notes draft.

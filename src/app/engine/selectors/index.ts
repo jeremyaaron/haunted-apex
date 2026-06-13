@@ -11,6 +11,16 @@ export type {
   ContactServiceView,
   ContactView,
 } from './contacts';
+export { selectFactionPanelView } from './factions';
+export type {
+  ActiveAccordView,
+  FactionAccordOptionView,
+  FactionCardView,
+  FactionInteractionView,
+  FactionMetricView,
+  FactionPanelView,
+  FactionRelatedEntityView,
+} from './factions';
 export { selectFrontPanelView } from './fronts';
 export type {
   FrontInvestmentPanelView,
@@ -83,11 +93,7 @@ export type {
   RunSummaryReport,
   RunSummaryRival,
 } from './run-summary';
-export {
-  selectHirePoolViews,
-  selectOperativeDetail,
-  selectRosterViews,
-} from './roster';
+export { selectHirePoolViews, selectOperativeDetail, selectRosterViews } from './roster';
 export type {
   HireCandidateView,
   OperativeDetailView,

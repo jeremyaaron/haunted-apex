@@ -137,6 +137,18 @@ export const DISTRICT_ZERO_ACTIONS: readonly ActionDefinition[] = [
     requiresTarget: true,
     allowedTargetTypes: ['front_opportunity', 'front'],
   },
+  {
+    id: 'broker_accord',
+    label: 'Broker Accord',
+    commandCost: 1,
+    resourceCost: 0,
+    effects: {},
+    baseRisk: 10,
+    stressType: 'none',
+    assignment: 'none',
+    requiresTarget: true,
+    allowedTargetTypes: ['faction'],
+  },
 ] as const;
 
 export function getActionDefinition(actionId: ActionId): ActionDefinition | undefined {

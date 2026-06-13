@@ -21,10 +21,10 @@ describe('Ledger content', () => {
   it('defines the current content slice', () => {
     const ids = definitions.map((definition) => definition.id);
 
-    expect(definitions.length).toBe(14);
+    expect(definitions.length).toBe(16);
     expect(new Set(ids).size).toBe(definitions.length);
-    expect(countByKind('secret')).toBe(7);
-    expect(countByKind('debt')).toBe(5);
+    expect(countByKind('secret')).toBe(8);
+    expect(countByKind('debt')).toBe(6);
     expect(countByKind('favor')).toBe(2);
   });
 
@@ -79,7 +79,11 @@ describe('Ledger content', () => {
         expect(option.label.trim())
           .withContext(`${definition.id} ${option.id} label`)
           .not.toBe('');
-        expect(Object.keys(option.effects).length)
+        expect(
+          Object.keys(option.effects).length +
+            Object.keys(option.relatedContactEffects ?? {}).length +
+            Object.keys(option.relatedFactionEffects ?? {}).length,
+        )
           .withContext(`${definition.id} ${option.id} effects`)
           .toBeGreaterThan(0);
 

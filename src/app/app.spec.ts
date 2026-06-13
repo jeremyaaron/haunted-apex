@@ -73,6 +73,13 @@ describe('App', () => {
     expect(compiled.textContent).toContain('The Pale Circuit');
     expect(compiled.textContent).toContain('Weekly Infrastructure');
     expect(compiled.textContent).toContain('Available Fronts');
+    expect(compiled.textContent).toContain('Faction Network');
+    expect(compiled.textContent).toContain('Accords and Institutional Pressure');
+    expect(compiled.textContent).toContain('Ashline Bureau');
+    expect(compiled.textContent).toContain('Standing');
+    expect(compiled.textContent).toContain('Suspicion');
+    expect(compiled.textContent).toContain('Obligation');
+    expect(compiled.textContent).toContain('Clean Corridor');
     expect(compiled.textContent).toContain('Dominion target 90');
     expect(compiled.textContent).toContain('Win at 90');
     expect(compiled.textContent).toContain('Warning at 25');
@@ -85,6 +92,8 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Rarity changes how often an operative appears');
     expect(compiled.textContent).toContain('Fronts are owned operations');
     expect(compiled.textContent).toContain('Lay Low can target an owned Front');
+    expect(compiled.textContent).toContain('Factions are city institutions');
+    expect(compiled.textContent).toContain('weekly effects begin on the next Advance Week');
     expect(compiled.textContent).not.toContain('operative_stress_at_least');
   });
 
@@ -133,11 +142,9 @@ describe('App', () => {
       },
       frontOpportunities: base.frontOpportunities.filter(
         (opportunity) =>
-          ![
-            'front_pale_circuit',
-            'front_black_clinic',
-            'front_courier_line',
-          ].includes(opportunity.definitionId),
+          !['front_pale_circuit', 'front_black_clinic', 'front_courier_line'].includes(
+            opportunity.definitionId,
+          ),
       ),
     };
     storeState(state);
@@ -313,9 +320,7 @@ describe('App', () => {
     expect(disabledOption).toBeTruthy();
     expect(disabledOption?.disabled).toBeTrue();
     expect(disabledOption?.textContent).toContain('Father Static - Confession Leak');
-    expect(disabledOption?.textContent).toContain(
-      'This contact option requirement is not met.',
-    );
+    expect(disabledOption?.textContent).toContain('This contact option requirement is not met.');
     expect(contactCard.textContent).not.toContain('Captain Rafe Hollis - Clean Passage');
   });
 
@@ -384,11 +389,7 @@ describe('App', () => {
   it('renders Contact effects on event choices and documents Entanglements', () => {
     const state: GameState = {
       ...newGame({ seed: 'PHASE-8-CONTACT-EVENT-CHOICE' }),
-      activeContactIds: [
-        'contact_veyra_lux',
-        'contact_captain_hollis',
-        'contact_father_static',
-      ],
+      activeContactIds: ['contact_veyra_lux', 'contact_captain_hollis', 'contact_father_static'],
       phase: 'EVENT_CHOICE',
       pendingEvent: {
         id: 'event_1_1',
@@ -403,7 +404,9 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     expect(compiled.querySelector('.choice-list')?.textContent).toContain('Veyra Lux +6 Trust');
-    expect(compiled.querySelector('.choice-list')?.textContent).toContain('Veyra Lux -4 Volatility');
+    expect(compiled.querySelector('.choice-list')?.textContent).toContain(
+      'Veyra Lux -4 Volatility',
+    );
     expect(compiled.querySelector('.guide-panel')?.textContent).toContain(
       'Entanglements and contacts',
     );
@@ -413,6 +416,15 @@ describe('App', () => {
   });
 
   it('renders roster identity, role, trait, liability, and Stress information', () => {
+    const state: GameState = {
+      ...newGame({ seed: 'APP-ROSTER-LIABILITY' }),
+      operatives: [
+        materializeOperativeState('op_mara_voss'),
+        materializeOperativeState('op_juno_hex'),
+        materializeOperativeState('op_rook_vale'),
+      ],
+    };
+    storeState(state);
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
@@ -919,9 +931,7 @@ describe('App', () => {
 
     expect(compiled.textContent).toContain('Intercepted Transmission');
     expect(compiled.textContent).toContain('Creates Debt: Contaminated Money');
-    expect(compiled.textContent).toContain(
-      'Creates Secret: Dead Channel Trace',
-    );
+    expect(compiled.textContent).toContain('Creates Secret: Dead Channel Trace');
   });
 
   it('disables required-target actions until a target is selected', () => {

@@ -139,10 +139,9 @@ describe('GameFacade', () => {
       'Chrome Narrows',
       'Ghostline Market',
     ]);
-    expect(facade.rivals().map((rival) => rival.name)).toEqual([
-      'Nyx Ardent',
-      'Knox Marrow',
-    ]);
+    expect(facade.rivals().map((rival) => rival.name)).toEqual(['Nyx Ardent', 'Knox Marrow']);
+    expect(facade.factions().factions.map((faction) => faction.name)).toContain('Ashline Bureau');
+    expect(facade.factions().activeCount).toBe(4);
   });
 
   it('advances to event choice and persists the new state', () => {
@@ -178,8 +177,7 @@ describe('GameFacade', () => {
     const definition = pendingEvent ? getEventDefinition(pendingEvent.definitionId) : undefined;
     const availableChoice = definition?.choices.find(
       (choice) =>
-        pendingEvent &&
-        facade.getEventChoiceAvailability(pendingEvent.id, choice.id).available,
+        pendingEvent && facade.getEventChoiceAvailability(pendingEvent.id, choice.id).available,
     );
 
     if (!pendingEvent || !availableChoice) {

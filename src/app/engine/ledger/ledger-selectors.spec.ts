@@ -187,6 +187,84 @@ describe('Ledger lifecycle and selectors', () => {
     ]);
   });
 
+  it('exposes declared faction effects for faction-linked Ledger entries', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-FACTION-VIEW' }), {
+      definitionId: 'debt_dirty_books',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_helix_meridian',
+          accordId: 'accord_helix_quiet_capital',
+        },
+      },
+      relatedFactionId: 'faction_helix_meridian',
+    });
+    const view = selectActiveLedgerEntryViews(state)[0];
+
+    expect(view.relatedFactionLabel).toBe('Helix Meridian');
+    expect(view.useOptions[0].relatedFactionEffectRows).toEqual([
+      { id: 'standing', value: 1 },
+      { id: 'obligation', value: -3 },
+    ]);
+  });
+
+  it('creates faction Ledger entry views and preserves normal summaries after consumption', () => {
+    const withFavor = addLedgerEntry(newGame({ seed: 'LEDGER-FACTION-ENTRIES' }), {
+      definitionId: 'debt_institutional_favor',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_helix_meridian',
+          accordId: 'accord_helix_quiet_capital',
+        },
+      },
+      relatedFactionId: 'faction_helix_meridian',
+    });
+    const withBlindSpot = addLedgerEntry(withFavor, {
+      definitionId: 'secret_compliance_blind_spot',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_ashline_bureau',
+          accordId: 'accord_ashline_inspection_delay',
+        },
+      },
+      relatedFactionId: 'faction_ashline_bureau',
+    });
+    const views = selectActiveLedgerEntryViews(withBlindSpot);
+    const consumed = consumeEntry(withBlindSpot, withBlindSpot.ledger.entries[0].id);
+
+    expect(views.map((entry) => entry.name)).toEqual([
+      'Institutional Favor',
+      'Compliance Blind Spot',
+    ]);
+    expect(views.map((entry) => entry.relatedFactionLabel)).toEqual([
+      'Helix Meridian',
+      'Ashline Bureau',
+    ]);
+    expect(selectLedgerSummary(consumed)).toEqual({
+      totalEntries: 2,
+      activeSecrets: 1,
+      activeDebts: 0,
+      activeFavors: 0,
+      consumedEntries: 1,
+      unresolvedDebtCount: 0,
+    });
+    expect(selectConsumedLedgerEntryViews(consumed)[0]).toEqual(
+      jasmine.objectContaining({
+        name: 'Institutional Favor',
+        relatedFactionLabel: 'Helix Meridian',
+        status: 'resolved',
+      }),
+    );
+  });
+
   function consumeEntry(state: GameState, entryId: string): GameState {
     return {
       ...state,

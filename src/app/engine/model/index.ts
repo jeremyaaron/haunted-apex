@@ -1,4 +1,14 @@
 export type {
+  AccordCost,
+  AccordDefinition,
+  AccordFrontEffect,
+  AccordId,
+  AccordLedgerEffect,
+  AccordRequirement,
+  ActiveAccord,
+  ActiveAccordId,
+} from './accords';
+export type {
   ActionAssignmentRule,
   ActionDefinition,
   ActionId,
@@ -26,12 +36,7 @@ export type {
   ContactStatus,
   UniversalContactOptionDefinition,
 } from './contacts';
-export type {
-  DistrictArchetype,
-  DistrictDefinition,
-  DistrictId,
-  DistrictState,
-} from './districts';
+export type { DistrictArchetype, DistrictDefinition, DistrictId, DistrictState } from './districts';
 export type {
   Difficulty,
   GameLogEntry,
@@ -42,6 +47,16 @@ export type {
   NewGameConfig,
   TurnPhase,
 } from './game-state';
+export type {
+  FactionArchetype,
+  FactionDefinition,
+  FactionId,
+  FactionInteraction,
+  FactionMetricDelta,
+  FactionRoleTag,
+  FactionState,
+  FactionStatus,
+} from './factions';
 export type {
   FrontArchetype,
   FrontDefinition,
@@ -75,8 +90,12 @@ export type {
   CityEventDefinition,
   ContactEventDefinition,
   EventChoiceDefinition,
+  EventChoiceFactionEffect,
+  EventChoiceFactionEffects,
   EventChoiceLedgerEffect,
   EventDefinition,
+  FactionEventDefinition,
+  FactionEventKind,
   EventId,
   EventTag,
   EventWeightRule,

@@ -632,8 +632,9 @@ describe('action previews', () => {
     const ledgerCard = cards.find((card) => card.actionId === 'work_the_ledger');
     const contactCard = cards.find((card) => card.actionId === 'manage_contact');
     const frontCard = cards.find((card) => card.actionId === 'invest_front');
+    const accordCard = cards.find((card) => card.actionId === 'broker_accord');
 
-    expect(cards.length).toBe(9);
+    expect(cards.length).toBe(10);
     expect(recruitCard?.assignment).toBe('none');
     expect(recruitCard?.state).toBe('unavailable');
     expect(recruitCard?.unavailableReason).toBe('target_required');
@@ -650,6 +651,10 @@ describe('action previews', () => {
     expect(frontCard?.state).toBe('unavailable');
     expect(frontCard?.unavailableReason).toBe('target_required');
     expect(frontCard?.availableOperatives).toEqual([]);
+    expect(accordCard?.assignment).toBe('none');
+    expect(accordCard?.state).toBe('unavailable');
+    expect(accordCard?.unavailableReason).toBe('target_required');
+    expect(accordCard?.availableOperatives).toEqual([]);
   });
 
   it('converts pressure deltas into stable display rows', () => {

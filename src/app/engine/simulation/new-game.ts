@@ -6,6 +6,7 @@ import {
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
 import { generateContacts } from '../contacts';
+import { generateFactions } from '../factions';
 import { generateFrontNetwork } from '../fronts';
 import type {
   DistrictId,
@@ -22,10 +23,11 @@ export function newGame(config: NewGameConfig = {}): GameState {
   const seed = normalizeSeed(config.seed ?? createDefaultSeed());
   const roster = generateRoster(seed);
   const contactNetwork = generateContacts(seed);
+  const factionNetwork = generateFactions(seed);
   const frontNetwork = generateFrontNetwork(seed);
 
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     id: createRunId(seed),
     seed,
     rngCursor: roster.rngCursor,
@@ -38,6 +40,9 @@ export function newGame(config: NewGameConfig = {}): GameState {
     hirePool: [...roster.hirePoolIds],
     contacts: contactNetwork.contacts,
     activeContactIds: contactNetwork.activeContactIds,
+    factions: factionNetwork.factions,
+    activeFactionIds: factionNetwork.activeFactionIds,
+    activeAccords: factionNetwork.activeAccords,
     fronts: frontNetwork.fronts,
     frontOpportunities: frontNetwork.frontOpportunities,
     seenSignatureEventIds: [],

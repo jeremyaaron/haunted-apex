@@ -1,5 +1,6 @@
 import type { ActionId, ActionTarget } from './actions';
 import type { ContactId, ContactMetricDelta } from './contacts';
+import type { FactionId, FactionMetricDelta } from './factions';
 import type { FrontId, FrontRoleTag } from './fronts';
 import type {
   LedgerEntryDefinitionId,
@@ -41,7 +42,13 @@ export type EventId =
   | 'front_staff_wants_protection'
   | 'front_rival_leans_on_your_front'
   | 'front_clean_money_dirty_hands'
-  | 'front_back_room_ledger';
+  | 'front_back_room_ledger'
+  | 'faction_demand'
+  | 'faction_scrutiny'
+  | 'accord_terms_shift'
+  | 'market_access'
+  | 'proxy_conflict'
+  | 'institutional_blind_spot';
 
 export type EventTag =
   | 'HEAT'
@@ -59,7 +66,9 @@ export type EventTag =
   | 'OPERATIVE'
   | 'LEDGER'
   | 'CONTACT'
-  | 'FRONT';
+  | 'FRONT'
+  | 'FACTION'
+  | 'ACCORD';
 
 export type EventWeightRule = {
   pressure?: PressureId;
@@ -96,6 +105,15 @@ export type EventChoiceLedgerEffect =
       optional?: boolean;
     };
 
+export type EventChoiceFactionEffect = {
+  factionId?: FactionId;
+  delta: FactionMetricDelta;
+};
+
+export type EventChoiceFactionEffects =
+  | FactionMetricDelta
+  | readonly EventChoiceFactionEffect[];
+
 export type EventChoiceDefinition = {
   id: string;
   label: string;
@@ -105,7 +123,8 @@ export type EventChoiceDefinition = {
   operativeEffects?: OperativeStateDelta;
   contactId?: ContactId;
   contactEffects?: ContactMetricDelta;
-  rivalPressure?: Partial<Record<RivalId | 'selected_front_rival', number>>;
+  factionEffects?: EventChoiceFactionEffects;
+  rivalPressure?: Partial<Record<RivalId | 'selected_front_rival' | 'selected_faction_rival', number>>;
   ledgerEffects?: readonly EventChoiceLedgerEffect[];
   frontEffects?: {
     exposure?: number;
@@ -132,6 +151,18 @@ export type FrontEventDefinition = {
   roleTags?: readonly FrontRoleTag[];
   requiresRelatedRival?: boolean;
   minRelatedRivalPressure?: number;
+};
+
+export type FactionEventKind =
+  | 'demand'
+  | 'scrutiny'
+  | 'accord_terms_shift'
+  | 'market_access'
+  | 'proxy_conflict'
+  | 'institutional_blind_spot';
+
+export type FactionEventDefinition = {
+  kind: FactionEventKind;
 };
 
 export type OperativeEventPredicate =
@@ -165,6 +196,7 @@ type BaseEventDefinition = {
   weightRules?: EventWeightRule[];
   contact?: ContactEventDefinition;
   front?: FrontEventDefinition;
+  faction?: FactionEventDefinition;
   choices: EventChoiceDefinition[];
 };
 
@@ -188,4 +220,5 @@ export type GameEventInstance = {
   selectedLedgerEntryId?: LedgerEntryId;
   selectedContactId?: ContactId;
   selectedFrontId?: FrontId;
+  selectedFactionId?: FactionId;
 };

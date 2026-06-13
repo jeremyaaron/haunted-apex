@@ -12,8 +12,9 @@ import {
   simulateBatch,
   simulateRun,
 } from './index';
-import { CONTACT_DEFINITIONS } from '../content';
+import { CONTACT_DEFINITIONS, FACTION_DEFINITIONS } from '../content';
 import { materializeContactState } from '../contacts';
+import { materializeFactionState } from '../factions';
 import { addLedgerEntry } from '../ledger';
 import { materializeOperativeState } from '../roster';
 import type {
@@ -23,6 +24,7 @@ import type {
   FrontOpportunity,
   FrontState,
   GameState,
+  FactionId,
 } from '../model';
 import { newGame, queueOrder } from '../simulation';
 
@@ -611,6 +613,90 @@ describe('simulation harness', () => {
     expect(choice?.preview.frontExposure?.projectedExposure).toBeLessThan(76);
   });
 
+  it('lets RandomBot select legal Broker Accord options', () => {
+    const state = withActiveFactions(withResources(newGame({ seed: 'HARNESS-RANDOM-ACCORD' }), 7000), [
+      'faction_ashline_bureau',
+      'faction_helix_meridian',
+      'faction_velvet_house',
+      'faction_chrome_maw',
+    ]);
+    state.pressures.intel = 40;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = RANDOM_BOT.chooseOrder(state, options, createTestContext('RANDOM', 'accord'));
+
+    expect(choice?.actionId).toBe('broker_accord');
+    expect(choice?.target?.type).toBe('faction');
+    expect(choice?.preview.brokerAccord?.ok).toBeTrue();
+  });
+
+  it('makes OperatorBot use a front safety Accord when exposure is severe', () => {
+    const state = withActiveFactions(
+      withHotFront(withResources(newGame({ seed: 'HARNESS-OPERATOR-ACCORD-FRONT' }), 7000), 'front_pale_circuit', 86),
+      [
+        'faction_ashline_bureau',
+        'faction_helix_meridian',
+        'faction_velvet_house',
+        'faction_chrome_maw',
+      ],
+    );
+    state.pressures.intel = 40;
+    state.pressures.heat = 52;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'accord'));
+
+    expect(choice?.target).toEqual({
+      type: 'faction',
+      factionId: 'faction_ashline_bureau',
+      accordId: 'accord_ashline_inspection_delay',
+    });
+    expect(choice?.preview.brokerAccord?.ok ? choice.preview.brokerAccord.frontEffectsOnStart[0].projectedExposure : undefined).toBeLessThan(86);
+  });
+
+  it('makes AggressiveBot prefer Dominion-oriented Broker Accords', () => {
+    const state = withActiveFactions(withResources(newGame({ seed: 'HARNESS-AGGRESSIVE-ACCORD' }), 7000), [
+      'faction_ashline_bureau',
+      'faction_helix_meridian',
+      'faction_velvet_house',
+      'faction_chrome_maw',
+    ]);
+    state.pressures.intel = 40;
+    state.pressures.dominion = 46;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'accord'));
+
+    expect(choice?.target).toEqual({
+      type: 'faction',
+      factionId: 'faction_chrome_maw',
+      accordId: 'accord_chrome_muscle_retainer',
+    });
+  });
+
+  it('makes GreedyBot prefer resource-oriented Broker Accords', () => {
+    const state = withActiveFactions(withResources(newGame({ seed: 'HARNESS-GREEDY-ACCORD' }), 1800), [
+      'faction_ashline_bureau',
+      'faction_helix_meridian',
+      'faction_velvet_house',
+      'faction_chrome_maw',
+    ]);
+    state.pressures.intel = 40;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = GREEDY_BOT.chooseOrder(state, options, createTestContext('GREEDY', 'accord'));
+
+    expect(choice?.target).toEqual({
+      type: 'faction',
+      factionId: 'faction_helix_meridian',
+      accordId: 'accord_helix_quiet_capital',
+    });
+  });
+
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {
     const report = simulateBatch({
       agents: STRATEGY_AGENTS,
@@ -647,6 +733,11 @@ describe('simulation harness', () => {
     expect(output).toContain('front_events');
     expect(output).toContain('front_opportunity_sets');
     expect(output).toContain('front_exposure_bands');
+    expect(output).toContain('faction_summary');
+    expect(output).toContain('accord_usage');
+    expect(output).toContain('faction_outcomes');
+    expect(output).toContain('faction_events');
+    expect(output).toContain('faction_sets');
     expect(output).toContain('roster_compositions');
     expect(output).toContain('operative_presence');
     expect(output).toContain('operative_recruitment');
@@ -700,6 +791,9 @@ describe('simulation harness', () => {
       expect(summary.frontOutcomeReports.length).toBeGreaterThan(0);
       expect(summary.frontOpportunitySetReports.length).toBeGreaterThan(0);
       expect(summary.frontExposureBandReports.length).toBeGreaterThan(0);
+      expect(summary.factionSummary.averageBrokerAccordUses).toBeGreaterThanOrEqual(0);
+      expect(summary.factionOutcomeReports.length).toBeGreaterThan(0);
+      expect(summary.factionSetReports.length).toBeGreaterThan(0);
     }
 
     expect(
@@ -734,6 +828,10 @@ function targetKey(target: ActionTarget): string {
 
   if (target.type === 'contact') {
     return `contact:${target.contactId}:${target.optionId}`;
+  }
+
+  if (target.type === 'faction') {
+    return `faction:${target.factionId}:${target.accordId}`;
   }
 
   return `${target.type}:${target.id}`;
@@ -775,6 +873,21 @@ function withActiveContacts(state: GameState, activeContactIds: ContactId[]): Ga
         }),
       ),
     },
+  };
+}
+
+function withActiveFactions(state: GameState, activeFactionIds: FactionId[]): GameState {
+  return {
+    ...state,
+    activeFactionIds,
+    factions: Object.fromEntries(
+      activeFactionIds.flatMap((factionId) => {
+        const definition = FACTION_DEFINITIONS.find((candidate) => candidate.id === factionId);
+
+        return definition ? [[factionId, materializeFactionState(definition)]] : [];
+      }),
+    ) as GameState['factions'],
+    activeAccords: {},
   };
 }
 

@@ -1,4 +1,5 @@
 import type { DistrictId } from './districts';
+import type { FactionId } from './factions';
 import type { LedgerEntryDefinitionId } from './ledger';
 import type { PressureDelta, Pressures } from './pressures';
 import type { RivalId } from './rivals';
@@ -138,6 +139,7 @@ export type ContactDefinition = {
   associatedDistrictId?: DistrictId;
   associatedVenueId?: VenueId;
   associatedRivalId?: RivalId;
+  associatedFactionId?: FactionId;
   baseTrust: number;
   baseLeverage: number;
   baseVolatility: number;

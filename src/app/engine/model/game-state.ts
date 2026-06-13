@@ -1,8 +1,10 @@
 import type { QueuedOrder } from './actions';
 import type { RecentActivityEntry } from './activity';
+import type { ActiveAccord, ActiveAccordId } from './accords';
 import type { ContactId, ContactState } from './contacts';
 import type { DistrictId, DistrictState } from './districts';
 import type { EventId, GameEventInstance } from './events';
+import type { FactionId, FactionState } from './factions';
 import type { FrontId, FrontOpportunity, FrontState } from './fronts';
 import type { LedgerState } from './ledger';
 import type { OperativeId, OperativeState } from './operatives';
@@ -41,6 +43,7 @@ export type GameLogEntryType =
   | 'ledger'
   | 'operative_condition'
   | 'complication'
+  | 'accord'
   | 'front_yield'
   | 'drift'
   | 'rival_effect'
@@ -59,7 +62,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
-  schemaVersion: 6;
+  schemaVersion: 7;
   id: string;
   seed: string;
   rngCursor: number;
@@ -72,6 +75,9 @@ export type GameState = {
   hirePool: OperativeId[];
   contacts: Record<ContactId, ContactState>;
   activeContactIds: ContactId[];
+  factions: Partial<Record<FactionId, FactionState>>;
+  activeFactionIds: FactionId[];
+  activeAccords: Record<ActiveAccordId, ActiveAccord>;
   fronts: Partial<Record<FrontId, FrontState>>;
   frontOpportunities: FrontOpportunity[];
   seenSignatureEventIds: EventId[];

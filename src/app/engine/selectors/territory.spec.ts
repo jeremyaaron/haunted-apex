@@ -56,6 +56,28 @@ describe('territory selectors', () => {
         (option) => `${option.targetType}:${targetKey(option.target).split(':').at(-1)}`,
       ),
     ).toEqual(state.hirePool.map((operativeId) => `recruit:${operativeId}`));
+    expect(
+      selectActionTargetOptions(state, 'broker_accord').map((option) => option.targetType),
+    ).toEqual(state.activeFactionIds.flatMap(() => ['faction', 'faction']));
+  });
+
+  it('returns Broker Accord targets for active factions only', () => {
+    const state = newGame({ seed: 'BROKER-TARGETS' });
+    const options = selectActionTargetOptions(state, 'broker_accord');
+
+    expect(options.length).toBe(state.activeFactionIds.length * 2);
+    expect(
+      options.every(
+        (option) => option.target.type === 'faction' &&
+          state.activeFactionIds.includes(option.target.factionId),
+      ),
+    ).toBeTrue();
+    expect(options[0]).toEqual(
+      jasmine.objectContaining({
+        targetType: 'faction',
+        affordable: true,
+      }),
+    );
   });
 
   it('labels owned active Fronts as Lay Low cooling targets', () => {
@@ -295,6 +317,10 @@ function targetKey(target: ActionTarget): string {
 
   if (target.type === 'contact') {
     return `contact:${target.contactId}:${target.optionId}`;
+  }
+
+  if (target.type === 'faction') {
+    return `faction:${target.factionId}:${target.accordId}`;
   }
 
   return `${target.type}:${target.id}`;

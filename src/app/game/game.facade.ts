@@ -9,6 +9,7 @@ import {
   getEventChoiceAvailability,
   getEventChoicePreview,
   getFrontDefinition,
+  getFactionDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
@@ -21,6 +22,7 @@ import {
   selectActiveContacts,
   selectAssignmentOptions,
   selectActionTargetOptions,
+  selectFactionPanelView,
   selectFrontPanelView,
   selectLedgerPanelView,
   selectDistrictTerritoryViews,
@@ -36,6 +38,7 @@ import {
   type ContactView,
   type EventChoiceAvailability,
   type EventChoicePreview,
+  type FactionPanelView,
   type GameState,
   type LedgerPanelView,
   type NewGameConfig,
@@ -47,13 +50,10 @@ import {
   type ResolveEventChoiceResult,
   type RunSummaryReport,
 } from '../engine';
-import {
-  GameStorageService,
-  type LoadCurrentRunResult,
-} from './game-storage.service';
+import { GameStorageService, type LoadCurrentRunResult } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected an older save. v0.6.0 - Fronts changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.7.0 - The Accords changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',
@@ -62,23 +62,20 @@ export class GameFacade {
   private readonly storage = inject(GameStorageService);
   private readonly initialLoadResult = this.storage.loadCurrentRun();
   private readonly stateSignal = signal<GameState>(
-    this.initialLoadResult.status === 'loaded'
-      ? this.initialLoadResult.state
-      : newGame(),
+    this.initialLoadResult.status === 'loaded' ? this.initialLoadResult.state : newGame(),
   );
   private readonly selectedOperativeId = signal<OperativeId | undefined>(undefined);
 
   readonly state = this.stateSignal.asReadonly();
   readonly compatibilityNotice = signal<string | undefined>(
-    requiresCompatibilityNotice(this.initialLoadResult)
-      ? SAVE_COMPATIBILITY_NOTICE
-      : undefined,
+    requiresCompatibilityNotice(this.initialLoadResult) ? SAVE_COMPATIBILITY_NOTICE : undefined,
   );
   readonly actionCards = computed(() => selectActionCards(this.stateSignal()));
   readonly queuedOrders = computed(() => selectQueuedOrderViews(this.stateSignal()));
   readonly ledgerPanel = computed<LedgerPanelView>(() => selectLedgerPanelView(this.stateSignal()));
   readonly fronts = computed(() => selectFrontPanelView(this.stateSignal()));
   readonly contacts = computed<ContactView[]>(() => selectActiveContacts(this.stateSignal()));
+  readonly factions = computed<FactionPanelView>(() => selectFactionPanelView(this.stateSignal()));
   readonly runSummary = computed<RunSummaryReport | undefined>(() => {
     const state = this.stateSignal();
 
@@ -90,9 +87,7 @@ export class GameFacade {
   readonly hirePool = computed(() => selectHirePoolViews(this.stateSignal()));
   readonly selectedOperativeDetail = computed(() => {
     const operativeId = this.selectedOperativeId();
-    return operativeId
-      ? selectOperativeDetail(this.stateSignal(), operativeId)
-      : undefined;
+    return operativeId ? selectOperativeDetail(this.stateSignal(), operativeId) : undefined;
   });
   readonly operatives = computed(() =>
     this.stateSignal().operatives.flatMap((operative) => {
@@ -300,11 +295,15 @@ function renderPendingEventText(state: GameState, text: string): string {
   const selectedFrontDefinition = selectedFront
     ? getFrontDefinition(selectedFront.definitionId)
     : undefined;
+  const selectedFactionDefinition = state.pendingEvent?.selectedFactionId
+    ? getFactionDefinition(state.pendingEvent.selectedFactionId)
+    : undefined;
 
   return text
     .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
     .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact')
-    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front');
+    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front')
+    .replaceAll('{factionName}', selectedFactionDefinition?.name ?? 'Faction');
 }
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {

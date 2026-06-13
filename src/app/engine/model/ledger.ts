@@ -2,6 +2,7 @@ import type { ActionId, ActionTarget } from './actions';
 import type { ContactId, ContactMetricDelta } from './contacts';
 import type { DistrictId } from './districts';
 import type { EventId } from './events';
+import type { FactionId, FactionMetricDelta } from './factions';
 import type { OperativeId } from './operatives';
 import type { PressureDelta, Pressures } from './pressures';
 import type { RivalId } from './rivals';
@@ -22,6 +23,8 @@ export type LedgerEntryDefinitionId =
   | 'debt_contaminated_money'
   | 'debt_saints_payment_trail'
   | 'debt_dirty_books'
+  | 'debt_institutional_favor'
+  | 'secret_compliance_blind_spot'
   | 'favor_checkpoint_captain'
   | 'favor_hidden_route';
 
@@ -48,6 +51,7 @@ export type LedgerUseOptionDefinition = {
   cost?: LedgerPressureCost;
   effects: PressureDelta;
   relatedContactEffects?: ContactMetricDelta;
+  relatedFactionEffects?: FactionMetricDelta;
   consumesEntry: boolean;
   riskModifier?: number;
   tags?: readonly string[];
@@ -114,6 +118,7 @@ export type LedgerEntry = {
   relatedOperativeId?: OperativeId;
   relatedRivalId?: RivalId;
   relatedContactId?: ContactId;
+  relatedFactionId?: FactionId;
   flags?: Record<string, boolean | number | string>;
 };
 

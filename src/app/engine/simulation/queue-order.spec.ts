@@ -114,6 +114,17 @@ describe('queueOrder', () => {
     });
   });
 
+  it('requires a Faction target for Broker Accord', () => {
+    expect(
+      getOrderAvailability(newGame({ seed: 'VIOLET-ASH-1047' }), {
+        actionId: 'broker_accord',
+      }),
+    ).toEqual({
+      available: false,
+      reason: 'target_required',
+    });
+  });
+
   it('allows optional target actions to queue without a target', () => {
     const result = queueOrder(newGame({ seed: 'VIOLET-ASH-1047' }), {
       actionId: 'gather_intel',
@@ -725,6 +736,54 @@ describe('queueOrder', () => {
       },
     });
     expect(result.state.operatives).toEqual(state.operatives);
+  });
+
+  it('queues Broker Accord without an operative', () => {
+    const state = newGame({ seed: 'BROKER-QUEUE' });
+    const result = queueOrder(state, {
+      actionId: 'broker_accord',
+      target: {
+        type: 'faction',
+        factionId: 'faction_ashline_bureau',
+        accordId: 'accord_ashline_clean_corridor',
+      },
+    });
+
+    if (!result.ok) {
+      fail(`Expected Broker Accord order, got ${result.error}`);
+      return;
+    }
+
+    expect(result.order).toEqual({
+      id: 'order_1_1',
+      actionId: 'broker_accord',
+      target: {
+        type: 'faction',
+        factionId: 'faction_ashline_bureau',
+        accordId: 'accord_ashline_clean_corridor',
+      },
+    });
+    expect(result.state.operatives).toEqual(state.operatives);
+  });
+
+  it('rejects operative assignment on Broker Accord', () => {
+    const state = newGame({ seed: 'BROKER-QUEUE-OPERATIVE' });
+
+    expect(
+      queueOrder(state, {
+        actionId: 'broker_accord',
+        assignedOperativeId: 'op_mara_voss',
+        target: {
+          type: 'faction',
+          factionId: 'faction_ashline_bureau',
+          accordId: 'accord_ashline_clean_corridor',
+        },
+      }),
+    ).toEqual({
+      ok: false,
+      state,
+      error: 'operative_not_allowed',
+    });
   });
 
   it('rejects Front-targeted Lay Low for unowned, inactive, or assigned-operative requests', () => {

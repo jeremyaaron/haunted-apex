@@ -1,4 +1,9 @@
-import { getContactDefinition, getEventDefinition, getLedgerEntryDefinition } from '../content';
+import {
+  getContactDefinition,
+  getEventDefinition,
+  getFactionDefinition,
+  getLedgerEntryDefinition,
+} from '../content';
 import { applyContactMetricDelta } from '../contacts';
 import {
   applyEventLedgerEffects,
@@ -27,6 +32,14 @@ import {
   getSelectedFrontName,
   resolveSelectedFrontRivalId,
 } from './front-events';
+import {
+  getEventFactionEffectRows,
+  getSelectedFactionName,
+  previewEventFactionEffects,
+  resolveSelectedFactionRivalId,
+  type FactionEffectPreviewRow,
+} from './faction-events';
+import { applyFactionMetricDelta } from './faction-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { applyWinLoss } from './win-loss';
 
@@ -51,6 +64,7 @@ export type EventChoicePreview = {
   ledgerEffects: EventLedgerEffectPreviewRow[];
   contactEffects: ContactEffectPreviewRow[];
   frontEffects: FrontEffectPreviewRow[];
+  factionEffects: FactionEffectPreviewRow[];
 };
 
 export type FrontEffectPreviewRow = {
@@ -119,6 +133,7 @@ export function resolveEventChoice(
   next = applyOperativeEffects(next, definition, choice);
   next = applyContactEffects(next, definition, choice);
   next = applyFrontEffects(next, choice);
+  next = applyFactionEffects(next, choice);
   next = applyRivalPressureEffects(next, choice.rivalPressure);
   next = {
     ...next,
@@ -139,6 +154,7 @@ export function resolveEventChoice(
       ledgerApplication.appliedRows,
       previewEventContactEffects(state, definition, choice),
       previewEventFrontEffects(state, choice),
+      previewEventFactionEffects(state, choice),
     ),
     pressureDelta,
     tags: definition.tags,
@@ -208,16 +224,14 @@ function applyRivalPressureEffects(
   const rivals = { ...state.rivals };
 
   for (const [rawRivalId, amount] of Object.entries(effects) as [
-    RivalId | 'selected_front_rival',
+    RivalId | 'selected_front_rival' | 'selected_faction_rival',
     number | undefined,
   ][]) {
     if (amount === undefined) {
       continue;
     }
 
-    const rivalId = rawRivalId === 'selected_front_rival'
-      ? resolveSelectedFrontRivalId(state)
-      : rawRivalId;
+    const rivalId = resolveEventRivalId(state, rawRivalId);
 
     if (!rivalId) {
       continue;
@@ -233,6 +247,21 @@ function applyRivalPressureEffects(
     ...state,
     rivals,
   };
+}
+
+function resolveEventRivalId(
+  state: GameState,
+  rawRivalId: RivalId | 'selected_front_rival' | 'selected_faction_rival',
+): RivalId | undefined {
+  if (rawRivalId === 'selected_front_rival') {
+    return resolveSelectedFrontRivalId(state);
+  }
+
+  if (rawRivalId === 'selected_faction_rival') {
+    return resolveSelectedFactionRivalId(state);
+  }
+
+  return rawRivalId;
 }
 
 function applyFrontEffects(
@@ -384,7 +413,19 @@ export function getEventChoicePreview(
     ledgerEffects: previewEventLedgerEffects(state, definition, choice),
     contactEffects: previewEventContactEffects(state, definition, choice),
     frontEffects: previewEventFrontEffects(state, choice),
+    factionEffects: previewEventFactionEffects(state, choice),
   };
+}
+
+function applyFactionEffects(state: GameState, choice: EventChoiceDefinition): GameState {
+  return getEventFactionEffectRows(state, choice).reduce(
+    (next, effect) =>
+      applyFactionMetricDelta(next, effect.factionId, effect.delta, {
+        sourceType: 'event',
+        sourceId: state.pendingEvent?.definitionId ?? 'event_choice',
+      }),
+    state,
+  );
 }
 
 function applyContactEffects(
@@ -475,6 +516,7 @@ function createEventChoiceLogBody(
   ledgerRows: readonly EventLedgerEffectPreviewRow[],
   contactRows: readonly ContactEffectPreviewRow[],
   frontRows: readonly FrontEffectPreviewRow[],
+  factionRows: readonly FactionEffectPreviewRow[],
 ): string {
   const ledger = ledgerRows.length > 0
     ? ` Ledger: ${ledgerRows.map(formatLedgerEffectRow).join('; ')}.`
@@ -485,8 +527,11 @@ function createEventChoiceLogBody(
   const front = frontRows.length > 0
     ? ` Front: ${formatFrontEffectRows(frontRows)}.`
     : '';
+  const faction = factionRows.length > 0
+    ? ` Faction: ${formatFactionEffectRows(factionRows)}.`
+    : '';
 
-  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}${contact}${front}`;
+  return `Response to ${renderEventTitle(state, definition.title)}.${ledger}${contact}${front}${faction}`;
 }
 
 function formatContactEffectRows(rows: readonly ContactEffectPreviewRow[]): string {
@@ -511,6 +556,23 @@ function formatFrontEffectRow(row: FrontEffectPreviewRow): string {
   }
 
   return `${row.id} ${String(row.projected)}`;
+}
+
+function formatFactionEffectRows(rows: readonly FactionEffectPreviewRow[]): string {
+  const byFaction = new Map<string, FactionEffectPreviewRow[]>();
+
+  for (const row of rows) {
+    byFaction.set(row.factionName, [...(byFaction.get(row.factionName) ?? []), row]);
+  }
+
+  return [...byFaction.entries()]
+    .map(
+      ([factionName, factionRows]) =>
+        `${factionName}: ${factionRows
+          .map((row) => `${row.id} ${row.value > 0 ? `+${row.value}` : row.value}`)
+          .join(', ')}`,
+    )
+    .join('; ');
 }
 
 function formatLedgerEffectRow(row: EventLedgerEffectPreviewRow): string {
@@ -542,11 +604,15 @@ function renderEventTitle(state: GameState, title: string): string {
   const selectedContact = state.pendingEvent?.selectedContactId
     ? getContactDefinition(state.pendingEvent.selectedContactId)
     : undefined;
+  const selectedFaction = state.pendingEvent?.selectedFactionId
+    ? getFactionDefinition(state.pendingEvent.selectedFactionId)
+    : undefined;
 
   return title
     .replaceAll('{ledgerEntryName}', selectedDefinition?.name ?? 'Ledger Entry')
     .replaceAll('{contactName}', selectedContact?.name ?? 'Contact')
-    .replaceAll('{frontName}', getSelectedFrontName(state));
+    .replaceAll('{frontName}', getSelectedFrontName(state))
+    .replaceAll('{factionName}', selectedFaction?.name ?? getSelectedFactionName(state));
 }
 
 function clearTransientFlags(

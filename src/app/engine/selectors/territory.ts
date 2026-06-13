@@ -1,7 +1,9 @@
 import {
   getActionDefinition,
+  getAccordDefinition,
   getContactDefinition,
   getDistrictDefinition,
+  getFactionDefinition,
   getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
@@ -29,6 +31,7 @@ import type {
   VenueArchetype,
   VenueId,
 } from '../model';
+import { previewBrokerAccord, type BrokerAccordUnavailableReason } from '../accords';
 import { previewFrontInvestment } from '../fronts';
 import { getRivalPressureTier } from './rivals';
 import { selectActiveLedgerEntryViews } from '../ledger';
@@ -83,11 +86,22 @@ export type FrontTargetOption = {
   unavailableReason?: string;
 };
 
+export type FactionAccordTargetOption = {
+  target: Extract<ActionTarget, { type: 'faction' }>;
+  label: string;
+  targetType: 'faction';
+  factionName: string;
+  accordLabel: string;
+  affordable: boolean;
+  unavailableReason?: BrokerAccordUnavailableReason;
+};
+
 export type ActionTargetOption =
   | TerritoryTargetOption
   | RecruitTargetOption
   | LedgerTargetOption
   | FrontTargetOption
+  | FactionAccordTargetOption
   | ContactTargetOption;
 
 export type VenueTerritoryView = {
@@ -348,6 +362,41 @@ export function selectActionTargetOptions(
     }
   }
 
+  if (allowedTypes.has('faction')) {
+    for (const factionId of state.activeFactionIds) {
+      const factionDefinition = getFactionDefinition(factionId);
+
+      if (!factionDefinition) {
+        continue;
+      }
+
+      for (const accordId of factionDefinition.accordIds) {
+        const accord = getAccordDefinition(accordId);
+
+        if (!accord) {
+          continue;
+        }
+
+        const target = {
+          type: 'faction' as const,
+          factionId,
+          accordId,
+        };
+        const preview = previewBrokerAccord(state, target);
+
+        options.push({
+          target,
+          label: `${factionDefinition.name} - ${accord.label}`,
+          targetType: 'faction',
+          factionName: factionDefinition.name,
+          accordLabel: accord.label,
+          affordable: preview.ok,
+          ...(!preview.ok ? { unavailableReason: preview.unavailableReason } : {}),
+        });
+      }
+    }
+  }
+
   return options;
 }
 
@@ -451,6 +500,7 @@ export function resolveTargetDistrictId(target?: ActionTarget): DistrictId | und
     case 'contact':
     case 'front_opportunity':
     case 'front':
+    case 'faction':
       return undefined;
   }
 }
@@ -472,6 +522,11 @@ export function getTargetTags(target?: ActionTarget): string[] {
       return [...(getRivalDefinition(target.id)?.traits ?? [])];
     case 'contact':
       return [...(getContactDefinition(target.contactId)?.roleTags ?? [])];
+    case 'faction': {
+      const faction = getFactionDefinition(target.factionId);
+      const accord = getAccordDefinition(target.accordId);
+      return [...new Set([...(faction?.roleTags ?? []), ...(accord?.tags ?? [])])];
+    }
     case 'recruit':
     case 'ledger':
     case 'front_opportunity':
@@ -503,6 +558,10 @@ export function getTargetControllerId(target?: ActionTarget): RivalId | undefine
       return getRivalDefinition(target.id)?.id;
     case 'contact':
       return getContactDefinition(target.contactId)?.associatedRivalId;
+    case 'faction': {
+      const faction = getFactionDefinition(target.factionId);
+      return faction?.associatedRivalIds?.[0];
+    }
     case 'recruit':
     case 'ledger':
     case 'front_opportunity':
@@ -564,6 +623,12 @@ export function getTargetLabel(target?: ActionTarget, state?: GameState): string
 
       return definition?.name ?? getFrontDefinition(target.id)?.name ?? target.id;
     }
+    case 'faction': {
+      const faction = getFactionDefinition(target.factionId);
+      const accord = getAccordDefinition(target.accordId);
+
+      return faction && accord ? `${faction.name} - ${accord.label}` : target.factionId;
+    }
   }
 }
 
@@ -579,7 +644,8 @@ export function calculateTargetControlGain(
     target.type === 'ledger' ||
     target.type === 'contact' ||
     target.type === 'front_opportunity' ||
-    target.type === 'front'
+    target.type === 'front' ||
+    target.type === 'faction'
   ) {
     return 0;
   }
@@ -597,6 +663,7 @@ export function calculateTargetControlGain(
     case 'work_the_ledger':
     case 'manage_contact':
     case 'invest_front':
+    case 'broker_accord':
       return 0;
   }
 }

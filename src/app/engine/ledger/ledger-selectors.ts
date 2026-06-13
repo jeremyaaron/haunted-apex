@@ -3,6 +3,7 @@ import {
   getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
+  getFactionDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
@@ -11,6 +12,7 @@ import {
 import type {
   ActionTarget,
   ContactMetricDelta,
+  FactionMetricDelta,
   GameState,
   LedgerEntry,
   LedgerEntryDefinition,
@@ -36,6 +38,11 @@ export type LedgerContactDeltaRow = {
   value: number;
 };
 
+export type LedgerFactionDeltaRow = {
+  id: keyof FactionMetricDelta;
+  value: number;
+};
+
 export type LedgerUseOptionView = {
   id: LedgerUseOptionId;
   label: string;
@@ -43,6 +50,7 @@ export type LedgerUseOptionView = {
   costRows: LedgerDeltaRow[];
   effectRows: LedgerDeltaRow[];
   relatedContactEffectRows: LedgerContactDeltaRow[];
+  relatedFactionEffectRows: LedgerFactionDeltaRow[];
   consumesEntry: boolean;
   affordable: boolean;
   unavailableReason?: 'insufficient_resources' | 'insufficient_intel' | 'entry_consumed';
@@ -60,6 +68,7 @@ export type LedgerEntryView = {
   sourceLabel: string;
   relatedContextLabel?: string;
   relatedContactLabel?: string;
+  relatedFactionLabel?: string;
   tags: string[];
   useOptions: LedgerUseOptionView[];
 };
@@ -175,6 +184,7 @@ function toLedgerEntryView(state: GameState, entry: LedgerEntry): LedgerEntryVie
       sourceLabel: getSourceLabel(entry),
       relatedContextLabel: getRelatedContextLabel(entry),
       relatedContactLabel: getRelatedContactLabel(entry),
+      relatedFactionLabel: getRelatedFactionLabel(entry),
       tags: [...definition.tags],
       useOptions: definition.useOptions.map((option) =>
         toLedgerUseOptionView(state, entry, option),
@@ -198,6 +208,9 @@ function toLedgerUseOptionView(
     effectRows: toDeltaRows(option.effects),
     relatedContactEffectRows: entry.relatedContactId
       ? toContactDeltaRows(option.relatedContactEffects)
+      : [],
+    relatedFactionEffectRows: entry.relatedFactionId
+      ? toFactionDeltaRows(option.relatedFactionEffects)
       : [],
     consumesEntry: option.consumesEntry,
     affordable: unavailableReason === undefined,
@@ -269,6 +282,12 @@ function getRelatedContactLabel(entry: LedgerEntry): string | undefined {
     : undefined;
 }
 
+function getRelatedFactionLabel(entry: LedgerEntry): string | undefined {
+  return entry.relatedFactionId
+    ? getFactionDefinition(entry.relatedFactionId)?.name
+    : undefined;
+}
+
 function getTargetLabel(target: ActionTarget): string | undefined {
   switch (target.type) {
     case 'district':
@@ -288,6 +307,8 @@ function getTargetLabel(target: ActionTarget): string | undefined {
       return target.id;
     case 'ledger':
       return target.entryId;
+    case 'faction':
+      return `${target.factionId} - ${target.accordId}`;
   }
 }
 
@@ -323,6 +344,25 @@ function toContactDeltaRows(delta: ContactMetricDelta | undefined): LedgerContac
   }
 
   return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
+    const value = delta[id];
+
+    return typeof value === 'number' && value !== 0
+      ? [
+          {
+            id,
+            value,
+          },
+        ]
+      : [];
+  });
+}
+
+function toFactionDeltaRows(delta: FactionMetricDelta | undefined): LedgerFactionDeltaRow[] {
+  if (!delta) {
+    return [];
+  }
+
+  return (['standing', 'suspicion', 'obligation'] as const).flatMap((id) => {
     const value = delta[id];
 
     return typeof value === 'number' && value !== 0
