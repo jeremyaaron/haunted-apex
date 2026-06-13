@@ -9,6 +9,7 @@ import type {
   ActionTarget,
   EventChoiceDefinition,
   EventChoiceLedgerEffect,
+  FactionRoleTag,
   FrontRoleTag,
   GameState,
   LedgerEntryDefinitionId,
@@ -73,7 +74,8 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
       context,
       aggressiveWeights(state),
       {},
-      (option) => scoreAggressiveTarget(state, option),
+      (option) =>
+        scoreAggressiveTarget(state, option) + scoreAggressiveAccordOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -104,7 +106,8 @@ export const CAUTIOUS_BOT: StrategyAgent = {
         scoreCautiousRoster(state, option) +
         scoreCautiousLedgerOrder(state, option) +
         scoreCautiousContactOrder(state, option) +
-        scoreCautiousFrontOrder(state, option),
+        scoreCautiousFrontOrder(state, option) +
+        scoreCautiousAccordOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -132,7 +135,8 @@ export const GREEDY_BOT: StrategyAgent = {
         scoreGreedyRoster(state, option) +
         scoreGreedyLedgerOrder(state, option) +
         scoreGreedyContactOrder(state, option) +
-        scoreGreedyFrontOrder(state, option),
+        scoreGreedyFrontOrder(state, option) +
+        scoreGreedyAccordOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -162,7 +166,8 @@ export const OPERATOR_BOT: StrategyAgent = {
         scoreOperatorRoster(state, option) +
         scoreOperatorLedgerOrder(state, option) +
         scoreOperatorContactOrder(state, option) +
-        scoreOperatorFrontOrder(state, option),
+        scoreOperatorFrontOrder(state, option) +
+        scoreOperatorAccordOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
@@ -1117,6 +1122,237 @@ function scoreOperatorFrontOrder(state: GameState, option: LegalOrderOption): nu
   });
 }
 
+function scoreAggressiveAccordOrder(state: GameState, option: LegalOrderOption): number {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return 0;
+  }
+
+  const delta = getAccordNetDelta(state, option);
+  const next = applyDeltaForScoring(state.pressures, delta);
+  const dominionBias = (delta.dominion ?? 0) * 14;
+  const roleBias = scoreFactionRoles(accord.definition.tags, {
+    dominion: 60,
+    industrial: 26,
+    nightlife: 18,
+    resources: 12,
+    rival_pressure: 8,
+    heat_control: state.pressures.heat >= 86 ? 20 : -12,
+    stability: -6,
+    ruin: -4,
+  });
+  const factionBias =
+    accord.faction.id === 'faction_chrome_maw' || accord.faction.id === 'faction_velvet_house'
+      ? 32
+      : 0;
+  const heatBrake = next.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+    ? -10_000
+    : state.pressures.heat >= 88 && (delta.heat ?? 0) > 0
+      ? -140
+      : 0;
+  const scheduleBias = isBehindDominionSchedule(state) && (delta.dominion ?? 0) > 0 ? 72 : 0;
+
+  return dominionBias + roleBias + factionBias + scheduleBias + heatBrake;
+}
+
+function scoreCautiousAccordOrder(state: GameState, option: LegalOrderOption): number {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return 0;
+  }
+
+  const delta = getAccordNetDelta(state, option);
+  const next = applyDeltaForScoring(state.pressures, delta);
+  const safetyBias =
+    scoreFactionRoles(accord.definition.tags, {
+      heat_control: 62,
+      stability: 48,
+      security: 34,
+      resources: state.pressures.resources <= 1700 ? 36 : 8,
+      fronts: 18,
+      dominion: state.week >= 7 ? 12 : -8,
+      rival_pressure: -45,
+      ruin: -32,
+    }) +
+    (accord.faction.id === 'faction_ashline_bureau' ? 32 : 0) +
+    (accord.faction.id === 'faction_helix_meridian' ? 20 : 0);
+  const reliefBias =
+    (state.pressures.heat >= 64 && (delta.heat ?? 0) < 0
+      ? Math.abs(delta.heat ?? 0) * 12
+      : 0) +
+    (state.pressures.ruin >= 18 && (delta.ruin ?? 0) < 0
+      ? Math.abs(delta.ruin ?? 0) * 10
+      : 0);
+  const factionPenalty =
+    Math.max(0, accord.factionEffectsOnStart.suspicion ?? 0) * -3.2 +
+    Math.max(0, accord.factionEffectsOnStart.obligation ?? 0) * -3.8;
+  const ledgerPenalty = accord.ledgerEffectsOnStart.some((effect) => effect.kind === 'debt')
+    ? -78
+    : 0;
+  const rivalPenalty =
+    accord.rivalPressureEffectsOnStart.reduce((sum, rival) => sum + rival.pressureGain, 0) * -5;
+  const reservePenalty = next.resources < 1600 ? (1600 - next.resources) * -0.05 : 0;
+  const losingPenalty = isLosingProjection(next) ? -10_000 : 0;
+
+  return safetyBias + reliefBias + factionPenalty + ledgerPenalty + rivalPenalty + reservePenalty + losingPenalty;
+}
+
+function scoreGreedyAccordOrder(state: GameState, option: LegalOrderOption): number {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return 0;
+  }
+
+  const delta = getAccordNetDelta(state, option);
+  const next = applyDeltaForScoring(state.pressures, delta);
+  const cashBias = (delta.resources ?? 0) * 0.08;
+  const intelBias = (delta.intel ?? 0) * 5;
+  const factionBias =
+    accord.faction.id === 'faction_helix_meridian' || accord.faction.id === 'faction_chrome_maw'
+      ? 52
+      : 0;
+  const roleBias = scoreFactionRoles(accord.definition.tags, {
+    resources: 68,
+    ledger: 22,
+    fronts: 18,
+    industrial: 14,
+    dominion: 12,
+    intel: 8,
+  });
+  const survivalBias =
+    state.pressures.resources < 1800 && (delta.resources ?? 0) > 0
+      ? Math.min(120, (1800 - state.pressures.resources) * 0.08)
+      : 0;
+  const heatLossPenalty = next.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+    ? -10_000
+    : state.pressures.heat >= 86 && (delta.heat ?? 0) > 0
+      ? -100
+      : 0;
+  const debtTolerance = accord.ledgerEffectsOnStart.some((effect) => effect.kind === 'debt')
+    ? 22
+    : 0;
+
+  return cashBias + intelBias + factionBias + roleBias + survivalBias + debtTolerance + heatLossPenalty;
+}
+
+function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): number {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return 0;
+  }
+
+  const delta = getAccordNetDelta(state, option);
+  const next = applyDeltaForScoring(state.pressures, delta);
+  const pressureScore = scoreOperatorPressureMove(state.pressures, delta, option.preview.riskChance);
+  const heatRelief =
+    state.pressures.heat >= 74 && (delta.heat ?? 0) < 0
+      ? 180 + Math.abs(delta.heat ?? 0) * 13
+      : 0;
+  const frontRelief = accord.frontEffectsOnStart.reduce((score, effect) => {
+    const urgentExposure = Math.max(0, effect.currentExposure - 58);
+    return score + urgentExposure * 4 + Math.abs(effect.exposureDelta) * 8;
+  }, 0);
+  const cashRelief =
+    state.pressures.resources <= 1700 && (delta.resources ?? 0) > 0
+      ? 110 + (delta.resources ?? 0) * 0.05
+      : 0;
+  const tempoBias =
+    isBehindDominionSchedule(state) && (delta.dominion ?? 0) > 0
+      ? 74 + (delta.dominion ?? 0) * 8
+      : 0;
+  const usefulRoleBias = scoreFactionRoles(accord.definition.tags, {
+    heat_control: state.pressures.heat >= 62 ? 45 : 14,
+    resources: state.pressures.resources <= 2400 ? 34 : 10,
+    dominion: state.week >= 5 ? 28 : 10,
+    fronts: 18,
+    stability: 18,
+    intel: state.pressures.intel <= 22 ? 24 : 6,
+    ruin: state.pressures.ruin >= 18 ? 18 : -4,
+  });
+  const factionPenalty =
+    Math.max(0, accord.factionEffectsOnStart.suspicion ?? 0) * -1.1 +
+    Math.max(0, accord.factionEffectsOnStart.obligation ?? 0) * -0.9;
+  const losingPenalty = isLosingProjection(next) ? -10_000 : 0;
+
+  return (
+    pressureScore +
+    heatRelief +
+    frontRelief +
+    cashRelief +
+    tempoBias +
+    usefulRoleBias +
+    factionPenalty +
+    losingPenalty
+  );
+}
+
+function getResolvedAccordPreview(option: LegalOrderOption): Extract<
+  NonNullable<ActionPreview['brokerAccord']>,
+  { ok: true }
+> | undefined {
+  const accord = option.preview.brokerAccord;
+  return accord?.ok ? accord : undefined;
+}
+
+function getAccordNetDelta(state: GameState, option: LegalOrderOption): PressureDelta {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return {};
+  }
+
+  const weeklyTicks = Math.min(
+    accord.durationWeeks ?? 0,
+    Math.max(0, state.maxWeeks - state.week),
+  );
+
+  return {
+    ...mergeDeltaForScoring(accord.immediateEffects, scaleDeltaForScoring(accord.weeklyEffects, weeklyTicks)),
+    resources:
+      (accord.immediateEffects.resources ?? 0) +
+      (accord.weeklyEffects.resources ?? 0) * weeklyTicks -
+      accord.cost.resources,
+    intel:
+      (accord.immediateEffects.intel ?? 0) +
+      (accord.weeklyEffects.intel ?? 0) * weeklyTicks -
+      accord.cost.intel,
+  };
+}
+
+function mergeDeltaForScoring(left: PressureDelta, right: PressureDelta): PressureDelta {
+  return {
+    dominion: (left.dominion ?? 0) + (right.dominion ?? 0),
+    heat: (left.heat ?? 0) + (right.heat ?? 0),
+    loyalty: (left.loyalty ?? 0) + (right.loyalty ?? 0),
+    resources: (left.resources ?? 0) + (right.resources ?? 0),
+    intel: (left.intel ?? 0) + (right.intel ?? 0),
+    ruin: (left.ruin ?? 0) + (right.ruin ?? 0),
+  };
+}
+
+function scaleDeltaForScoring(delta: PressureDelta, multiplier: number): PressureDelta {
+  return {
+    dominion: (delta.dominion ?? 0) * multiplier,
+    heat: (delta.heat ?? 0) * multiplier,
+    loyalty: (delta.loyalty ?? 0) * multiplier,
+    resources: (delta.resources ?? 0) * multiplier,
+    intel: (delta.intel ?? 0) * multiplier,
+    ruin: (delta.ruin ?? 0) * multiplier,
+  };
+}
+
+function isBehindDominionSchedule(state: GameState): boolean {
+  return (
+    state.pressures.dominion <
+    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / state.maxWeeks) *
+      Math.max(1, state.week)
+  );
+}
+
 function scoreFrontCooling(
   option: LegalOrderOption,
   config: {
@@ -1449,6 +1685,13 @@ function operatorRoleValues(state: GameState): Partial<Record<OperativeRoleTag, 
 function scoreRoles(
   roles: readonly OperativeRoleTag[],
   roleValues: Partial<Record<OperativeRoleTag, number>>,
+): number {
+  return roles.reduce((score, role) => score + (roleValues[role] ?? 0), 0);
+}
+
+function scoreFactionRoles(
+  roles: readonly FactionRoleTag[],
+  roleValues: Partial<Record<FactionRoleTag, number>>,
 ): number {
   return roles.reduce((score, role) => score + (roleValues[role] ?? 0), 0);
 }

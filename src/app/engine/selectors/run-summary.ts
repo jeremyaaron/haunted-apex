@@ -1,16 +1,22 @@
 import {
+  getAccordDefinition,
+  getFactionDefinition,
   getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
 } from '../content';
+import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
 import type {
+  AccordId,
   FrontId,
   FrontStatus,
   GameLogEntry,
   GameOverState,
   GameState,
+  FactionId,
+  FactionStatus,
   LedgerEntry,
   LedgerEntryKind,
   OperativeId,
@@ -53,6 +59,19 @@ export type RunSummaryFront = {
   weeklyYieldTotals: Partial<Pressures>;
 };
 
+export type RunSummaryFaction = {
+  id: FactionId;
+  name: string;
+  status: FactionStatus;
+  standing: number;
+  suspicion: number;
+  obligation: number;
+  usedAccords: string[];
+  activeAccords: string[];
+  highSuspicion: boolean;
+  highObligation: boolean;
+};
+
 export type RunSummaryReport = {
   title: string;
   seed: string;
@@ -84,6 +103,15 @@ export type RunSummaryReport = {
     averageFinalExposure: number;
     entries: RunSummaryFront[];
   };
+  factions: {
+    active: number;
+    brokeredAccords: number;
+    activeAccords: number;
+    highSuspicion: number;
+    highObligation: number;
+    eventsTriggered: number;
+    entries: RunSummaryFaction[];
+  };
   majorEvents: string[];
   epitaph: string;
   text: string;
@@ -102,6 +130,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
   const mvpOperative = selectMvp(finalRoster);
   const ledgerEntries = state.ledger.entries.map(toLedgerReportEntry);
   const frontSummary = buildFrontSummary(state);
+  const factionSummary = buildFactionSummary(state);
   const reportWithoutText = {
     title: `Haunted Apex Run Report - ${formatResult(gameOver.result)}`,
     seed: state.seed,
@@ -123,6 +152,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
       entries: ledgerEntries,
     },
     fronts: frontSummary,
+    factions: factionSummary,
     majorEvents: selectMajorEvents(state),
     epitaph: selectEpitaph(state, gameOver),
   };
@@ -172,6 +202,15 @@ export function formatRunSummary(
     `- Average Final Exposure: ${report.fronts.averageFinalExposure.toFixed(1)}`,
     ...formatFrontEntries(report.fronts.entries),
     '',
+    'Faction Network:',
+    `- Active Factions: ${report.factions.active}`,
+    `- Brokered Accords: ${report.factions.brokeredAccords}`,
+    `- Active Accords At End: ${report.factions.activeAccords}`,
+    `- High Suspicion Factions: ${report.factions.highSuspicion}`,
+    `- High Obligation Factions: ${report.factions.highObligation}`,
+    `- Faction Events Triggered: ${report.factions.eventsTriggered}`,
+    ...formatFactionEntries(report.factions.entries),
+    '',
     'Major Events:',
     ...formatMajorEvents(report.majorEvents),
     '',
@@ -179,6 +218,50 @@ export function formatRunSummary(
   ];
 
   return lines.join('\n');
+}
+
+function buildFactionSummary(state: GameState): RunSummaryReport['factions'] {
+  const entries = state.activeFactionIds
+    .flatMap((factionId) => {
+      const faction = state.factions[factionId];
+
+      if (!faction) {
+        return [];
+      }
+
+      return [
+        {
+          id: factionId,
+          name: getFactionDefinition(factionId)?.name ?? factionId,
+          status: deriveFactionStatus(faction),
+          standing: faction.standing,
+          suspicion: faction.suspicion,
+          obligation: faction.obligation,
+          usedAccords: faction.usedAccordIds.map(formatAccordName),
+          activeAccords: faction.activeAccordIds.flatMap((activeAccordId) => {
+            const activeAccord = state.activeAccords[activeAccordId];
+            return activeAccord ? [formatAccordName(activeAccord.definitionId)] : [];
+          }),
+          highSuspicion: faction.suspicion >= 70,
+          highObligation: faction.obligation >= 70,
+        },
+      ];
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    active: entries.length,
+    brokeredAccords: entries.reduce((sum, faction) => sum + faction.usedAccords.length, 0),
+    activeAccords: Object.keys(state.activeAccords).length,
+    highSuspicion: entries.filter((faction) => faction.highSuspicion).length,
+    highObligation: entries.filter((faction) => faction.highObligation).length,
+    eventsTriggered: state.eventLog.filter(isFactionEventLogEntry).length,
+    entries,
+  };
+}
+
+function formatAccordName(accordId: AccordId): string {
+  return getAccordDefinition(accordId)?.label ?? accordId;
 }
 
 function toOperativeSummary(
@@ -395,6 +478,24 @@ function formatFrontEntries(entries: readonly RunSummaryFront[]): string[] {
   ];
 }
 
+function formatFactionEntries(entries: readonly RunSummaryFaction[]): string[] {
+  if (entries.length === 0) {
+    return ['- Factions: None'];
+  }
+
+  return [
+    '- Factions:',
+    ...entries.map((faction) => {
+      const accords =
+        faction.usedAccords.length > 0 ? `, Accords ${faction.usedAccords.join(' + ')}` : '';
+
+      return `  - ${faction.name}: ${formatToken(faction.status)}, Standing ${
+        faction.standing
+      }, Suspicion ${faction.suspicion}, Obligation ${faction.obligation}${accords}`;
+    }),
+  ];
+}
+
 function formatMajorEvents(events: readonly string[]): string[] {
   return events.length > 0 ? events.map((event) => `- ${event}`) : ['- None'];
 }
@@ -411,6 +512,10 @@ function formatOperative(operative: RunSummaryOperative | undefined): string {
 
 function formatRival(rival: RunSummaryRival | undefined): string {
   return rival ? `${rival.name} (${rival.pressure} Pressure)` : 'None';
+}
+
+function isFactionEventLogEntry(entry: GameLogEntry): boolean {
+  return entry.type === 'event_presented' && (entry.tags?.includes('FACTION') ?? false);
 }
 
 function formatResult(result: GameOverState['result']): string {

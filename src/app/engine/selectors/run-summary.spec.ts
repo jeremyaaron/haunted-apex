@@ -1,4 +1,4 @@
-import type { FrontState, GameState } from '../model';
+import type { ActiveAccordId, FrontState, GameState } from '../model';
 import { addLedgerEntry } from '../ledger';
 import { newGame } from '../simulation';
 import { buildRunSummary, formatRunSummary } from './run-summary';
@@ -32,12 +32,30 @@ describe('run summary report', () => {
       'Shell Gallery',
       'The Pale Circuit',
     ]);
+    expect(report.factions.active).toBe(4);
+    expect(report.factions.brokeredAccords).toBe(1);
+    expect(report.factions.activeAccords).toBe(1);
+    expect(report.factions.highSuspicion).toBe(1);
+    expect(report.factions.highObligation).toBe(1);
+    expect(report.factions.eventsTriggered).toBe(1);
+    expect(report.factions.entries.find((faction) => faction.name === 'Ashline Bureau')).toEqual(
+      jasmine.objectContaining({
+        status: 'entangled',
+        usedAccords: ['Clean Corridor'],
+        activeAccords: ['Clean Corridor'],
+        highSuspicion: true,
+        highObligation: true,
+      }),
+    );
     expect(report.majorEvents).toContain('Week 5: Debt Comes Due: Owes the Liaison');
     expect(report.text).toContain('Seed: RUN-SUMMARY-VICTORY');
     expect(report.text).toContain('Unresolved Debts: 1');
     expect(report.text).toContain('Front Network:');
     expect(report.text).toContain('New Fronts Established: 1');
     expect(report.text).toContain('The Pale Circuit: Level 2');
+    expect(report.text).toContain('Faction Network:');
+    expect(report.text).toContain('Brokered Accords: 1');
+    expect(report.text).toContain('Ashline Bureau: Entangled');
   });
 
   it('formats deterministic report text for a fixed final state', () => {
@@ -59,6 +77,7 @@ describe('run summary report', () => {
 
 function buildCompletedState(result: 'victory' | 'loss'): GameState {
   const base = newGame({ seed: `RUN-SUMMARY-${result.toUpperCase()}` });
+  const activeAccordId: ActiveAccordId = 'active_accord_ashline_clean_corridor_1';
   const withSecret = addLedgerEntry(base, {
     definitionId: 'secret_dead_channel_trace',
     source: {
@@ -143,6 +162,30 @@ function buildCompletedState(result: 'victory' | 'loss'): GameState {
       consumedCount: 1,
     },
     fronts: buildFronts(withDebt),
+    activeAccords: {
+      [activeAccordId]: {
+        id: activeAccordId,
+        definitionId: 'accord_ashline_clean_corridor',
+        factionId: 'faction_ashline_bureau',
+        startedWeek: 4,
+        remainingWeeks: 1,
+        firstWeeklyEffectWeek: 5,
+        source: {
+          type: 'broker_accord',
+        },
+      },
+    },
+    factions: {
+      ...withDebt.factions,
+      faction_ashline_bureau: {
+        ...withDebt.factions.faction_ashline_bureau!,
+        standing: 72,
+        suspicion: 74,
+        obligation: 76,
+        usedAccordIds: ['accord_ashline_clean_corridor'],
+        activeAccordIds: [activeAccordId],
+      },
+    },
     eventLog: [
       ...withDebt.eventLog,
       {
@@ -157,6 +200,13 @@ function buildCompletedState(result: 'victory' | 'loss'): GameState {
         type: 'event_presented',
         title: 'Front Inspection: Shell Gallery',
         tags: ['FRONT', 'HEAT'],
+      },
+      {
+        id: 'log_faction_event',
+        week: 5,
+        type: 'event_presented',
+        title: 'Faction Audit: Ashline Bureau',
+        tags: ['FACTION', 'HEAT'],
       },
     ],
   };

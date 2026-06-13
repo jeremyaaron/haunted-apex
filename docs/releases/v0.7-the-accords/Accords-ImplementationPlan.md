@@ -1202,6 +1202,53 @@ Unit/harness tests:
 - Aggressive prefers Dominion-oriented accords when legal.
 - Greedy prefers resource-oriented accords when legal.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added Faction Network data to run-end summaries, including active factions, brokered Accord
+  count, active Accords at end, high Suspicion/Obligation counts, Faction event counts, and
+  per-Faction used/active Accord labels.
+- Added harness run stats for active Faction sets, Broker Accord orders, Accord usage, max
+  active Accords, weekly Accord pressure yields, final Faction metrics/statuses, Faction event
+  frequencies, and high Suspicion/Obligation flags.
+- Added CSV sections:
+
+```text
+faction_summary
+accord_usage
+faction_outcomes
+faction_events
+faction_sets
+```
+
+- Updated target reporting so Faction targets render as readable `Faction - Accord` labels.
+- Added Faction-aware agent scoring:
+  - RandomBot can select legal Broker Accord options through the existing legal option set.
+  - OperatorBot values Heat relief, front-exposure relief, resource recovery, and Dominion tempo.
+  - CautiousBot prefers Ashline/Helix safety and penalizes faction pressure, Debt, and rival heat.
+  - AggressiveBot prefers Chrome/Velvet Dominion options and brakes only near severe Heat.
+  - GreedyBot prefers Helix/Chrome economic value and tolerates Debt/Obligation.
+- Added focused specs for run-summary Faction output, legal RandomBot Accord selection, Operator
+  safety Accord behavior, Aggressive Dominion Accord preference, Greedy resource Accord
+  preference, and the new harness CSV sections.
+- Validation completed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/harness/simulation-harness.spec.ts' --include='src/app/engine/selectors/run-summary.spec.ts'
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Full suite passed with 532 tests.
+- Standard production and GitHub Pages subpath builds both produced an initial bundle of
+  `624.80 kB`.
+
 ### Review Gate
 
 Confirm the harness can answer whether accords are being used and whether faction pressure

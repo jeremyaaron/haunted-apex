@@ -1,20 +1,26 @@
 import {
+  ACCORD_DEFINITIONS,
   DISTRICT_ZERO_ACTIONS,
+  FACTION_DEFINITIONS,
   FRONT_DEFINITIONS,
   ROSTER_OPERATIVES,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
+  getAccordDefinition,
   getDistrictDefinition,
   getContactDefinition,
   getEventDefinition,
+  getFactionDefinition,
   getFrontDefinition,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
+import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
 import type {
+  AccordId,
   ActionId,
   ActionTarget,
   ContactId,
@@ -22,6 +28,8 @@ import type {
   DistrictId,
   EventChoiceDefinition,
   EventId,
+  FactionId,
+  FactionStatus,
   FrontDefinitionId,
   GameOverReason,
   GameState,
@@ -93,6 +101,7 @@ export type HarnessRunResult = {
   ledgerStats: LedgerRunStats;
   contactStats: ContactRunStats;
   frontStats: FrontRunStats;
+  factionStats: FactionRunStats;
   trace: HarnessTraceEntry[];
 };
 
@@ -145,6 +154,11 @@ export type AgentBatchSummary = {
   frontEventReports: FrontEventReport[];
   frontOpportunitySetReports: FrontOpportunitySetReport[];
   frontExposureBandReports: FrontExposureBandReport[];
+  factionSummary: FactionSummaryReport;
+  accordUsageReports: AccordUsageReport[];
+  factionOutcomeReports: FactionOutcomeReport[];
+  factionEventReports: FactionEventReport[];
+  factionSetReports: FactionSetReport[];
 };
 
 export type HarnessBatchReport = {
@@ -513,6 +527,92 @@ export type FrontExposureBandReport = {
   averageOwnedFronts: number;
 };
 
+export type FactionRunStats = {
+  activeFactionSetKey: string;
+  brokerAccordOrders: number;
+  maxActiveAccords: number;
+  weeklyYieldTotals: Pressures;
+  factionEventsEligible: Partial<Record<EventId, number>>;
+  factionEventsSelected: Partial<Record<EventId, number>>;
+  accordUsage: Record<AccordId, AccordUsageRunStats>;
+  finalFactions: Record<FactionId, FactionFinalRunStats>;
+};
+
+export type AccordUsageRunStats = {
+  factionId: FactionId;
+  factionName: string;
+  accordId: AccordId;
+  accordLabel: string;
+  uses: number;
+  activeAtEnd: number;
+};
+
+export type FactionFinalRunStats = {
+  factionId: FactionId;
+  factionName: string;
+  active: boolean;
+  status: FactionStatus;
+  standing: number;
+  suspicion: number;
+  obligation: number;
+  usedAccords: number;
+  activeAccords: number;
+  highSuspicion: boolean;
+  highObligation: boolean;
+};
+
+export type FactionSummaryReport = {
+  averageBrokerAccordUses: number;
+  averageMaxActiveAccords: number;
+  averageUsedAccords: number;
+  averageActiveAccordsAtEnd: number;
+  averageHighSuspicionFactions: number;
+  averageHighObligationFactions: number;
+  averageWeeklyYieldDominion: number;
+  averageWeeklyYieldHeatDelta: number;
+  averageWeeklyYieldResources: number;
+  averageWeeklyYieldIntel: number;
+};
+
+export type AccordUsageReport = AccordUsageRunStats & {
+  wins: number;
+  losses: number;
+  winRate: number;
+};
+
+export type FactionOutcomeReport = {
+  factionId: FactionId;
+  factionName: string;
+  presentRuns: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageStanding: number;
+  averageSuspicion: number;
+  averageObligation: number;
+  averageUsedAccords: number;
+  averageActiveAccords: number;
+  highSuspicionRuns: number;
+  highObligationRuns: number;
+};
+
+export type FactionEventReport = {
+  eventId: EventId;
+  eventTitle: string;
+  eligibleRuns: number;
+  selections: number;
+  selectionRate: number;
+};
+
+export type FactionSetReport = {
+  factionSetKey: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  averageBrokerAccordUses: number;
+};
+
 const MAX_HARNESS_STEPS = 64;
 const DANGEROUS_TARGET_MINIMUM_SELECTIONS = 5;
 const TARGET_TAG_MODIFIERS = new Set([
@@ -536,6 +636,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const ledgerStats = createEmptyLedgerRunStats();
   const contactStats = createEmptyContactRunStats(state);
   const frontStats = createEmptyFrontRunStats(state);
+  const factionStats = createEmptyFactionRunStats(state);
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   let stalled = false;
@@ -551,6 +652,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         ledgerStats,
         contactStats,
         frontStats,
+        factionStats,
         trace,
         options.collectTrace,
       );
@@ -597,8 +699,14 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         advanced.eventCandidates,
         advanced.eventSelection,
       );
+      recordFactionEventStats(
+        factionStats,
+        advanced.eventCandidates,
+        advanced.eventSelection,
+      );
       recordContextualEvent(contextualEvents, advanced.eventSelection);
       state = advanced.state;
+      recordFactionSnapshot(factionStats, state);
       appendTrace(trace, options.collectTrace, state, 'Advanced week and presented event.');
     }
 
@@ -623,6 +731,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
       eventChoiceUsage[choice.choice.id] = (eventChoiceUsage[choice.choice.id] ?? 0) + 1;
       recordOperativeEventChoiceContribution(operativeStats, state, choice.choice);
       state = resolved.state;
+      recordFactionSnapshot(factionStats, state);
       appendTrace(trace, options.collectTrace, state, `Chose event option: ${choice.choice.label}.`);
     }
   }
@@ -631,6 +740,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   finalizeLedgerRunStats(ledgerStats, state);
   finalizeContactRunStats(contactStats, state);
   finalizeFrontRunStats(frontStats, state);
+  finalizeFactionRunStats(factionStats, state);
 
   return {
     agentId: options.agent.id,
@@ -651,6 +761,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     ledgerStats,
     contactStats,
     frontStats,
+    factionStats,
     trace,
   };
 }
@@ -1211,6 +1322,127 @@ export function formatBatchReport(report: HarnessBatchReport): string {
 
   lines.push(
     '',
+    'faction_summary',
+    'agent,avgBrokerAccordUses,avgMaxActiveAccords,avgUsedAccords,avgActiveAccordsAtEnd,avgHighSuspicionFactions,avgHighObligationFactions,avgWeeklyYieldDominion,avgWeeklyYieldHeatDelta,avgWeeklyYieldResources,avgWeeklyYieldIntel',
+  );
+
+  for (const summary of report.summaries) {
+    lines.push(
+      [
+        summary.agentId,
+        summary.factionSummary.averageBrokerAccordUses.toFixed(2),
+        summary.factionSummary.averageMaxActiveAccords.toFixed(2),
+        summary.factionSummary.averageUsedAccords.toFixed(2),
+        summary.factionSummary.averageActiveAccordsAtEnd.toFixed(2),
+        summary.factionSummary.averageHighSuspicionFactions.toFixed(2),
+        summary.factionSummary.averageHighObligationFactions.toFixed(2),
+        summary.factionSummary.averageWeeklyYieldDominion.toFixed(2),
+        summary.factionSummary.averageWeeklyYieldHeatDelta.toFixed(2),
+        summary.factionSummary.averageWeeklyYieldResources.toFixed(2),
+        summary.factionSummary.averageWeeklyYieldIntel.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'accord_usage',
+    'agent,factionId,factionName,accordId,accordLabel,uses,activeAtEnd,wins,losses,winRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const accord of summary.accordUsageReports) {
+      lines.push(
+        [
+          summary.agentId,
+          accord.factionId,
+          csvCell(accord.factionName),
+          accord.accordId,
+          csvCell(accord.accordLabel),
+          accord.uses,
+          accord.activeAtEnd,
+          accord.wins,
+          accord.losses,
+          accord.winRate.toFixed(3),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'faction_outcomes',
+    'agent,factionId,factionName,presentRuns,wins,losses,winRate,avgStanding,avgSuspicion,avgObligation,avgUsedAccords,avgActiveAccords,highSuspicionRuns,highObligationRuns',
+  );
+
+  for (const summary of report.summaries) {
+    for (const faction of summary.factionOutcomeReports) {
+      lines.push(
+        [
+          summary.agentId,
+          faction.factionId,
+          csvCell(faction.factionName),
+          faction.presentRuns,
+          faction.wins,
+          faction.losses,
+          faction.winRate.toFixed(3),
+          faction.averageStanding.toFixed(2),
+          faction.averageSuspicion.toFixed(2),
+          faction.averageObligation.toFixed(2),
+          faction.averageUsedAccords.toFixed(2),
+          faction.averageActiveAccords.toFixed(2),
+          faction.highSuspicionRuns,
+          faction.highObligationRuns,
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'faction_events',
+    'agent,eventId,eventTitle,eligibleRuns,selections,selectionRate',
+  );
+
+  for (const summary of report.summaries) {
+    for (const event of summary.factionEventReports) {
+      lines.push(
+        [
+          summary.agentId,
+          event.eventId,
+          csvCell(event.eventTitle),
+          event.eligibleRuns,
+          event.selections,
+          event.selectionRate.toFixed(3),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
+    'faction_sets',
+    'agent,factionSetKey,runs,wins,losses,winRate,avgBrokerAccordUses',
+  );
+
+  for (const summary of report.summaries) {
+    for (const set of summary.factionSetReports) {
+      lines.push(
+        [
+          summary.agentId,
+          csvCell(set.factionSetKey),
+          set.runs,
+          set.wins,
+          set.losses,
+          set.winRate.toFixed(3),
+          set.averageBrokerAccordUses.toFixed(2),
+        ].join(','),
+      );
+    }
+  }
+
+  lines.push(
+    '',
     'roster_compositions',
     'agent,rosterKey,runs,wins,losses,winRate,avgWeeks',
   );
@@ -1458,6 +1690,7 @@ function queueAgentOrders(
   ledgerStats: LedgerRunStats,
   contactStats: ContactRunStats,
   frontStats: FrontRunStats,
+  factionStats: FactionRunStats,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
 ): GameState {
@@ -1488,6 +1721,8 @@ function queueAgentOrders(
     recordLedgerOrderStats(ledgerStats, decision);
     recordContactOrderStats(contactStats, decision);
     recordFrontOrderStats(frontStats, decision);
+    recordFactionOrderStats(factionStats, decision);
+    recordFactionSnapshot(factionStats, next);
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
@@ -1585,6 +1820,14 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     FrontExposureBand,
     FrontExposureBandReport & { ownedFronts: number }
   >();
+  const factionSummaryTotals = createEmptyFactionSummaryTotals();
+  const accordUsageReports = new Map<AccordId, AccordUsageReport>();
+  const factionOutcomeReports = new Map<FactionId, FactionOutcomeReport>();
+  const factionEventReports = new Map<EventId, FactionEventReport>();
+  const factionSetReports = new Map<
+    string,
+    FactionSetReport & { brokerAccordUses: number }
+  >();
   let weeksTotal = 0;
   let wins = 0;
   let losses = 0;
@@ -1674,6 +1917,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     addFrontEventReports(frontEventReports, run.frontStats);
     addFrontOpportunitySetReports(frontOpportunitySetReports, run);
     addFrontExposureBandReports(frontExposureBandReports, run);
+    addFactionSummaryTotals(factionSummaryTotals, run.factionStats);
+    addAccordUsageReports(accordUsageReports, run);
+    addFactionOutcomeReports(factionOutcomeReports, run);
+    addFactionEventReports(factionEventReports, run.factionStats);
+    addFactionSetReports(factionSetReports, run);
   }
 
   const targetReports = [...targetReportsByKey.values()]
@@ -1727,6 +1975,11 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     frontEventReports: sortFrontEventReports([...frontEventReports.values()]),
     frontOpportunitySetReports: finalizeFrontOpportunitySetReports(frontOpportunitySetReports),
     frontExposureBandReports: finalizeFrontExposureBandReports(frontExposureBandReports),
+    factionSummary: finalizeFactionSummaryReport(factionSummaryTotals, runs.length),
+    accordUsageReports: sortAccordUsageReports([...accordUsageReports.values()]),
+    factionOutcomeReports: sortFactionOutcomeReports([...factionOutcomeReports.values()]),
+    factionEventReports: sortFactionEventReports([...factionEventReports.values()]),
+    factionSetReports: finalizeFactionSetReports(factionSetReports),
   };
 }
 
@@ -2742,6 +2995,128 @@ function finalizeFrontRunStats(stats: FrontRunStats, state: GameState): void {
   }
 }
 
+function createEmptyFactionRunStats(state: GameState): FactionRunStats {
+  return {
+    activeFactionSetKey: getFactionSetKey(state.activeFactionIds),
+    brokerAccordOrders: 0,
+    maxActiveAccords: Object.keys(state.activeAccords).length,
+    weeklyYieldTotals: createEmptyPressureTotals(),
+    factionEventsEligible: {},
+    factionEventsSelected: {},
+    accordUsage: ACCORD_DEFINITIONS.reduce(
+      (usage, accord) => {
+        const faction = getFactionDefinition(accord.factionId);
+        usage[accord.id] = {
+          factionId: accord.factionId,
+          factionName: faction?.name ?? accord.factionId,
+          accordId: accord.id,
+          accordLabel: accord.label,
+          uses: 0,
+          activeAtEnd: 0,
+        };
+        return usage;
+      },
+      {} as Record<AccordId, AccordUsageRunStats>,
+    ),
+    finalFactions: FACTION_DEFINITIONS.reduce(
+      (factions, faction) => {
+        factions[faction.id] = {
+          factionId: faction.id,
+          factionName: faction.name,
+          active: state.activeFactionIds.includes(faction.id),
+          status: 'neutral',
+          standing: 0,
+          suspicion: 0,
+          obligation: 0,
+          usedAccords: 0,
+          activeAccords: 0,
+          highSuspicion: false,
+          highObligation: false,
+        };
+        return factions;
+      },
+      {} as Record<FactionId, FactionFinalRunStats>,
+    ),
+  };
+}
+
+function recordFactionOrderStats(stats: FactionRunStats, decision: LegalOrderOption): void {
+  if (decision.actionId !== 'broker_accord' || decision.target?.type !== 'faction') {
+    return;
+  }
+
+  const accordStats = stats.accordUsage[decision.target.accordId];
+  stats.brokerAccordOrders += 1;
+  accordStats.uses += 1;
+}
+
+function recordFactionSnapshot(stats: FactionRunStats, state: GameState): void {
+  stats.maxActiveAccords = Math.max(
+    stats.maxActiveAccords,
+    Object.keys(state.activeAccords).length,
+  );
+}
+
+function recordFactionEventStats(
+  stats: FactionRunStats,
+  candidates: readonly WeightedEvent[],
+  selection: EventSelection,
+): void {
+  for (const candidate of candidates) {
+    if (!isFactionEvent(candidate.event)) {
+      continue;
+    }
+
+    stats.factionEventsEligible[candidate.event.id] =
+      (stats.factionEventsEligible[candidate.event.id] ?? 0) + 1;
+  }
+
+  if (isFactionEvent(selection.definition)) {
+    stats.factionEventsSelected[selection.definition.id] =
+      (stats.factionEventsSelected[selection.definition.id] ?? 0) + 1;
+  }
+}
+
+function finalizeFactionRunStats(stats: FactionRunStats, state: GameState): void {
+  recordFactionSnapshot(stats, state);
+
+  for (const entry of state.eventLog) {
+    if (entry.type !== 'accord' || !entry.pressureDelta) {
+      continue;
+    }
+
+    for (const pressure of PRESSURE_IDS) {
+      stats.weeklyYieldTotals[pressure] += entry.pressureDelta[pressure] ?? 0;
+    }
+  }
+
+  for (const activeAccord of Object.values(state.activeAccords)) {
+    stats.accordUsage[activeAccord.definitionId].activeAtEnd += 1;
+  }
+
+  for (const definition of FACTION_DEFINITIONS) {
+    const faction = state.factions[definition.id];
+
+    if (!faction) {
+      continue;
+    }
+
+    stats.finalFactions[definition.id] = {
+      factionId: definition.id,
+      factionName: definition.name,
+      active: true,
+      status: deriveFactionStatus(faction),
+      standing: faction.standing,
+      suspicion: faction.suspicion,
+      obligation: faction.obligation,
+      usedAccords: faction.usedAccordIds.length,
+      activeAccords: faction.activeAccordIds.length,
+      highSuspicion: faction.suspicion >= 70,
+      highObligation: faction.obligation >= 70,
+    };
+  }
+}
+
 function createEmptyFrontSummaryTotals(): FrontSummaryReport & {
   frontEventTotal: number;
   exposureSamples: number;
@@ -3044,6 +3419,256 @@ function frontExposureBandRank(band: FrontExposureBand): number {
     case 'compromised':
       return 4;
   }
+}
+
+function createEmptyFactionSummaryTotals(): FactionSummaryReport {
+  return {
+    averageBrokerAccordUses: 0,
+    averageMaxActiveAccords: 0,
+    averageUsedAccords: 0,
+    averageActiveAccordsAtEnd: 0,
+    averageHighSuspicionFactions: 0,
+    averageHighObligationFactions: 0,
+    averageWeeklyYieldDominion: 0,
+    averageWeeklyYieldHeatDelta: 0,
+    averageWeeklyYieldResources: 0,
+    averageWeeklyYieldIntel: 0,
+  };
+}
+
+function addFactionSummaryTotals(
+  totals: FactionSummaryReport,
+  stats: FactionRunStats,
+): void {
+  const finalFactions = Object.values(stats.finalFactions).filter((faction) => faction.active);
+
+  totals.averageBrokerAccordUses += stats.brokerAccordOrders;
+  totals.averageMaxActiveAccords += stats.maxActiveAccords;
+  totals.averageUsedAccords += finalFactions.reduce(
+    (sum, faction) => sum + faction.usedAccords,
+    0,
+  );
+  totals.averageActiveAccordsAtEnd += finalFactions.reduce(
+    (sum, faction) => sum + faction.activeAccords,
+    0,
+  );
+  totals.averageHighSuspicionFactions += finalFactions.filter(
+    (faction) => faction.highSuspicion,
+  ).length;
+  totals.averageHighObligationFactions += finalFactions.filter(
+    (faction) => faction.highObligation,
+  ).length;
+  totals.averageWeeklyYieldDominion += stats.weeklyYieldTotals.dominion;
+  totals.averageWeeklyYieldHeatDelta += stats.weeklyYieldTotals.heat;
+  totals.averageWeeklyYieldResources += stats.weeklyYieldTotals.resources;
+  totals.averageWeeklyYieldIntel += stats.weeklyYieldTotals.intel;
+}
+
+function finalizeFactionSummaryReport(
+  totals: FactionSummaryReport,
+  runs: number,
+): FactionSummaryReport {
+  return {
+    averageBrokerAccordUses: runs > 0 ? totals.averageBrokerAccordUses / runs : 0,
+    averageMaxActiveAccords: runs > 0 ? totals.averageMaxActiveAccords / runs : 0,
+    averageUsedAccords: runs > 0 ? totals.averageUsedAccords / runs : 0,
+    averageActiveAccordsAtEnd: runs > 0 ? totals.averageActiveAccordsAtEnd / runs : 0,
+    averageHighSuspicionFactions:
+      runs > 0 ? totals.averageHighSuspicionFactions / runs : 0,
+    averageHighObligationFactions:
+      runs > 0 ? totals.averageHighObligationFactions / runs : 0,
+    averageWeeklyYieldDominion:
+      runs > 0 ? totals.averageWeeklyYieldDominion / runs : 0,
+    averageWeeklyYieldHeatDelta:
+      runs > 0 ? totals.averageWeeklyYieldHeatDelta / runs : 0,
+    averageWeeklyYieldResources:
+      runs > 0 ? totals.averageWeeklyYieldResources / runs : 0,
+    averageWeeklyYieldIntel: runs > 0 ? totals.averageWeeklyYieldIntel / runs : 0,
+  };
+}
+
+function addAccordUsageReports(
+  reports: Map<AccordId, AccordUsageReport>,
+  run: HarnessRunResult,
+): void {
+  for (const accord of Object.values(run.factionStats.accordUsage)) {
+    if (accord.uses === 0 && accord.activeAtEnd === 0) {
+      continue;
+    }
+
+    const report = reports.get(accord.accordId) ?? {
+      ...accord,
+      uses: 0,
+      activeAtEnd: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+    };
+
+    report.uses += accord.uses;
+    report.activeAtEnd += accord.activeAtEnd;
+
+    if (accord.uses > 0 || accord.activeAtEnd > 0) {
+      report.wins += run.outcome === 'victory' ? 1 : 0;
+      report.losses += run.outcome === 'loss' ? 1 : 0;
+    }
+
+    reports.set(accord.accordId, report);
+  }
+}
+
+function sortAccordUsageReports(reports: AccordUsageReport[]): AccordUsageReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      winRate:
+        report.wins + report.losses > 0 ? report.wins / (report.wins + report.losses) : 0,
+    }))
+    .sort(
+      (left, right) =>
+        left.factionName.localeCompare(right.factionName) ||
+        left.accordLabel.localeCompare(right.accordLabel),
+    );
+}
+
+function addFactionOutcomeReports(
+  reports: Map<FactionId, FactionOutcomeReport>,
+  run: HarnessRunResult,
+): void {
+  for (const faction of Object.values(run.factionStats.finalFactions)) {
+    if (!faction.active) {
+      continue;
+    }
+
+    const report = reports.get(faction.factionId) ?? {
+      factionId: faction.factionId,
+      factionName: faction.factionName,
+      presentRuns: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      averageStanding: 0,
+      averageSuspicion: 0,
+      averageObligation: 0,
+      averageUsedAccords: 0,
+      averageActiveAccords: 0,
+      highSuspicionRuns: 0,
+      highObligationRuns: 0,
+    };
+
+    report.presentRuns += 1;
+    report.wins += run.outcome === 'victory' ? 1 : 0;
+    report.losses += run.outcome === 'loss' ? 1 : 0;
+    report.averageStanding += faction.standing;
+    report.averageSuspicion += faction.suspicion;
+    report.averageObligation += faction.obligation;
+    report.averageUsedAccords += faction.usedAccords;
+    report.averageActiveAccords += faction.activeAccords;
+    report.highSuspicionRuns += faction.highSuspicion ? 1 : 0;
+    report.highObligationRuns += faction.highObligation ? 1 : 0;
+    reports.set(faction.factionId, report);
+  }
+}
+
+function sortFactionOutcomeReports(reports: FactionOutcomeReport[]): FactionOutcomeReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      winRate:
+        report.wins + report.losses > 0 ? report.wins / (report.wins + report.losses) : 0,
+      averageStanding:
+        report.presentRuns > 0 ? report.averageStanding / report.presentRuns : 0,
+      averageSuspicion:
+        report.presentRuns > 0 ? report.averageSuspicion / report.presentRuns : 0,
+      averageObligation:
+        report.presentRuns > 0 ? report.averageObligation / report.presentRuns : 0,
+      averageUsedAccords:
+        report.presentRuns > 0 ? report.averageUsedAccords / report.presentRuns : 0,
+      averageActiveAccords:
+        report.presentRuns > 0 ? report.averageActiveAccords / report.presentRuns : 0,
+    }))
+    .sort((left, right) => left.factionName.localeCompare(right.factionName));
+}
+
+function addFactionEventReports(
+  reports: Map<EventId, FactionEventReport>,
+  stats: FactionRunStats,
+): void {
+  const eventIds = new Set<EventId>([
+    ...Object.keys(stats.factionEventsEligible),
+    ...Object.keys(stats.factionEventsSelected),
+  ] as EventId[]);
+
+  for (const eventId of eventIds) {
+    const report = reports.get(eventId) ?? {
+      eventId,
+      eventTitle: getEventTitle(eventId),
+      eligibleRuns: 0,
+      selections: 0,
+      selectionRate: 0,
+    };
+    report.eligibleRuns += stats.factionEventsEligible[eventId] ?? 0;
+    report.selections += stats.factionEventsSelected[eventId] ?? 0;
+    reports.set(eventId, report);
+  }
+}
+
+function sortFactionEventReports(reports: FactionEventReport[]): FactionEventReport[] {
+  return reports
+    .map((report) => ({
+      ...report,
+      selectionRate: report.eligibleRuns > 0 ? report.selections / report.eligibleRuns : 0,
+    }))
+    .sort((left, right) => left.eventTitle.localeCompare(right.eventTitle));
+}
+
+function addFactionSetReports(
+  reports: Map<string, FactionSetReport & { brokerAccordUses: number }>,
+  run: HarnessRunResult,
+): void {
+  const key = run.factionStats.activeFactionSetKey;
+  const report = reports.get(key) ?? {
+    factionSetKey: key,
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    winRate: 0,
+    averageBrokerAccordUses: 0,
+    brokerAccordUses: 0,
+  };
+
+  report.runs += 1;
+  report.wins += run.outcome === 'victory' ? 1 : 0;
+  report.losses += run.outcome === 'loss' ? 1 : 0;
+  report.brokerAccordUses += run.factionStats.brokerAccordOrders;
+  reports.set(key, report);
+}
+
+function finalizeFactionSetReports(
+  reports: Map<string, FactionSetReport & { brokerAccordUses: number }>,
+): FactionSetReport[] {
+  return [...reports.values()]
+    .map((report) => ({
+      factionSetKey: report.factionSetKey,
+      runs: report.runs,
+      wins: report.wins,
+      losses: report.losses,
+      winRate: report.runs > 0 ? report.wins / report.runs : 0,
+      averageBrokerAccordUses:
+        report.runs > 0 ? report.brokerAccordUses / report.runs : 0,
+    }))
+    .sort((left, right) => left.factionSetKey.localeCompare(right.factionSetKey));
+}
+
+function isFactionEvent(event: WeightedEvent['event'] | EventSelection['definition']): boolean {
+  return event.tags.includes('FACTION');
+}
+
+function getFactionSetKey(factionIds: readonly FactionId[]): string {
+  return factionIds
+    .map((factionId) => getFactionDefinition(factionId)?.name ?? factionId)
+    .sort()
+    .join('+');
 }
 
 function addRosterCompositionReport(
@@ -3470,8 +4095,16 @@ function getTargetReportLabel(target: TargetRunStats): string {
     case 'front':
       return target.targetId;
     case 'faction':
-      return target.targetId;
+      return getFactionTargetLabel(target.targetId);
   }
+}
+
+function getFactionTargetLabel(targetId: string): string {
+  const [factionId, accordId] = targetId.split(':') as [FactionId, AccordId];
+  const faction = getFactionDefinition(factionId)?.name ?? factionId;
+  const accord = getAccordDefinition(accordId)?.label ?? accordId;
+
+  return `${faction} - ${accord}`;
 }
 
 function selectMostSelectedTarget(targets: readonly TargetReport[]): TargetReport | undefined {
