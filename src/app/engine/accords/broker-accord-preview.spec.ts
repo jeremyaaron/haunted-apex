@@ -19,17 +19,17 @@ describe('previewBrokerAccord', () => {
 
     expect(preview.factionName).toBe('Ashline Bureau');
     expect(preview.accordLabel).toBe('Clean Corridor');
-    expect(preview.costRows).toEqual([{ id: 'resources', value: 700 }]);
+    expect(preview.costRows).toEqual([{ id: 'resources', value: 900 }]);
     expect(preview.immediateEffects).toEqual({ heat: -6 });
     expect(preview.weeklyEffects).toEqual({ heat: -3 });
     expect(preview.durationWeeks).toBe(2);
     expect(preview.timingLabel).toBe('Starting next week for 2 weeks');
     expect(preview.factionEffectsOnStart).toEqual({
       standing: 3,
-      suspicion: 8,
-      obligation: 8,
+      suspicion: 10,
+      obligation: 36,
     });
-    expect(preview.factionEffectsPerWeek).toEqual({ suspicion: 3 });
+    expect(preview.factionEffectsPerWeek).toEqual({ suspicion: 4 });
   });
 
   it('previews Ledger, rival pressure, and front hooks', () => {

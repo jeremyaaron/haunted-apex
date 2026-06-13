@@ -9,6 +9,7 @@ import type {
   ActionTarget,
   EventChoiceDefinition,
   EventChoiceLedgerEffect,
+  FactionId,
   FactionRoleTag,
   FrontRoleTag,
   GameState,
@@ -1152,8 +1153,13 @@ function scoreAggressiveAccordOrder(state: GameState, option: LegalOrderOption):
       ? -140
       : 0;
   const scheduleBias = isBehindDominionSchedule(state) && (delta.dominion ?? 0) > 0 ? 72 : 0;
+  const usagePenalty = getAccordUsagePenalty(state, accord.faction.id, {
+    total: 72,
+    faction: 95,
+    active: 18,
+  });
 
-  return dominionBias + roleBias + factionBias + scheduleBias + heatBrake;
+  return dominionBias + roleBias + factionBias + scheduleBias + heatBrake - usagePenalty;
 }
 
 function scoreCautiousAccordOrder(state: GameState, option: LegalOrderOption): number {
@@ -1178,6 +1184,12 @@ function scoreCautiousAccordOrder(state: GameState, option: LegalOrderOption): n
     }) +
     (accord.faction.id === 'faction_ashline_bureau' ? 32 : 0) +
     (accord.faction.id === 'faction_helix_meridian' ? 20 : 0);
+  const firstSafetyAccordBias =
+    getUsedAccordCount(state) === 0 &&
+    (accord.faction.id === 'faction_ashline_bureau' ||
+      accord.faction.id === 'faction_helix_meridian')
+      ? 95
+      : 0;
   const reliefBias =
     (state.pressures.heat >= 64 && (delta.heat ?? 0) < 0
       ? Math.abs(delta.heat ?? 0) * 12
@@ -1186,8 +1198,8 @@ function scoreCautiousAccordOrder(state: GameState, option: LegalOrderOption): n
       ? Math.abs(delta.ruin ?? 0) * 10
       : 0);
   const factionPenalty =
-    Math.max(0, accord.factionEffectsOnStart.suspicion ?? 0) * -3.2 +
-    Math.max(0, accord.factionEffectsOnStart.obligation ?? 0) * -3.8;
+    Math.max(0, accord.factionEffectsOnStart.suspicion ?? 0) * -1.6 +
+    Math.max(0, accord.factionEffectsOnStart.obligation ?? 0) * -1.15;
   const ledgerPenalty = accord.ledgerEffectsOnStart.some((effect) => effect.kind === 'debt')
     ? -78
     : 0;
@@ -1195,8 +1207,23 @@ function scoreCautiousAccordOrder(state: GameState, option: LegalOrderOption): n
     accord.rivalPressureEffectsOnStart.reduce((sum, rival) => sum + rival.pressureGain, 0) * -5;
   const reservePenalty = next.resources < 1600 ? (1600 - next.resources) * -0.05 : 0;
   const losingPenalty = isLosingProjection(next) ? -10_000 : 0;
+  const usagePenalty = getAccordUsagePenalty(state, accord.faction.id, {
+    total: 105,
+    faction: 120,
+    active: 24,
+  });
 
-  return safetyBias + reliefBias + factionPenalty + ledgerPenalty + rivalPenalty + reservePenalty + losingPenalty;
+  return (
+    safetyBias +
+    firstSafetyAccordBias +
+    reliefBias +
+    factionPenalty +
+    ledgerPenalty +
+    rivalPenalty +
+    reservePenalty +
+    losingPenalty -
+    usagePenalty
+  );
 }
 
 function scoreGreedyAccordOrder(state: GameState, option: LegalOrderOption): number {
@@ -1234,8 +1261,22 @@ function scoreGreedyAccordOrder(state: GameState, option: LegalOrderOption): num
   const debtTolerance = accord.ledgerEffectsOnStart.some((effect) => effect.kind === 'debt')
     ? 22
     : 0;
+  const usagePenalty = getAccordUsagePenalty(state, accord.faction.id, {
+    total: 115,
+    faction: 115,
+    active: 18,
+  });
 
-  return cashBias + intelBias + factionBias + roleBias + survivalBias + debtTolerance + heatLossPenalty;
+  return (
+    cashBias +
+    intelBias +
+    factionBias +
+    roleBias +
+    survivalBias +
+    debtTolerance +
+    heatLossPenalty -
+    usagePenalty
+  );
 }
 
 function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): number {
@@ -1277,6 +1318,11 @@ function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): n
     Math.max(0, accord.factionEffectsOnStart.suspicion ?? 0) * -1.1 +
     Math.max(0, accord.factionEffectsOnStart.obligation ?? 0) * -0.9;
   const losingPenalty = isLosingProjection(next) ? -10_000 : 0;
+  const usagePenalty = getAccordUsagePenalty(state, accord.faction.id, {
+    total: 95,
+    faction: 115,
+    active: 20,
+  });
 
   return (
     pressureScore +
@@ -1286,7 +1332,8 @@ function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): n
     tempoBias +
     usefulRoleBias +
     factionPenalty +
-    losingPenalty
+    losingPenalty -
+    usagePenalty
   );
 }
 
@@ -1350,6 +1397,40 @@ function isBehindDominionSchedule(state: GameState): boolean {
     state.pressures.dominion <
     (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / state.maxWeeks) *
       Math.max(1, state.week)
+  );
+}
+
+function getAccordUsagePenalty(
+  state: GameState,
+  factionId: FactionId,
+  weights: { total: number; faction: number; active: number },
+): number {
+  const queuedBrokerAccords = state.queuedOrders.filter(
+    (order) => order.actionId === 'broker_accord',
+  ).length;
+
+  if (queuedBrokerAccords > 0) {
+    return 10_000;
+  }
+
+  const totalUsedAccords = Object.values(state.factions).reduce(
+    (sum, faction) => sum + (faction?.usedAccordIds.length ?? 0),
+    0,
+  );
+  const factionUsedAccords = state.factions[factionId]?.usedAccordIds.length ?? 0;
+  const activeAccords = Object.keys(state.activeAccords).length;
+
+  return (
+    totalUsedAccords * weights.total +
+    factionUsedAccords * weights.faction +
+    activeAccords * weights.active
+  );
+}
+
+function getUsedAccordCount(state: GameState): number {
+  return Object.values(state.factions).reduce(
+    (sum, faction) => sum + (faction?.usedAccordIds.length ?? 0),
+    0,
   );
 }
 

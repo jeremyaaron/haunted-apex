@@ -1342,6 +1342,72 @@ faction event counts
 final faction metrics
 ```
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Ran a deterministic 100-runs-per-agent pre-tuning snapshot with seed prefix
+  `V07-PHASE12-BEFORE`.
+- The pre-tuning profile had acceptable win rates but excessive Accord chaining:
+
+```text
+Random:      0% wins, 1.89 Broker Accord uses/run
+Aggressive: 41% wins, 2.46 Broker Accord uses/run
+Cautious:    0% wins, 2.57 Broker Accord uses/run
+Greedy:     49% wins, 3.46 Broker Accord uses/run
+Operator:   60% wins, 3.33 Broker Accord uses/run
+```
+
+- Tuned Accord content:
+  - Increased Resource/Intel costs on several high-value Accords.
+  - Reduced economic yield on Helix/Chrome capital Accords.
+  - Increased Faction Obligation and Suspicion consequences so repeated reliance on one Faction
+    can reach demand/scrutiny territory.
+  - Kept duration and active Accord caps unchanged.
+- Tuned agent scoring:
+  - Added a strong penalty against queueing multiple Broker Accords in the same command week.
+  - Added escalating penalties for total used Accords, same-Faction repeated Accords, and active
+    Accords.
+  - Preserved strategy identity: Aggressive still favors Chrome/Velvet Dominion, Greedy still
+    favors Helix/Chrome value, Operator still uses safety/economic Accords, and Cautious takes a
+    narrow Ashline safety line without winning.
+- Ran the final deterministic 100-runs-per-agent snapshot with seed prefix
+  `V07-PHASE12-AFTER2`:
+
+```text
+Random:      0% wins, 1.64 Broker Accord uses/run, 0.10 high-Obligation factions/run
+Aggressive: 40% wins, 1.57 Broker Accord uses/run, 0.01 high-Obligation factions/run
+Cautious:    0% wins, 1.00 Broker Accord uses/run, 100 out-of-time losses
+Greedy:     26% wins, 1.46 Broker Accord uses/run, volatile via Heat/out-of-time losses
+Operator:   61% wins, 1.67 Broker Accord uses/run, 0.01 high-Obligation factions/run
+```
+
+- Final selected Faction events remained within the intended 0-2 per-run band:
+
+```text
+Random:      0.10 selected Faction events/run
+Aggressive: 0.23 selected Faction events/run
+Cautious:   0.10 selected Faction events/run
+Greedy:     0.22 selected Faction events/run
+Operator:   0.21 selected Faction events/run
+```
+
+- Validation completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --progress=false`: 532 tests passed.
+  - `npm run build`
+  - `npm run build -- --configuration production --base-href /haunted-apex/`
+  - `npm run check:docs`
+
+- Residual balance risk:
+  - Greedy landed on the low end of viability at 26% wins after capital Accords were made less
+    generous.
+  - High Obligation appears in some runs but remains rare; future versions may need more Faction
+    demand hooks if the layer should feel more politically dangerous.
+  - Operator leans heavily on Clean Corridor, but not so heavily that Broker Accord is mandatory
+    or always the same two-Accord sequence.
+
 ### Review Gate
 
 Manual and harness review: confirm accords are useful, costly, and not mandatory.

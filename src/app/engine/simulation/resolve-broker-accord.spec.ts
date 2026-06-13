@@ -17,9 +17,9 @@ describe('resolveQueuedOrder Broker Accord', () => {
     expect(resolved.complication).toBeFalse();
     expect(resolved.resolvedDelta).toEqual({
       heat: -6,
-      resources: -700,
+      resources: -900,
     });
-    expect(resolved.state.pressures.resources).toBe(state.pressures.resources - 700);
+    expect(resolved.state.pressures.resources).toBe(state.pressures.resources - 900);
     expect(resolved.state.pressures.heat).toBe(state.pressures.heat - 6);
     expect(Object.keys(resolved.state.activeAccords)).toEqual([
       'active_accord_ashline_clean_corridor_1',
@@ -46,8 +46,8 @@ describe('resolveQueuedOrder Broker Accord', () => {
     const faction = resolved.state.factions.faction_ashline_bureau!;
 
     expect(faction.standing).toBe(48);
-    expect(faction.suspicion).toBe(43);
-    expect(faction.obligation).toBe(8);
+    expect(faction.suspicion).toBe(45);
+    expect(faction.obligation).toBe(36);
     expect(faction.usedAccordIds).toEqual(['accord_ashline_clean_corridor']);
     expect(faction.activeAccordIds).toEqual(['active_accord_ashline_clean_corridor_1']);
     expect(faction.recentInteractions).toEqual([
@@ -56,8 +56,8 @@ describe('resolveQueuedOrder Broker Accord', () => {
         sourceType: 'accord',
         sourceId: 'active_accord_ashline_clean_corridor_1',
         standingDelta: 3,
-        suspicionDelta: 8,
-        obligationDelta: 8,
+        suspicionDelta: 10,
+        obligationDelta: 36,
       }),
     ]);
   });

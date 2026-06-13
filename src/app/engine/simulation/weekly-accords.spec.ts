@@ -30,7 +30,7 @@ describe('applyWeeklyAccordEffects', () => {
     expect(
       resolved.activeAccords['active_accord_ashline_clean_corridor_1']?.remainingWeeks,
     ).toBe(1);
-    expect(resolved.factions.faction_ashline_bureau?.suspicion).toBe(46);
+    expect(resolved.factions.faction_ashline_bureau?.suspicion).toBe(49);
     expect(resolved.eventLog.at(-1)).toEqual(
       jasmine.objectContaining({
         type: 'accord',
@@ -55,7 +55,7 @@ describe('applyWeeklyAccordEffects', () => {
       second.activeAccords['active_accord_ashline_clean_corridor_1']?.remainingWeeks,
     ).toBe(1);
     expect(second.eventLog.filter((entry) => entry.type === 'accord').length).toBe(1);
-    expect(second.factions.faction_ashline_bureau?.suspicion).toBe(46);
+    expect(second.factions.faction_ashline_bureau?.suspicion).toBe(49);
   });
 
   it('expires accords after their final tick and preserves used accord ids', () => {
@@ -74,8 +74,8 @@ describe('applyWeeklyAccordEffects', () => {
     expect(secondTick.factions.faction_ashline_bureau?.usedAccordIds).toEqual([
       'accord_ashline_clean_corridor',
     ]);
-    expect(secondTick.factions.faction_ashline_bureau?.suspicion).toBe(49);
-    expect(secondTick.factions.faction_ashline_bureau?.obligation).toBe(6);
+    expect(secondTick.factions.faction_ashline_bureau?.suspicion).toBe(53);
+    expect(secondTick.factions.faction_ashline_bureau?.obligation).toBe(32);
     expect(secondTick.eventLog.at(-1)).toEqual(
       jasmine.objectContaining({
         type: 'accord',

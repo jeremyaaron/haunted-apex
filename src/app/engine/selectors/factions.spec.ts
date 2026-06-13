@@ -26,8 +26,8 @@ describe('faction selectors', () => {
         faction_ashline_bureau: {
           ...base.factions.faction_ashline_bureau!,
           standing: 52,
-          suspicion: 48,
-          obligation: 14,
+          suspicion: 45,
+          obligation: 36,
           activeAccordIds: [activeAccordId],
           usedAccordIds: ['accord_ashline_clean_corridor'],
           recentInteractions: [
@@ -36,8 +36,8 @@ describe('faction selectors', () => {
               sourceType: 'accord',
               sourceId: 'accord_ashline_clean_corridor',
               standingDelta: 3,
-              suspicionDelta: 8,
-              obligationDelta: 8,
+              suspicionDelta: 10,
+              obligationDelta: 36,
             },
           ],
         },
@@ -56,8 +56,8 @@ describe('faction selectors', () => {
         archetype: 'security_bureau',
         status: 'neutral',
         standing: 52,
-        suspicion: 48,
-        obligation: 14,
+        suspicion: 45,
+        obligation: 36,
       }),
     );
     expect(ashline?.metrics.map((metric) => metric.label)).toEqual([
@@ -75,9 +75,9 @@ describe('faction selectors', () => {
       jasmine.objectContaining({
         available: false,
         unavailableReason: 'accord_already_used',
-        costSummary: '700 Resources',
+        costSummary: '900 Resources',
         weeklySummary: '-3 Heat',
-        factionStartSummary: '+3 Standing · +8 Suspicion · +8 Obligation',
+        factionStartSummary: '+3 Standing · +10 Suspicion · +36 Obligation',
       }),
     );
     expect(ashline?.activeAccords[0]).toEqual(
@@ -86,7 +86,7 @@ describe('faction selectors', () => {
         remainingWeeks: 1,
         timingLabel: '1 weekly tick remaining',
         weeklySummary: '-3 Heat',
-        factionWeeklySummary: '+3 Suspicion',
+        factionWeeklySummary: '+4 Suspicion',
       }),
     );
     expect(ashline?.recentInteractions[0]).toEqual(
