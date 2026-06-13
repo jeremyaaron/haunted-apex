@@ -33,12 +33,10 @@ describe('advanceWeek', () => {
     expect(result.eventSelection.event).toEqual(result.state.pendingEvent!);
     expect(result.eventSelection.diagnostics.finalWeight).toBeGreaterThan(0);
     expect(result.state.pressures).toEqual({
-      dominion: 12,
-      heat: 17,
-      loyalty: 68,
-      resources: 4350,
-      intel: 20,
-      ruin: 0,
+      ...queued.pressures,
+      heat: queued.pressures.heat - 1,
+      resources: queued.pressures.resources - 650,
+      intel: queued.pressures.intel + 10,
     });
     expect(result.state.fronts.front_pale_circuit?.exposure).toBe(14);
     expect(result.state.districts.district_violet_ward.control).toBe(13);
@@ -51,7 +49,7 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_saint_calder')?.stress).toBe(
       18,
     );
-    expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
+    expect(nonCampaignLogTypes(result.state)).toEqual([
       'order_resolved',
       'front_yield',
       'drift',
@@ -90,15 +88,17 @@ describe('advanceWeek', () => {
     expect(result.state.operatives.find((operative) => operative.id === 'op_mara_voss')?.stress).toBe(
       30,
     );
-    expect(result.state.pressures.resources).toBe(6700);
-    expect(result.state.pressures.dominion).toBe(18);
-    expect(result.state.pressures.heat).toBe(31);
+    expect(result.state.pressures.resources).toBe(queued.pressures.resources + 1700);
+    expect(result.state.pressures.dominion).toBe(queued.pressures.dominion + 6);
+    expect(result.state.pressures.heat).toBe(queued.pressures.heat + 13);
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
       control: 11,
       heat: 32,
     });
-    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(10);
+    expect(result.state.rivals.rival_knox_marrow.pressure).toBe(
+      queued.rivals.rival_knox_marrow.pressure + 10,
+    );
     expect(result.state.recentActivity).toEqual([
       jasmine.objectContaining({
         actionId: 'run_small_job',
@@ -111,8 +111,9 @@ describe('advanceWeek', () => {
         dominionDelta: 6,
       }),
     ]);
-    expect(result.state.eventLog[0].body).toContain('Target: Zero Mercy.');
-    expect(result.state.eventLog[0].body).toContain('Rival attention: Knox Marrow +10.');
+    const orderLog = result.state.eventLog.find((entry) => entry.type === 'order_resolved');
+    expect(orderLog?.body).toContain('Target: Zero Mercy.');
+    expect(orderLog?.body).toContain('Rival attention: Knox Marrow +10.');
   });
 
   it('applies Bribe Official failure behavior and sets bribe_exposed', () => {
@@ -128,14 +129,13 @@ describe('advanceWeek', () => {
 
     expect(result.state.flags['bribe_exposed']).toBeTrue();
     expect(result.state.pressures).toEqual({
-      dominion: 12,
-      heat: 22,
-      loyalty: 68,
-      resources: 3550,
-      intel: 12,
-      ruin: 2,
+      ...queued.pressures,
+      heat: queued.pressures.heat + 4,
+      resources: queued.pressures.resources - 1450,
+      intel: queued.pressures.intel + 2,
+      ruin: queued.pressures.ruin + 2,
     });
-    expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
+    expect(nonCampaignLogTypes(result.state)).toEqual([
       'order_resolved',
       'complication',
       'front_yield',
@@ -160,12 +160,11 @@ describe('advanceWeek', () => {
     }
 
     expect(result.state.pressures).toEqual({
-      dominion: 16,
-      heat: 30,
-      loyalty: 64,
-      resources: 6250,
-      intel: 10,
-      ruin: 0,
+      ...queued.pressures,
+      dominion: queued.pressures.dominion + 4,
+      heat: queued.pressures.heat + 12,
+      loyalty: queued.pressures.loyalty - 4,
+      resources: queued.pressures.resources + 1250,
     });
     expect(result.state.districts.district_chrome_narrows).toEqual({
       id: 'district_chrome_narrows',
@@ -360,7 +359,7 @@ describe('advanceWeek', () => {
     expect(result.state.phase).toBe('EVENT_CHOICE');
     expect(result.state.pendingEvent).toBeDefined();
     expect(result.state.gameOver).toBeUndefined();
-    expect(result.state.eventLog.map((entry) => entry.type)).toEqual([
+    expect(nonCampaignLogTypes(result.state)).toEqual([
       'order_resolved',
       'front_yield',
       'drift',
@@ -426,12 +425,10 @@ describe('weekly drift', () => {
     const drifted = applyWeeklyDrift(state);
 
     expect(drifted.pressures).toEqual({
-      dominion: 12,
-      heat: 16,
-      loyalty: 67,
-      resources: 4500,
-      intel: 10,
-      ruin: 0,
+      ...state.pressures,
+      heat: state.pressures.heat - 2,
+      loyalty: state.pressures.loyalty - 1,
+      resources: state.pressures.resources - 500,
     });
   });
 
@@ -556,4 +553,10 @@ function withPressures(pressures: Partial<GameState['pressures']>): GameState {
       ...pressures,
     },
   };
+}
+
+function nonCampaignLogTypes(state: GameState): string[] {
+  return state.eventLog
+    .filter((entry) => entry.type !== 'campaign')
+    .map((entry) => entry.type);
 }

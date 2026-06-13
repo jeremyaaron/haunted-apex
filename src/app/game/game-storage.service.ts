@@ -634,7 +634,8 @@ function isFactionInteractionSourceType(value: unknown): boolean {
     value === 'action' ||
     value === 'front' ||
     value === 'contact' ||
-    value === 'ledger'
+    value === 'ledger' ||
+    value === 'campaign'
   );
 }
 
@@ -1255,6 +1256,7 @@ function isEventLog(value: unknown): boolean {
 
 function isGameLogEntryType(value: unknown): boolean {
   return (
+    value === 'campaign' ||
     value === 'order_queued' ||
     value === 'order_resolved' ||
     value === 'ledger' ||

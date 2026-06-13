@@ -492,6 +492,40 @@ npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/ca
 git diff --check
 ```
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added `applyCampaignModifiersToRun()` under `src/app/engine/campaign/`.
+- Applied Campaign starting modifiers during run assembly:
+  - pressure deltas through existing pressure clamping
+  - active faction metric deltas through existing faction clamping and interaction recording
+  - rival pressure deltas through 0-100 pressure clamping
+  - contact metric deltas through existing contact clamping
+- Recorded exact applied modifier payloads in `CampaignState.appliedModifiers`.
+- Kept generation bias out of scope for this phase. Faction modifiers only apply when the faction
+  is present in the generated active faction network; Phase 4 owns required/weighted faction
+  generation.
+- Added an idempotency guard so an already-applied Campaign run cannot stack starting modifiers
+  or duplicate the opening log.
+- Added `campaign` as a `GameLogEntryType`.
+- Added `campaign` as a faction interaction source type for Campaign-applied faction shifts.
+- Added `formatCampaignModifierSummary()` for concise opening-log copy that includes exact
+  applied deltas without generation-bias details.
+- Updated save validation to accept persisted Campaign log entries and Campaign faction
+  interactions.
+- Updated existing low-level tests that previously assumed District Zero numeric baselines so
+  they now assert behavior relative to the generated Campaign starting state.
+- Focused Phase 3 verification passed:
+
+```text
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/campaign/*.spec.ts' --include='src/app/engine/simulation/new-game.spec.ts'
+```
+
+- Full regression suite passed: 549 tests in ChromeHeadless.
+
 ### Review Gate
 
 Confirm campaign modifiers are visible, exact, and one-time only before changing generation.

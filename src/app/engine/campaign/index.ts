@@ -1,3 +1,7 @@
+export {
+  applyCampaignModifiersToRun,
+  formatCampaignModifierSummary,
+} from './apply-campaign-modifiers';
 export { assembleNewRun } from './assemble-new-run';
 export {
   getCampaignTensionDefinitionOrThrow,

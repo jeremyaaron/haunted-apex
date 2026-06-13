@@ -19,6 +19,7 @@ import type {
 } from '../model';
 import { createDefaultSeed, createRunId, normalizeSeed } from '../rng';
 import { generateRoster, materializeOperativeState } from '../roster';
+import { applyCampaignModifiersToRun } from './apply-campaign-modifiers';
 import { generateCityIdentity } from './generate-city-identity';
 import { getCampaignTensionDefinitionOrThrow, selectCampaignTension } from './select-campaign-tension';
 
@@ -34,7 +35,7 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
   const frontNetwork = generateFrontNetwork(seed);
   const rivals = initializeRivals();
 
-  return {
+  const state: GameState = {
     schemaVersion: 8,
     id: createRunId(seed),
     seed,
@@ -79,6 +80,8 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
     eventLog: [],
     flags: {},
   };
+
+  return applyCampaignModifiersToRun(state, campaignTension);
 }
 
 type CreateCampaignStateConfig = {

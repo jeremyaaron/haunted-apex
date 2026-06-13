@@ -19,7 +19,7 @@ describe('Secret discovery', () => {
   } as const satisfies ActionTarget;
 
   it('does not preview a Secret chance for untargeted Gather Intel', () => {
-    const preview = previewSecretDiscovery(newGame({ seed: 'SECRET-UNTARGETED' }), {
+    const preview = previewSecretDiscovery(testGame('SECRET-UNTARGETED'), {
       actionId: 'gather_intel',
     });
 
@@ -32,7 +32,7 @@ describe('Secret discovery', () => {
   });
 
   it('previews an exact targeted Gather Intel Secret chance', () => {
-    const preview = previewSecretDiscovery(newGame({ seed: 'SECRET-TARGETED' }), {
+    const preview = previewSecretDiscovery(testGame('SECRET-TARGETED'), {
       actionId: 'gather_intel',
       target: ghostlineTarget,
     });
@@ -48,7 +48,7 @@ describe('Secret discovery', () => {
   });
 
   it('responds to target context and assigned operative Stress', () => {
-    const base = newGame({ seed: 'SECRET-STRESS' });
+    const base = testGame('SECRET-STRESS');
     const state = {
       ...base,
       operatives: [
@@ -78,7 +78,7 @@ describe('Secret discovery', () => {
   });
 
   it('reduces duplicate candidate weight without blocking non-unique repeats', () => {
-    const base = newGame({ seed: 'SECRET-DUPLICATE' });
+    const base = testGame('SECRET-DUPLICATE');
     const duplicate = addLedgerEntry(base, {
       definitionId: 'secret_patrol_schedule',
       source: {
@@ -107,7 +107,7 @@ describe('Secret discovery', () => {
   });
 
   it('does not rediscover active unique definitions', () => {
-    const state = addLedgerEntry(newGame({ seed: 'SECRET-UNIQUE' }), {
+    const state = addLedgerEntry(testGame('SECRET-UNIQUE'), {
       definitionId: 'secret_nyx_velvet_ledger',
       source: {
         type: 'action',
@@ -170,7 +170,7 @@ describe('Secret discovery', () => {
     expectedDefinitionId?: LedgerEntryDefinitionId,
   ): GameState {
     for (let index = 1; index <= 500; index += 1) {
-      const state = newGame({ seed: `SECRET-FIND-${index}` });
+      const state = testGame(`SECRET-FIND-${index}`);
       const result = resolveQueuedOrder(state, createGatherIntelOrder(target));
       const entry = result.state.ledger.entries[0];
 
@@ -186,3 +186,7 @@ describe('Secret discovery', () => {
     throw new Error('Expected to find a deterministic Secret discovery seed.');
   }
 });
+
+function testGame(seed: string): GameState {
+  return newGame({ seed, campaignTensionId: 'campaign_nightlife_war' });
+}

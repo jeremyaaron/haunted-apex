@@ -12,6 +12,7 @@ import {
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
+import { applyCampaignModifiersToRun } from '../campaign';
 import { ACTIVE_CONTACT_COUNT, satisfiesContactCoverage } from '../contacts';
 import {
   ACTIVE_FACTION_COUNT,
@@ -36,7 +37,6 @@ describe('newGame', () => {
     expect(state.phase).toBe('COMMAND');
     expect(state.commandPointsPerWeek).toBe(DISTRICT_ZERO_COMMAND_POINTS);
     expect(state.rngCursor).toBe(10);
-    expect(state.pressures).toEqual(DISTRICT_ZERO_INITIAL_PRESSURES);
     expect(state.queuedOrders).toEqual([]);
     expect(state.recentActivity).toEqual([]);
     expect(state.ledger).toEqual({
@@ -44,7 +44,15 @@ describe('newGame', () => {
       discoveredCount: 0,
       consumedCount: 0,
     });
-    expect(state.eventLog).toEqual([]);
+    expect(state.eventLog.length).toBe(1);
+    expect(state.eventLog[0]).toEqual(
+      jasmine.objectContaining({
+        id: 'log_1_1_campaign',
+        week: 1,
+        type: 'campaign',
+        tags: ['CAMPAIGN', state.campaign.tensionId],
+      }),
+    );
     expect(state.flags).toEqual({});
     expect(state.seenSignatureEventIds).toEqual([]);
     expect(state.gameOver).toBeUndefined();
@@ -61,7 +69,7 @@ describe('newGame', () => {
     expect(state.campaign.cityName.trim()).not.toBe('');
     expect(matchingTension?.cityProfileOptions).toContain(state.campaign.cityProfile);
     expect(state.campaign.openingBriefingShown).toBeFalse();
-    expect(state.campaign.appliedModifiers).toEqual({});
+    expect(state.campaign.appliedModifiers).not.toEqual({});
     expect(state.campaign.flags).toEqual({});
     expect(state.campaign.activeContent.factionIds).toEqual(state.activeFactionIds);
     expect(state.campaign.activeContent.contactIds).toEqual(state.activeContactIds);
@@ -87,6 +95,58 @@ describe('newGame', () => {
     expect(state.campaign.cityProfile).toBe('ghost_market');
   });
 
+  it('applies explicit Campaign starting pressure and rival modifiers once', () => {
+    const state = newGame({
+      seed: 'VIOLET-ASH-1047',
+      campaignTensionId: 'campaign_nightlife_war',
+    });
+    const campaign = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (definition) => definition.id === 'campaign_nightlife_war',
+    )!;
+    const reapplied = applyCampaignModifiersToRun(state, campaign);
+
+    expect(state.pressures).toEqual({
+      ...DISTRICT_ZERO_INITIAL_PRESSURES,
+      dominion: DISTRICT_ZERO_INITIAL_PRESSURES.dominion + 3,
+      heat: DISTRICT_ZERO_INITIAL_PRESSURES.heat + 4,
+      loyalty: DISTRICT_ZERO_INITIAL_PRESSURES.loyalty - 4,
+    });
+    expect(state.rivals.rival_nyx_ardent.pressure).toBe(15);
+    expect(state.campaign.appliedModifiers).toEqual({
+      startingPressureDelta: { dominion: 3, loyalty: -4, heat: 4 },
+      rivalPressureModifiers: { rival_nyx_ardent: 15 },
+    });
+    expect(state.eventLog.length).toBe(1);
+    expect(state.eventLog[0].title).toBe(`Nightlife War: ${state.campaign.cityName}`);
+    expect(state.eventLog[0].body).toContain(campaign.openingBriefing);
+    expect(state.eventLog[0].body).toContain('Nyx Ardent Pressure +15');
+    expect(reapplied).toEqual(state);
+  });
+
+  it('applies Campaign faction modifiers to active factions and records faction interactions', () => {
+    const state = newGame({
+      seed: 'VIOLET-ASH-1047',
+      campaignTensionId: 'campaign_corp_crackdown',
+    });
+    const ashline = state.factions.faction_ashline_bureau;
+
+    expect(ashline).toBeDefined();
+    expect(ashline?.standing).toBe(45);
+    expect(ashline?.suspicion).toBe(47);
+    expect(ashline?.obligation).toBe(0);
+    expect(ashline?.recentInteractions).toEqual([
+      {
+        week: 1,
+        sourceType: 'campaign',
+        sourceId: 'campaign_corp_crackdown',
+        suspicionDelta: 12,
+      },
+    ]);
+    expect(state.campaign.appliedModifiers.factionModifiers).toEqual({
+      faction_ashline_bureau: { suspicion: 12 },
+    });
+  });
+
   it('initializes district overlays from static definitions', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
@@ -109,7 +169,7 @@ describe('newGame', () => {
     for (const definition of RIVAL_TERRITORY_RIVALS) {
       expect(state.rivals[definition.id]).toEqual({
         id: definition.id,
-        pressure: 0,
+        pressure: state.campaign.appliedModifiers.rivalPressureModifiers?.[definition.id] ?? 0,
         disposition: definition.baseDisposition,
         active: true,
       });
@@ -169,9 +229,25 @@ describe('newGame', () => {
 
     for (const factionId of state.activeFactionIds) {
       const definition = FACTION_DEFINITIONS.find((candidate) => candidate.id === factionId);
+      const campaignDelta = state.campaign.appliedModifiers.factionModifiers?.[factionId];
+      const expected = materializeFactionState(definition!);
 
       expect(definition).toBeDefined();
-      expect(state.factions[factionId]).toEqual(materializeFactionState(definition!));
+      expect(state.factions[factionId]).toEqual({
+        ...expected,
+        standing: expected.standing + (campaignDelta?.standing ?? 0),
+        suspicion: expected.suspicion + (campaignDelta?.suspicion ?? 0),
+        obligation: expected.obligation + (campaignDelta?.obligation ?? 0),
+        recentInteractions: campaignDelta
+          ? [
+              jasmine.objectContaining({
+                week: 1,
+                sourceType: 'campaign',
+                sourceId: state.campaign.tensionId,
+              }),
+            ]
+          : [],
+      });
     }
   });
 
@@ -265,7 +341,9 @@ describe('newGame', () => {
     expect(second.factions[second.activeFactionIds[0]]!.standing).not.toBe(99);
     expect(second.factions[second.activeFactionIds[0]]!.flags['test_mutation']).toBeUndefined();
     expect(second.districts['district_violet_ward'].control).toBe(12);
-    expect(second.rivals['rival_nyx_ardent'].pressure).toBe(0);
+    expect(second.rivals['rival_nyx_ardent'].pressure).toBe(
+      second.campaign.appliedModifiers.rivalPressureModifiers?.rival_nyx_ardent ?? 0,
+    );
     expect(second.recentActivity).toEqual([]);
   });
 });

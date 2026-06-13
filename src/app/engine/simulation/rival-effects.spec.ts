@@ -8,21 +8,21 @@ describe('rival passive effects', () => {
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty);
-    expect(resolved.eventLog).toEqual([]);
+    expect(rivalEffectLogs(resolved)).toEqual([]);
   });
 
   it('does not apply Nyx Ardent when Intel is at least 20', () => {
     const state = {
       ...withRivalPressure('rival_nyx_ardent', 40),
       pressures: {
-        ...newGame().pressures,
+        ...withRivalPressure('rival_nyx_ardent', 40).pressures,
         intel: 20,
       },
     };
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty);
-    expect(resolved.eventLog).toEqual([]);
+    expect(rivalEffectLogs(resolved)).toEqual([]);
   });
 
   it('applies and logs Nyx Ardent Loyalty pressure under the full condition', () => {
@@ -30,7 +30,7 @@ describe('rival passive effects', () => {
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures.loyalty).toBe(state.pressures.loyalty - 5);
-    expect(resolved.eventLog).toEqual([
+    expect(rivalEffectLogs(resolved)).toEqual([
       jasmine.objectContaining({
         type: 'rival_effect',
         title: jasmine.stringContaining('Nyx Ardent'),
@@ -46,14 +46,14 @@ describe('rival passive effects', () => {
     const state = {
       ...withRivalPressure('rival_knox_marrow', 40),
       pressures: {
-        ...newGame().pressures,
+        ...withRivalPressure('rival_knox_marrow', 40).pressures,
         heat: 99,
       },
     };
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures.heat).toBe(100);
-    expect(resolved.eventLog).toEqual([
+    expect(rivalEffectLogs(resolved)).toEqual([
       jasmine.objectContaining({
         type: 'rival_effect',
         title: jasmine.stringContaining('Knox Marrow'),
@@ -103,7 +103,7 @@ describe('rival passive effects', () => {
     const resolved = applyRivalPassiveEffects(state);
 
     expect(resolved.pressures).toEqual(state.pressures);
-    expect(resolved.eventLog).toEqual([]);
+    expect(rivalEffectLogs(resolved)).toEqual([]);
   });
 });
 
@@ -122,4 +122,8 @@ function withRivalPressure(
       },
     },
   };
+}
+
+function rivalEffectLogs(state: GameState): GameState['eventLog'] {
+  return state.eventLog.filter((entry) => entry.type === 'rival_effect');
 }

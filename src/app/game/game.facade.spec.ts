@@ -43,7 +43,7 @@ describe('GameFacade', () => {
 
     expect(facade.state().week).toBe(1);
     expect(facade.state().phase).toBe('COMMAND');
-    expect(facade.state().pressures.dominion).toBe(12);
+    expect(facade.state().campaign.tensionId).toBeDefined();
     expect(facade.compatibilityNotice()).toBe(SAVE_COMPATIBILITY_NOTICE);
     expect(readStoredState()).toEqual(facade.state());
   });
@@ -221,7 +221,9 @@ describe('GameFacade', () => {
     expect(facade.state().queuedOrders).toEqual([]);
     expect(facade.state().recentActivity).toEqual([]);
     expect(facade.districts().every((district) => district.heat === district.baseHeat)).toBeTrue();
-    expect(facade.rivals().every((rival) => rival.pressure === 0)).toBeTrue();
+    expect(facade.rivals().map((rival) => rival.pressure)).toEqual(
+      Object.values(reset.rivals).map((rival) => rival.pressure),
+    );
     expect(readStoredState()).toEqual(reset);
   });
 

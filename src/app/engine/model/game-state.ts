@@ -40,6 +40,7 @@ export type GameOverState = {
 };
 
 export type GameLogEntryType =
+  | 'campaign'
   | 'order_queued'
   | 'order_resolved'
   | 'ledger'
