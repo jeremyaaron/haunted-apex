@@ -11,6 +11,7 @@ import {
 import type {
   ActionTarget,
   ContactMetricDelta,
+  FactionMetricDelta,
   GameState,
   LedgerEntry,
   LedgerEntryDefinition,
@@ -36,6 +37,11 @@ export type LedgerContactDeltaRow = {
   value: number;
 };
 
+export type LedgerFactionDeltaRow = {
+  id: keyof FactionMetricDelta;
+  value: number;
+};
+
 export type LedgerUseOptionView = {
   id: LedgerUseOptionId;
   label: string;
@@ -43,6 +49,7 @@ export type LedgerUseOptionView = {
   costRows: LedgerDeltaRow[];
   effectRows: LedgerDeltaRow[];
   relatedContactEffectRows: LedgerContactDeltaRow[];
+  relatedFactionEffectRows: LedgerFactionDeltaRow[];
   consumesEntry: boolean;
   affordable: boolean;
   unavailableReason?: 'insufficient_resources' | 'insufficient_intel' | 'entry_consumed';
@@ -199,6 +206,9 @@ function toLedgerUseOptionView(
     relatedContactEffectRows: entry.relatedContactId
       ? toContactDeltaRows(option.relatedContactEffects)
       : [],
+    relatedFactionEffectRows: entry.relatedFactionId
+      ? toFactionDeltaRows(option.relatedFactionEffects)
+      : [],
     consumesEntry: option.consumesEntry,
     affordable: unavailableReason === undefined,
     unavailableReason,
@@ -325,6 +335,25 @@ function toContactDeltaRows(delta: ContactMetricDelta | undefined): LedgerContac
   }
 
   return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
+    const value = delta[id];
+
+    return typeof value === 'number' && value !== 0
+      ? [
+          {
+            id,
+            value,
+          },
+        ]
+      : [];
+  });
+}
+
+function toFactionDeltaRows(delta: FactionMetricDelta | undefined): LedgerFactionDeltaRow[] {
+  if (!delta) {
+    return [];
+  }
+
+  return (['standing', 'suspicion', 'obligation'] as const).flatMap((id) => {
     const value = delta[id];
 
     return typeof value === 'number' && value !== 0

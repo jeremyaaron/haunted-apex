@@ -1,3 +1,6 @@
+import { getFactionDefinition } from '../content';
+import { materializeFactionState } from '../factions';
+import type { FactionId, GameState } from '../model';
 import { applyPressureDelta } from '../simulation';
 import { newGame } from '../simulation/new-game';
 import { resolveQueuedOrder } from '../simulation/resolve-action';
@@ -300,4 +303,105 @@ describe('Ledger use preview and resolution', () => {
     );
     expect(result.state.eventLog.at(-1)?.body).not.toContain('Ciro Moth:');
   });
+
+  it('previews and applies declared faction effects for faction-linked Ledger use', () => {
+    const withFaction = withActiveFaction(
+      newGame({ seed: 'LEDGER-FACTION-EFFECTS' }),
+      'faction_helix_meridian',
+    );
+    const state = addLedgerEntry(
+      {
+        ...withFaction,
+        factions: {
+          ...withFaction.factions,
+          faction_helix_meridian: {
+            ...withFaction.factions.faction_helix_meridian!,
+            obligation: 5,
+          },
+        },
+      },
+      {
+        definitionId: 'debt_dirty_books',
+        source: {
+          type: 'action',
+          actionId: 'broker_accord',
+          target: {
+            type: 'faction',
+            factionId: 'faction_helix_meridian',
+            accordId: 'accord_helix_quiet_capital',
+          },
+        },
+        relatedFactionId: 'faction_helix_meridian',
+      },
+    );
+    const target = {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'pay_auditors_off',
+    } as const;
+    const preview = previewLedgerUse(state, target);
+    const result = resolveLedgerUse(state, target);
+
+    if (!preview.ok) {
+      fail(`Expected valid preview, got ${preview.reason}`);
+      return;
+    }
+
+    expect(preview.relatedFactionName).toBe('Helix Meridian');
+    expect(preview.relatedFactionEffectRows).toEqual([
+      { id: 'standing', value: 1 },
+      { id: 'obligation', value: -3 },
+    ]);
+    expect(result.state.factions.faction_helix_meridian?.standing).toBe(
+      state.factions.faction_helix_meridian!.standing + 1,
+    );
+    expect(result.state.factions.faction_helix_meridian?.obligation).toBe(2);
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Helix Meridian: standing +1, obligation -3.',
+    );
+  });
+
+  it('does not change a linked faction when the use option declares no faction effects', () => {
+    const withFaction = withActiveFaction(
+      newGame({ seed: 'LEDGER-FACTION-NO-EFFECTS' }),
+      'faction_ghostline_communion',
+    );
+    const state = addLedgerEntry(withFaction, {
+      definitionId: 'favor_hidden_route',
+      source: {
+        type: 'event',
+        eventId: 'blackmail_lead',
+        choiceId: 'save_it_for_later',
+      },
+      relatedFactionId: 'faction_ghostline_communion',
+    });
+    const before = structuredClone(state.factions.faction_ghostline_communion);
+    const result = resolveLedgerUse(state, {
+      type: 'ledger',
+      entryId: state.ledger.entries[0].id,
+      useOptionId: 'open_hidden_route',
+    });
+
+    expect(result.state.factions.faction_ghostline_communion).toEqual(before);
+    expect(result.state.eventLog.at(-1)?.body).not.toContain('Ghostline Communion:');
+  });
 });
+
+function withActiveFaction(state: GameState, factionId: FactionId): GameState {
+  if (state.activeFactionIds.includes(factionId)) {
+    return state;
+  }
+
+  const replaceableId = state.activeFactionIds.find(
+    (activeFactionId) => activeFactionId !== 'faction_ashline_bureau',
+  )!;
+  const definition = getFactionDefinition(factionId)!;
+  const next = structuredClone(state);
+  next.activeFactionIds = next.activeFactionIds.map((activeFactionId) =>
+    activeFactionId === replaceableId ? factionId : activeFactionId,
+  );
+  delete next.factions[replaceableId];
+  next.factions[factionId] = materializeFactionState(definition);
+
+  return next;
+}

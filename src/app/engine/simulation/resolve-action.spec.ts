@@ -398,4 +398,28 @@ describe('resolveQueuedOrder assignment history and Stress', () => {
       ),
     ).toBeTrue();
   });
+
+  it('does not apply faction touch to ordinary district or venue targets', () => {
+    const state = newGame({ seed: 'NO-BROAD-FACTION-TOUCH' });
+    const before = structuredClone(state.factions.faction_ashline_bureau);
+    const districtResult = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'gather_intel',
+      target: {
+        type: 'district',
+        id: 'district_chrome_narrows',
+      },
+    });
+    const venueResult = resolveQueuedOrder(districtResult.state, {
+      id: 'order_1_2',
+      actionId: 'run_small_job',
+      target: {
+        type: 'venue',
+        id: 'venue_pale_circuit',
+      },
+    });
+
+    expect(districtResult.state.factions.faction_ashline_bureau).toEqual(before);
+    expect(venueResult.state.factions.faction_ashline_bureau).toEqual(before);
+  });
 });

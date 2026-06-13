@@ -2,7 +2,7 @@ import type { ActionId, ActionTarget } from './actions';
 import type { ContactId, ContactMetricDelta } from './contacts';
 import type { DistrictId } from './districts';
 import type { EventId } from './events';
-import type { FactionId } from './factions';
+import type { FactionId, FactionMetricDelta } from './factions';
 import type { OperativeId } from './operatives';
 import type { PressureDelta, Pressures } from './pressures';
 import type { RivalId } from './rivals';
@@ -49,6 +49,7 @@ export type LedgerUseOptionDefinition = {
   cost?: LedgerPressureCost;
   effects: PressureDelta;
   relatedContactEffects?: ContactMetricDelta;
+  relatedFactionEffects?: FactionMetricDelta;
   consumesEntry: boolean;
   riskModifier?: number;
   tags?: readonly string[];

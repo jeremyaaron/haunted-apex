@@ -18,6 +18,11 @@ import type {
 } from '../model';
 import { createRng, nextInt, type RngState } from '../rng';
 import { clampStress } from './clamps';
+import {
+  applyFactionMetricDelta,
+  getContactFactionTouch,
+  type FactionTouch,
+} from './faction-effects';
 import { applyPressureDelta } from './pressure-delta';
 
 export type ResolveContactOptionResult = {
@@ -82,12 +87,34 @@ export function resolveContactOption(
   next = quietTreatment.state;
   next = applyRivalPressureEffects(next, preview.rivalPressureEffects);
   next = applyContactLedgerEffects(next, preview);
+  const factionTouch = getContactFactionTouch(next, preview.contactId, preview.kind, {
+    hasPressureBenefit: hasPressureBenefit(preview.effects),
+    createsLedgerValue: preview.ledgerEffects.length > 0,
+  });
+  if (factionTouch) {
+    next = applyFactionMetricDelta(next, factionTouch.factionId, factionTouch.delta, {
+      sourceType: 'contact',
+      sourceId: `${preview.contactId}:${preview.id}`,
+    });
+  }
   next = appendLog(next, {
     type: 'order_resolved',
     title: `Manage Contact: ${preview.contactName}`,
-    body: createResolutionBody(preview, roll.value, complication, quietTreatment.stressDelta),
+    body: createResolutionBody(
+      preview,
+      roll.value,
+      complication,
+      quietTreatment.stressDelta,
+      factionTouch,
+    ),
     pressureDelta: preview.resolvedDelta,
-    tags: ['CONTACT', preview.contactId, preview.kind, preview.id],
+    tags: [
+      'CONTACT',
+      preview.contactId,
+      preview.kind,
+      preview.id,
+      ...(factionTouch ? ['FACTION', factionTouch.factionId] : []),
+    ],
   });
 
   if (complication) {
@@ -206,6 +233,7 @@ function createResolutionBody(
   roll: number,
   complication: boolean,
   stressDelta: number,
+  factionTouch: FactionTouch | undefined,
 ): string {
   const cost = preview.costRows.map((row) => `${row.value} ${row.id}`).join(', ');
   const costText = cost ? ` Cost: ${cost}.` : '';
@@ -217,9 +245,10 @@ function createResolutionBody(
   const ledgerText = preview.ledgerEffects.length > 0
     ? ` Ledger entries created: ${preview.ledgerEffects.map((effect) => effect.entryName).join(', ')}.`
     : '';
+  const factionText = factionTouch ? ` Faction: ${formatFactionTouch(factionTouch)}.` : '';
   const result = complication ? 'Resolved with blowback.' : 'Resolved cleanly.';
 
-  return `${result} Option: ${preview.label}.${costText}${contactText}${rivalText}${stressText}${ledgerText} Risk ${preview.riskChance}, roll ${roll}.`;
+  return `${result} Option: ${preview.label}.${costText}${contactText}${rivalText}${stressText}${ledgerText}${factionText} Risk ${preview.riskChance}, roll ${roll}.`;
 }
 
 function formatContactDelta(
@@ -243,6 +272,19 @@ function formatRivalEffects(effects: Partial<Record<RivalId, number>>): string {
     });
 
   return parts.length > 0 ? ` Rival pressure: ${parts.join(', ')}.` : '';
+}
+
+function formatFactionTouch(touch: FactionTouch): string {
+  const delta = Object.entries(touch.delta)
+    .filter(([, value]) => value !== undefined && value !== 0)
+    .map(([metric, value]) => `${metric} ${formatSigned(value ?? 0)}`)
+    .join(', ');
+
+  return `${touch.factionName}: ${delta}`;
+}
+
+function hasPressureBenefit(delta: PressureDelta): boolean {
+  return Object.values(delta).some((value) => value !== undefined && value !== 0);
 }
 
 function formatSigned(value: number): string {

@@ -1,9 +1,11 @@
-import { getContactDefinition, getLedgerEntryDefinition } from '../content';
+import { getContactDefinition, getFactionDefinition, getLedgerEntryDefinition } from '../content';
 import { applyContactMetricDelta } from '../contacts';
 import type {
   ActionTarget,
   ContactId,
   ContactMetricDelta,
+  FactionId,
+  FactionMetricDelta,
   GameLogEntry,
   GameState,
   LedgerEntry,
@@ -15,6 +17,7 @@ import type {
 } from '../model';
 import { PRESSURE_IDS } from '../model';
 import { createRng, nextInt, type RngState } from '../rng';
+import { applyFactionMetricDelta } from '../simulation/faction-effects';
 import { applyPressureDelta, mergePressureDeltas } from '../simulation/pressure-delta';
 
 export type LedgerUseUnavailableReason =
@@ -33,6 +36,11 @@ export type LedgerCostRow = {
 
 export type LedgerContactEffectRow = {
   id: keyof ContactMetricDelta;
+  value: number;
+};
+
+export type LedgerFactionEffectRow = {
+  id: keyof FactionMetricDelta;
   value: number;
 };
 
@@ -56,6 +64,10 @@ export type LedgerUsePreview =
       relatedContactName?: string;
       relatedContactEffects: ContactMetricDelta;
       relatedContactEffectRows: LedgerContactEffectRow[];
+      relatedFactionId?: FactionId;
+      relatedFactionName?: string;
+      relatedFactionEffects: FactionMetricDelta;
+      relatedFactionEffectRows: LedgerFactionEffectRow[];
       consumesEntry: boolean;
       affordable: true;
       riskModifier: number;
@@ -117,9 +129,16 @@ export function previewLedgerUse(
   const relatedContactName = entry.relatedContactId
     ? getContactDefinition(entry.relatedContactId)?.name
     : undefined;
+  const relatedFactionName = entry.relatedFactionId
+    ? getFactionDefinition(entry.relatedFactionId)?.name
+    : undefined;
   const relatedContactEffects = normalizeRelatedContactEffects(
     entry,
     useOption.relatedContactEffects,
+  );
+  const relatedFactionEffects = normalizeRelatedFactionEffects(
+    entry,
+    useOption.relatedFactionEffects,
   );
 
   if (cost.resources > state.pressures.resources) {
@@ -146,6 +165,10 @@ export function previewLedgerUse(
     ...(relatedContactName ? { relatedContactName } : {}),
     relatedContactEffects,
     relatedContactEffectRows: toContactEffectRows(relatedContactEffects),
+    ...(entry.relatedFactionId ? { relatedFactionId: entry.relatedFactionId } : {}),
+    ...(relatedFactionName ? { relatedFactionName } : {}),
+    relatedFactionEffects,
+    relatedFactionEffectRows: toFactionEffectRows(relatedFactionEffects),
     consumesEntry: useOption.consumesEntry,
     affordable: true,
     riskModifier: useOption.riskModifier ?? 0,
@@ -202,6 +225,7 @@ export function resolveLedgerUse(
   };
 
   next = applyRelatedContactEffects(next, preview);
+  next = applyRelatedFactionEffects(next, preview);
 
   next = appendLog(next, {
     type: 'order_resolved',
@@ -214,6 +238,7 @@ export function resolveLedgerUse(
       ...preview.definition.tags,
       ...(preview.useOption.tags ?? []),
       ...(preview.relatedContactId ? ['CONTACT', preview.relatedContactId] : []),
+      ...(preview.relatedFactionId ? ['FACTION', preview.relatedFactionId] : []),
     ],
   });
 
@@ -252,9 +277,15 @@ function createResolutionBody(
           .map((row) => `${row.id} ${formatSigned(row.value)}`)
           .join(', ')}.`
       : '';
+  const factionText =
+    preview.relatedFactionId && preview.relatedFactionEffectRows.length > 0
+      ? ` ${preview.relatedFactionName ?? preview.relatedFactionId}: ${preview.relatedFactionEffectRows
+          .map((row) => `${row.id} ${formatSigned(row.value)}`)
+          .join(', ')}.`
+      : '';
   const result = complication ? 'Resolved with blowback.' : 'Resolved cleanly.';
 
-  return `${result} Use: ${preview.useOptionLabel}.${costText}${consumption}${contactText} Risk ${preview.riskChance}, roll ${roll}.`;
+  return `${result} Use: ${preview.useOptionLabel}.${costText}${consumption}${contactText}${factionText} Risk ${preview.riskChance}, roll ${roll}.`;
 }
 
 function toCostDelta(cost: { resources: number; intel: number }): PressureDelta {
@@ -320,8 +351,37 @@ function normalizeRelatedContactEffects(
   return normalized;
 }
 
+function normalizeRelatedFactionEffects(
+  entry: LedgerEntry,
+  delta: FactionMetricDelta | undefined,
+): FactionMetricDelta {
+  if (!entry.relatedFactionId || !delta) {
+    return {};
+  }
+
+  const normalized: FactionMetricDelta = {};
+
+  for (const id of ['standing', 'suspicion', 'obligation'] as const) {
+    const value = delta[id];
+
+    if (value !== undefined && value !== 0) {
+      normalized[id] = value;
+    }
+  }
+
+  return normalized;
+}
+
 function toContactEffectRows(delta: ContactMetricDelta): LedgerContactEffectRow[] {
   return (['trust', 'leverage', 'volatility', 'exposure'] as const).flatMap((id) => {
+    const value = delta[id];
+
+    return typeof value === 'number' && value !== 0 ? [{ id, value }] : [];
+  });
+}
+
+function toFactionEffectRows(delta: FactionMetricDelta): LedgerFactionEffectRow[] {
+  return (['standing', 'suspicion', 'obligation'] as const).flatMap((id) => {
     const value = delta[id];
 
     return typeof value === 'number' && value !== 0 ? [{ id, value }] : [];
@@ -352,6 +412,25 @@ function applyRelatedContactEffects(
       ),
     },
   };
+}
+
+function applyRelatedFactionEffects(
+  state: GameState,
+  preview: Extract<LedgerUsePreview, { ok: true }>,
+): GameState {
+  if (!preview.relatedFactionId || preview.relatedFactionEffectRows.length === 0) {
+    return state;
+  }
+
+  return applyFactionMetricDelta(
+    state,
+    preview.relatedFactionId,
+    preview.relatedFactionEffects,
+    {
+      sourceType: 'ledger',
+      sourceId: `${preview.entry.id}:${preview.useOption.id}`,
+    },
+  );
 }
 
 function formatSigned(value: number): string {

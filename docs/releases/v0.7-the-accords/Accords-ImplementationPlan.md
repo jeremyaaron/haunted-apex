@@ -873,6 +873,27 @@ Unit tests:
 - Ledger faction effects apply only when declared.
 - Ordinary district and venue target actions do not apply faction touch.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added shared faction touch helpers for clamped metric deltas, recent interaction recording,
+  front sphere matching, and contact action classification.
+- Refactored broker accord and weekly accord faction deltas through the shared helper.
+- Front establishment and upgrade now touch matching active factions by district, venue, or
+  front tag, with `fronts` accords reducing Suspicion gain.
+- Associated contact cultivation, pressure, and service use now apply scoped faction touches and
+  include the consequences in the contact event log.
+- Ledger use options now support explicit related faction effects, with preview rows in the
+  command board and resolution-time metric application only when an option declares them.
+- Added Dirty Books Ledger faction effects for a live content path.
+- Added focused tests for front, contact, Ledger, selector preview, and negative ordinary
+  district/venue action behavior.
+- Verification completed: app/spec TypeScript, focused Phase 7 adjacent suite, full suite,
+  local build, Pages production build, docs check, and `git diff --check` passed.
+- Build bundle check: initial bundle `584.90 kB`, under the current `600 kB` warning budget.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm faction touch is useful but constrained before adding faction Ledger content.

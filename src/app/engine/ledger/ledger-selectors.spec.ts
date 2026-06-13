@@ -187,6 +187,28 @@ describe('Ledger lifecycle and selectors', () => {
     ]);
   });
 
+  it('exposes declared faction effects for faction-linked Ledger entries', () => {
+    const state = addLedgerEntry(newGame({ seed: 'LEDGER-FACTION-VIEW' }), {
+      definitionId: 'debt_dirty_books',
+      source: {
+        type: 'action',
+        actionId: 'broker_accord',
+        target: {
+          type: 'faction',
+          factionId: 'faction_helix_meridian',
+          accordId: 'accord_helix_quiet_capital',
+        },
+      },
+      relatedFactionId: 'faction_helix_meridian',
+    });
+    const view = selectActiveLedgerEntryViews(state)[0];
+
+    expect(view.useOptions[0].relatedFactionEffectRows).toEqual([
+      { id: 'standing', value: 1 },
+      { id: 'obligation', value: -3 },
+    ]);
+  });
+
   function consumeEntry(state: GameState, entryId: string): GameState {
     return {
       ...state,

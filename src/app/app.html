@@ -328,6 +328,12 @@
                           {{ ledgerContactEffectText(effect) }}
                         </span>
                       }
+                      @for (effect of ledgerUse.relatedFactionEffectRows; track effect.id) {
+                        <span [class.negative]="effect.value < 0">
+                          {{ ledgerUse.relatedFactionName || 'Faction' }}
+                          {{ ledgerFactionEffectText(effect) }}
+                        </span>
+                      }
                       @if (ledgerUse.consumesEntry) {
                         <span>Consumes Entry</span>
                       }

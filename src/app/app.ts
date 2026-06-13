@@ -27,6 +27,7 @@ import {
   type FrontInvestmentPanelView,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
+  type LedgerFactionDeltaRow,
   type HireCandidateView,
   type LedgerDeltaRow,
   type LedgerEntryView,
@@ -464,12 +465,19 @@ export class App {
     return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
   }
 
+  protected ledgerFactionEffectText(row: LedgerFactionDeltaRow): string {
+    return `${this.signed(row.value)} ${this.displayToken(row.id)}`;
+  }
+
   protected ledgerUseSummary(option: LedgerUseOptionView): string {
     const rows = [
       ...option.costRows.map((row) => this.ledgerDeltaText(row)),
       ...option.effectRows.map((row) => this.ledgerDeltaText(row)),
       ...option.relatedContactEffectRows.map((row) =>
         this.ledgerContactEffectText(row),
+      ),
+      ...option.relatedFactionEffectRows.map((row) =>
+        this.ledgerFactionEffectText(row),
       ),
     ];
 

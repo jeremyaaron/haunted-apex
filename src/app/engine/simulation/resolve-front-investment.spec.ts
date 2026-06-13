@@ -231,6 +231,107 @@ describe('resolveQueuedOrder Front investments', () => {
     );
   });
 
+  it('applies faction touch when establishing a Front in an active faction sphere', () => {
+    const state = {
+      ...newGame({ seed: 'FRONT-FACTION-ESTABLISH' }),
+      pressures: {
+        ...newGame({ seed: 'FRONT-FACTION-ESTABLISH' }).pressures,
+        resources: 6000,
+      },
+      frontOpportunities: [
+        {
+          id: 'front_opportunity_front_courier_line' as const,
+          definitionId: 'front_courier_line' as const,
+          districtId: 'district_chrome_narrows' as const,
+        },
+      ],
+    };
+    const before = state.factions.faction_ashline_bureau!;
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'invest_front',
+      target: {
+        type: 'front_opportunity',
+        id: 'front_opportunity_front_courier_line',
+      },
+    });
+    const after = result.state.factions.faction_ashline_bureau!;
+
+    expect(after.standing).toBe(before.standing + 1);
+    expect(after.suspicion).toBe(before.suspicion + 4);
+    expect(after.recentInteractions.at(-1)).toEqual(
+      jasmine.objectContaining({
+        sourceType: 'front',
+        sourceId: 'front_courier_line:establish',
+        standingDelta: 1,
+        suspicionDelta: 4,
+      }),
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Ashline Bureau: suspicion +4, standing +1',
+    );
+  });
+
+  it('does not apply faction touch when a Front is outside active faction spheres', () => {
+    const base = newGame({ seed: 'FRONT-FACTION-OUTSIDE' });
+    const state: GameState = {
+      ...base,
+      activeFactionIds: ['faction_ashline_bureau'],
+      factions: {
+        faction_ashline_bureau: base.factions.faction_ashline_bureau,
+      },
+      pressures: {
+        ...base.pressures,
+        resources: 6000,
+      },
+      frontOpportunities: [
+        {
+          id: 'front_opportunity_front_zero_mercy_cut',
+          definitionId: 'front_zero_mercy_cut',
+          districtId: 'district_ghostline_market',
+        },
+      ],
+    };
+    const before = structuredClone(state.factions.faction_ashline_bureau);
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'invest_front',
+      target: {
+        type: 'front_opportunity',
+        id: 'front_opportunity_front_zero_mercy_cut',
+      },
+    });
+
+    expect(result.state.factions.faction_ashline_bureau).toEqual(before);
+    expect(result.state.eventLog.at(-1)?.body).not.toContain('Factions:');
+  });
+
+  it('reduces Front faction Suspicion gain when a matching fronts accord is active', () => {
+    const brokered = resolveQueuedOrder(newGame({ seed: 'FRONT-FACTION-ACCORD' }), {
+      id: 'order_1_1',
+      actionId: 'broker_accord',
+      target: {
+        type: 'faction',
+        factionId: 'faction_ashline_bureau',
+        accordId: 'accord_ashline_inspection_delay',
+      },
+    }).state;
+    const before = brokered.factions.faction_ashline_bureau!;
+    const result = resolveQueuedOrder(brokered, {
+      id: 'order_1_2',
+      actionId: 'invest_front',
+      target: {
+        type: 'front',
+        id: 'front_pale_circuit',
+      },
+    });
+
+    expect(result.state.factions.faction_ashline_bureau?.suspicion).toBe(
+      before.suspicion + 2,
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain('Ashline Bureau: suspicion +2');
+  });
+
   it('blocks upgrade beyond level 2', () => {
     const state = withFrontLevel(
       newGame({ seed: 'FRONT-MAX-RESOLUTION' }),

@@ -12,6 +12,11 @@ import type {
   RivalId,
 } from '../model';
 import { createRng } from '../rng';
+import {
+  applyFactionMetricDelta,
+  getFrontFactionTouches,
+  type FactionTouch,
+} from './faction-effects';
 import type { ActionResolution } from './resolve-action';
 import { applyPressureDelta } from './pressure-delta';
 
@@ -55,10 +60,24 @@ export function resolveInvestFront(
     ? establishFront(next, preview)
     : upgradeFront(next, preview);
   next = applyEstablishRivalPressure(next, preview);
+  const factionTouches = getFrontFactionTouches(next, {
+    frontId: preview.frontId,
+    districtId: preview.districtId,
+    ...(preview.venueId ? { venueId: preview.venueId } : {}),
+    roleTags: preview.definition.roleTags,
+  });
+  next = factionTouches.reduce(
+    (current, touch) =>
+      applyFactionMetricDelta(current, touch.factionId, touch.delta, {
+        sourceType: 'front',
+        sourceId: `${preview.frontId}:${preview.mode}`,
+      }),
+    next,
+  );
   next = appendLog(next, {
     type: 'order_resolved',
     title: `Invest in Front: ${preview.frontName}`,
-    body: createResolutionBody(preview, resolvedDelta),
+    body: createResolutionBody(preview, resolvedDelta, factionTouches),
     pressureDelta: resolvedDelta,
     tags: [
       'FRONT',
@@ -67,6 +86,7 @@ export function resolveInvestFront(
       preview.districtId,
       ...(preview.venueId ? [preview.venueId] : []),
       ...(preview.relatedRivalId ? [preview.relatedRivalId] : []),
+      ...factionTouches.map((touch) => touch.factionId),
     ],
   });
 
@@ -173,6 +193,7 @@ function applyRivalPressure(state: GameState, rivalId: RivalId, amount: number):
 function createResolutionBody(
   preview: ResolvedFrontInvestmentPreview,
   resolvedDelta: PressureDelta,
+  factionTouches: readonly FactionTouch[],
 ): string {
   const action =
     preview.mode === 'establish'
@@ -188,8 +209,10 @@ function createResolutionBody(
   const rival = preview.rivalPressureWarning && preview.rivalPressureWarning.pressureGain > 0
     ? ` ${preview.rivalPressureWarning.rivalName} Pressure +${preview.rivalPressureWarning.pressureGain}.`
     : '';
+  const faction = formatFactionTouches(factionTouches);
+  const factionText = faction ? ` Factions: ${faction}.` : '';
 
-  return `${action} in ${preview.districtName}.${cost}${pressureText}${exposure}${rival}`;
+  return `${action} in ${preview.districtName}.${cost}${pressureText}${exposure}${rival}${factionText}`;
 }
 
 function formatPressureDelta(delta: PressureDelta): string {
@@ -197,6 +220,25 @@ function formatPressureDelta(delta: PressureDelta): string {
     .filter(([, value]) => value !== 0)
     .map(([pressure, value]) => `${value > 0 ? '+' : ''}${value} ${pressure}`)
     .join(', ');
+}
+
+function formatFactionTouches(touches: readonly FactionTouch[]): string {
+  return touches
+    .map((touch) => {
+      const delta = Object.entries(touch.delta)
+        .filter(([, value]) => value !== undefined && value !== 0)
+        .map(([metric, value]) => `${metric} ${formatSigned(value)}`)
+        .join(', ');
+
+      return delta ? `${touch.factionName}: ${delta}` : '';
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
+function formatSigned(value: number | undefined): string {
+  const safeValue = value ?? 0;
+  return safeValue > 0 ? `+${safeValue}` : `${safeValue}`;
 }
 
 function appendLog(

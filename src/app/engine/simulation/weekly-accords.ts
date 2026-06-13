@@ -8,7 +8,7 @@ import type {
   GameState,
   PressureDelta,
 } from '../model';
-import { applyFactionMetricDelta } from './resolve-broker-accord';
+import { applyFactionMetricDelta } from './faction-effects';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 
 type AccordTick = {

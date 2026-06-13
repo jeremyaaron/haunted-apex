@@ -1,5 +1,4 @@
 import { createActiveAccordId, previewBrokerAccord } from '../accords';
-import { clampFactionMetric } from '../factions';
 import { clampFrontExposure } from '../fronts';
 import { addLedgerEntry } from '../ledger';
 import type {
@@ -7,14 +6,13 @@ import type {
   ActiveAccordId,
   AccordId,
   ActionTarget,
-  FactionId,
-  FactionInteraction,
   FactionMetricDelta,
   GameLogEntry,
   GameState,
   PressureDelta,
 } from '../model';
 import { createRng } from '../rng';
+import { applyFactionMetricDelta } from './faction-effects';
 import type { ActionResolution } from './resolve-action';
 import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 
@@ -70,53 +68,6 @@ export function resolveBrokerAccord(
     riskChance: 10,
     resolvedDelta,
     stressDelta: 0,
-  };
-}
-
-export function applyFactionMetricDelta(
-  state: GameState,
-  factionId: FactionId,
-  delta: FactionMetricDelta,
-  context: Pick<FactionInteraction, 'sourceType' | 'sourceId'>,
-): GameState {
-  const faction = state.factions[factionId];
-
-  if (!faction) {
-    return state;
-  }
-
-  const standing = clampFactionMetric(faction.standing + (delta.standing ?? 0));
-  const suspicion = clampFactionMetric(faction.suspicion + (delta.suspicion ?? 0));
-  const obligation = clampFactionMetric(faction.obligation + (delta.obligation ?? 0));
-  const changed =
-    standing !== faction.standing ||
-    suspicion !== faction.suspicion ||
-    obligation !== faction.obligation;
-  const interaction: FactionInteraction = {
-    week: state.week,
-    sourceType: context.sourceType,
-    sourceId: context.sourceId,
-    ...(standing !== faction.standing ? { standingDelta: standing - faction.standing } : {}),
-    ...(suspicion !== faction.suspicion ? { suspicionDelta: suspicion - faction.suspicion } : {}),
-    ...(obligation !== faction.obligation
-      ? { obligationDelta: obligation - faction.obligation }
-      : {}),
-  };
-
-  return {
-    ...state,
-    factions: {
-      ...state.factions,
-      [factionId]: {
-        ...faction,
-        standing,
-        suspicion,
-        obligation,
-        recentInteractions: changed
-          ? [...faction.recentInteractions, interaction].slice(-8)
-          : faction.recentInteractions,
-      },
-    },
   };
 }
 

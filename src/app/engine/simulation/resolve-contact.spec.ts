@@ -1,3 +1,5 @@
+import { getFactionDefinition } from '../content';
+import { materializeFactionState } from '../factions';
 import type { ContactId, GameState } from '../model';
 import { previewContactOption } from '../contacts';
 import { newGame } from './new-game';
@@ -42,6 +44,37 @@ describe('resolveQueuedOrder Manage Contact', () => {
     );
   });
 
+  it('cultivating an associated contact increases faction Standing', () => {
+    const state = withActiveFaction(
+      withActiveContacts(newGame({ seed: 'CONTACT-FACTION-CULTIVATE' }), [
+        'contact_veyra_lux',
+        'contact_captain_hollis',
+        'contact_father_static',
+      ]),
+      'faction_velvet_house',
+    );
+    const before = state.factions.faction_velvet_house!;
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'manage_contact',
+      target: {
+        type: 'contact',
+        contactId: 'contact_veyra_lux',
+        optionId: 'cultivate',
+      },
+    });
+
+    expect(result.state.factions.faction_velvet_house?.standing).toBe(before.standing + 1);
+    expect(result.state.factions.faction_velvet_house?.recentInteractions.at(-1)).toEqual(
+      jasmine.objectContaining({
+        sourceType: 'contact',
+        sourceId: 'contact_veyra_lux:cultivate',
+        standingDelta: 1,
+      }),
+    );
+    expect(result.state.eventLog.at(-1)?.body).toContain('Velvet House: standing +1');
+  });
+
   it('applies Pressure exactly as previewed', () => {
     const state = withActiveContacts(newGame({ seed: 'CONTACT-PRESSURE' }), [
       'contact_veyra_lux',
@@ -81,6 +114,30 @@ describe('resolveQueuedOrder Manage Contact', () => {
     expect(result.state.contacts.contact_veyra_lux.volatility).toBe(
       state.contacts.contact_veyra_lux.volatility + 8,
     );
+  });
+
+  it('pressuring an associated contact increases faction Suspicion', () => {
+    const state = withActiveFaction(
+      withActiveContacts(newGame({ seed: 'CONTACT-FACTION-PRESSURE' }), [
+        'contact_veyra_lux',
+        'contact_captain_hollis',
+        'contact_father_static',
+      ]),
+      'faction_velvet_house',
+    );
+    const before = state.factions.faction_velvet_house!;
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'manage_contact',
+      target: {
+        type: 'contact',
+        contactId: 'contact_veyra_lux',
+        optionId: 'pressure',
+      },
+    });
+
+    expect(result.state.factions.faction_velvet_house?.suspicion).toBe(before.suspicion + 2);
+    expect(result.state.eventLog.at(-1)?.body).toContain('Velvet House: suspicion +2');
   });
 
   it('applies service pressure, contact, and rival pressure effects', () => {
@@ -124,6 +181,33 @@ describe('resolveQueuedOrder Manage Contact', () => {
           },
         },
       }),
+    );
+  });
+
+  it('using an associated contact service adds scoped Suspicion and Obligation', () => {
+    const state = withActiveFaction(
+      withActiveContacts(newGame({ seed: 'CONTACT-FACTION-SERVICE' }), [
+        'contact_veyra_lux',
+        'contact_captain_hollis',
+        'contact_father_static',
+      ]),
+      'faction_velvet_house',
+    );
+    const before = state.factions.faction_velvet_house!;
+    const result = resolveQueuedOrder(state, {
+      id: 'order_1_1',
+      actionId: 'manage_contact',
+      target: {
+        type: 'contact',
+        contactId: 'contact_veyra_lux',
+        optionId: 'private_room_access',
+      },
+    });
+
+    expect(result.state.factions.faction_velvet_house?.suspicion).toBe(before.suspicion + 2);
+    expect(result.state.factions.faction_velvet_house?.obligation).toBe(before.obligation + 2);
+    expect(result.state.eventLog.at(-1)?.body).toContain(
+      'Velvet House: suspicion +2, obligation +2',
     );
   });
 
@@ -228,4 +312,26 @@ function withActiveContacts(state: GameState, activeContactIds: ContactId[]): Ga
     ...state,
     activeContactIds,
   };
+}
+
+function withActiveFaction(
+  state: GameState,
+  factionId: NonNullable<ReturnType<typeof getFactionDefinition>>['id'],
+): GameState {
+  if (state.activeFactionIds.includes(factionId)) {
+    return state;
+  }
+
+  const replaceableId = state.activeFactionIds.find(
+    (activeFactionId) => activeFactionId !== 'faction_ashline_bureau',
+  )!;
+  const definition = getFactionDefinition(factionId)!;
+  const next = structuredClone(state);
+  next.activeFactionIds = next.activeFactionIds.map((activeFactionId) =>
+    activeFactionId === replaceableId ? factionId : activeFactionId,
+  );
+  delete next.factions[replaceableId];
+  next.factions[factionId] = materializeFactionState(definition);
+
+  return next;
 }
