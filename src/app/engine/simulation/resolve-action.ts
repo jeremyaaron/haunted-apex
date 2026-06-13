@@ -41,6 +41,7 @@ import { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 import { recordRecentActivity } from './recent-activity';
 import { resolveContactOption } from './resolve-contact';
 import { resolveInvestFront } from './resolve-front-investment';
+import { resolveBrokerAccord } from './resolve-broker-accord';
 
 export type ActionResolution = {
   state: GameState;
@@ -97,6 +98,10 @@ export function resolveQueuedOrder(state: GameState, order: QueuedOrder): Action
 
   if (action.id === 'invest_front') {
     return resolveInvestFront(state, order.target);
+  }
+
+  if (action.id === 'broker_accord') {
+    return resolveBrokerAccord(state, order.target);
   }
 
   if (action.id === 'lay_low' && order.target?.type === 'front') {

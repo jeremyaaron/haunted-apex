@@ -4,6 +4,7 @@ export { advanceWeek } from './resolve-week';
 export { getActionStressDelta, getResolvedActionDelta, resolveQueuedOrder } from './resolve-action';
 export { resolveContactOption } from './resolve-contact';
 export { resolveInvestFront } from './resolve-front-investment';
+export { applyFactionMetricDelta, resolveBrokerAccord } from './resolve-broker-accord';
 export { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 export { applyWeeklyFrontYields } from './front-yields';
 export { applyWeeklyDrift } from './weekly-drift';

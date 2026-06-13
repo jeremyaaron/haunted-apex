@@ -716,6 +716,31 @@ Unit tests:
 - Different accord from the same faction can be brokered later after expiration.
 - Stale invalid queued broker orders are blocked and logged.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added `resolveBrokerAccord` and wired `broker_accord` into queued order resolution.
+- Broker Accord resolution now reuses `previewBrokerAccord` for validation, costs, immediate
+  effects, faction deltas, rival pressure effects, front exposure hooks, Ledger entries, and
+  active accord timing.
+- Invalid or stale queued Broker Accord orders now resolve as blocked complications instead of
+  crashing the run.
+- Brokered accords now create `ActiveAccord` records, mark the accord definition as used, add the
+  active accord id to the faction, and append a recent faction interaction.
+- Added event-feed logging for resolved and blocked accord orders.
+- Exported broker accord resolution helpers from the simulation barrel for later weekly accord
+  phases.
+- Added resolver coverage for cost spending, immediate effects, faction start effects, rival
+  pressure, front exposure hooks, Ledger entry creation, one-use blocking, later different accords,
+  and stale invalid orders.
+- Verification completed: focused Broker Accord resolver spec passed with 8 specs; focused
+  Broker Accord/preview/queue/action suite passed with 61 specs; full suite passed with 500 specs;
+  app/spec TypeScript, docs check, local build, Pages production build, and `git diff --check`
+  passed.
+- Build bundle check: initial bundle `578.33 kB`, under the current `600 kB` warning budget.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm the player can broker accords through the engine before adding weekly effects.
