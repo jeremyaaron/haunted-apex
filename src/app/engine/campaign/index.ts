@@ -1,3 +1,4 @@
+export { assembleNewRun } from './assemble-new-run';
 export {
   getCampaignTensionDefinitionOrThrow,
   selectCampaignTension,

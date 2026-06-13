@@ -1,4 +1,5 @@
 import {
+  CAMPAIGN_TENSION_DEFINITIONS,
   CONTACT_DEFINITIONS,
   DISTRICT_ZERO_COMMAND_POINTS,
   DISTRICT_ZERO_INITIAL_PRESSURES,
@@ -29,7 +30,7 @@ describe('newGame', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(7);
+    expect(state.schemaVersion).toBe(8);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
@@ -48,6 +49,42 @@ describe('newGame', () => {
     expect(state.seenSignatureEventIds).toEqual([]);
     expect(state.gameOver).toBeUndefined();
     expect(state.pendingEvent).toBeUndefined();
+  });
+
+  it('creates deterministic Campaign identity and run-start active-content audit', () => {
+    const state = newGame({ seed: 'VIOLET-ASH-1047' });
+    const matchingTension = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (definition) => definition.id === state.campaign.tensionId,
+    );
+
+    expect(matchingTension).toBeDefined();
+    expect(state.campaign.cityName.trim()).not.toBe('');
+    expect(matchingTension?.cityProfileOptions).toContain(state.campaign.cityProfile);
+    expect(state.campaign.openingBriefingShown).toBeFalse();
+    expect(state.campaign.appliedModifiers).toEqual({});
+    expect(state.campaign.flags).toEqual({});
+    expect(state.campaign.activeContent.factionIds).toEqual(state.activeFactionIds);
+    expect(state.campaign.activeContent.contactIds).toEqual(state.activeContactIds);
+    expect(state.campaign.activeContent.rivalIds).toEqual(
+      RIVAL_TERRITORY_RIVALS.map((rival) => rival.id),
+    );
+    expect(state.campaign.activeContent.startingOperativeIds).toEqual(
+      state.operatives.map((operative) => operative.id),
+    );
+    expect(state.campaign.activeContent.frontDefinitionIds).toEqual([
+      'front_pale_circuit',
+      ...state.frontOpportunities.map((opportunity) => opportunity.definitionId),
+    ]);
+  });
+
+  it('respects explicit Campaign Tension override', () => {
+    const state = newGame({
+      seed: 'VIOLET-ASH-1047',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+
+    expect(state.campaign.tensionId).toBe('campaign_ghostline_signal');
+    expect(state.campaign.cityProfile).toBe('ghost_market');
   });
 
   it('initializes district overlays from static definitions', () => {

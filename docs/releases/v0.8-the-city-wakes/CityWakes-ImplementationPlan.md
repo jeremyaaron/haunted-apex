@@ -398,6 +398,52 @@ npm run build
 git diff --check
 ```
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added `campaign: CampaignState` to `GameState`.
+- Advanced `GameState.schemaVersion` to `8`.
+- Added `campaignTensionId?: CampaignTensionId` to `NewGameConfig`.
+- Moved new-run assembly into `src/app/engine/campaign/assemble-new-run.ts` while preserving
+  `newGame(config)` as the public simulation entry point.
+- New runs now select a Campaign Tension deterministically from the seed unless an explicit
+  Campaign Tension override is provided.
+- New runs now generate deterministic city identity and populate `CampaignState` with:
+  - `tensionId`
+  - `cityName`
+  - `cityProfile`
+  - `openingBriefingShown: false`
+  - empty `appliedModifiers`
+  - active content audit IDs
+  - empty campaign flags
+- Kept campaign generation bias and starting modifiers out of scope for this phase.
+- Updated persistence constants:
+
+```text
+save schema: 8
+game version: 0.8.0
+current key: haunted-apex:v0.8:current-run
+legacy key invalidated: haunted-apex:v0.7:current-run
+```
+
+- Updated incompatible-save copy for v0.8.0 - The City Wakes.
+- Updated storage validation for Campaign state. Campaign active-content audit IDs are validated
+  as defined, unique content references; they are not required to mirror mutable live collections.
+- Added storage coverage for v0.8 envelopes, v0.7 legacy invalidation, Campaign state round-trip,
+  and malformed Campaign state rejection.
+- Added new-run coverage for Campaign identity, city identity, active content audit state, and
+  explicit Campaign Tension override.
+- Focused Phase 2 verification passed:
+
+```text
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/simulation/new-game.spec.ts' --include='src/app/game/game-storage.service.spec.ts' --include='src/app/engine/campaign/campaign.spec.ts'
+```
+
+- Full regression suite passed: 547 tests in ChromeHeadless.
+
 ### Review Gate
 
 Confirm new runs and persistence are stable before applying campaign modifiers.

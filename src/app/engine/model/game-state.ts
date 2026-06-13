@@ -1,6 +1,7 @@
 import type { QueuedOrder } from './actions';
 import type { RecentActivityEntry } from './activity';
 import type { ActiveAccord, ActiveAccordId } from './accords';
+import type { CampaignState, CampaignTensionId } from './campaign';
 import type { ContactId, ContactState } from './contacts';
 import type { DistrictId, DistrictState } from './districts';
 import type { EventId, GameEventInstance } from './events';
@@ -16,6 +17,7 @@ export type Difficulty = 'standard';
 export type NewGameConfig = {
   seed?: string;
   difficulty?: Difficulty;
+  campaignTensionId?: CampaignTensionId;
 };
 
 export type TurnPhase =
@@ -62,7 +64,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
-  schemaVersion: 7;
+  schemaVersion: 8;
   id: string;
   seed: string;
   rngCursor: number;
@@ -70,6 +72,7 @@ export type GameState = {
   maxWeeks: number;
   phase: TurnPhase;
   commandPointsPerWeek: number;
+  campaign: CampaignState;
   pressures: Pressures;
   operatives: OperativeState[];
   hirePool: OperativeId[];
