@@ -7,6 +7,8 @@ export {
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
 } from './district-zero-tuning';
 export { ACCORD_DEFINITIONS, getAccordDefinition } from './accords';
+export { CAMPAIGN_TENSION_DEFINITIONS, getCampaignTensionDefinition } from './campaign-tensions';
+export { CITY_PREFIXES, CITY_SUFFIXES } from './city-names';
 export { CONTACT_DEFINITIONS, getContactDefinition, UNIVERSAL_CONTACT_OPTIONS } from './contacts';
 export { DISTRICT_ZERO_ACTIONS, getActionDefinition } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './event-registry';

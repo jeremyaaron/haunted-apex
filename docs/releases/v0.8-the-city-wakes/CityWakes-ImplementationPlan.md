@@ -290,6 +290,61 @@ npm run check:docs
 git diff --check
 ```
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added Campaign model contracts in `src/app/engine/model/campaign.ts`:
+  - `CampaignTensionId`
+  - `CampaignRoleTag`
+  - `CityProfile`
+  - `CityIdentity`
+  - `CampaignGenerationBias`
+  - `CampaignEventWeightModifier`
+  - `CampaignTensionDefinition`
+  - `CampaignState`
+- Added the five locked Campaign Tension definitions in
+  `src/app/engine/content/campaign-tensions.ts`:
+  - Corp Crackdown
+  - Nightlife War
+  - Ghostline Signal
+  - Industrial Cut
+  - Dirty Capital
+- Added deterministic city-name source content in `src/app/engine/content/city-names.ts`.
+- Added `selectCampaignTension()` and `generateCityIdentity()` under
+  `src/app/engine/campaign/`.
+- Added `getCampaignTensionDefinition()` to the content registry.
+- Exported Campaign model, content, and helper APIs through the existing engine barrels.
+- Kept Campaign state unattached from `GameState`; Phase 2 still owns save-schema and storage-key
+  changes.
+- Kept all Campaign references scoped to existing content IDs.
+- Mapped the vision's `resources` operative bias to the existing `money` operative role tag.
+- Added content validation coverage for Campaign references:
+  - Factions
+  - Rivals
+  - Contacts
+  - Operatives
+  - Front definitions
+  - Operative role tags
+  - Front role tags
+  - Event tags
+  - Event IDs
+- Added deterministic helper coverage proving:
+  - Same seed selects the same Campaign Tension.
+  - Seed space can select more than one Campaign Tension.
+  - Same seed and tension generate the same city identity.
+  - Explicit different tensions can produce different city profiles.
+  - Campaign selection and city identity generation do not consume the caller RNG cursor.
+- Focused Phase 1 verification passed:
+
+```text
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/content/campaign-content.spec.ts' --include='src/app/engine/campaign/campaign.spec.ts'
+```
+
+- Focused Campaign suites passed: 10 tests.
+
 ### Review Gate
 
 Confirm campaign content and ID normalization before changing `GameState`.
