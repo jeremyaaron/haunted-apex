@@ -10,6 +10,7 @@ export { ACCORD_DEFINITIONS, getAccordDefinition } from './accords';
 export { CONTACT_DEFINITIONS, getContactDefinition, UNIVERSAL_CONTACT_OPTIONS } from './contacts';
 export { DISTRICT_ZERO_ACTIONS, getActionDefinition } from './district-zero-actions';
 export { DISTRICT_ZERO_EVENTS, getEventDefinition } from './event-registry';
+export { FACTION_EVENTS } from './faction-events';
 export { FACTION_DEFINITIONS, getFactionDefinition } from './factions';
 export { FRONT_EVENTS } from './front-events';
 export { getLedgerEntryDefinition, LEDGER_ENTRY_DEFINITIONS } from './ledger-entries';

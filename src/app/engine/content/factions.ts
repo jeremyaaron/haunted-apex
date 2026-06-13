@@ -1,5 +1,14 @@
 import type { FactionDefinition, FactionId } from '../model';
 
+const GENERIC_FACTION_EVENT_IDS = [
+  'faction_demand',
+  'faction_scrutiny',
+  'accord_terms_shift',
+  'market_access',
+  'proxy_conflict',
+  'institutional_blind_spot',
+] as const;
+
 export const FACTION_DEFINITIONS = [
   {
     id: 'faction_ashline_bureau',
@@ -14,7 +23,7 @@ export const FACTION_DEFINITIONS = [
     associatedVenueIds: ['venue_pale_circuit'],
     associatedContactIds: ['contact_captain_hollis'],
     associatedFrontTags: ['heat_control', 'security', 'stability'],
-    eventIds: [],
+    eventIds: GENERIC_FACTION_EVENT_IDS,
     flavor: {
       dossier: 'Ashline Bureau does not prevent crime. It prices visibility.',
       visualTags: ['security', 'patrols', 'compliance', 'files'],
@@ -31,7 +40,7 @@ export const FACTION_DEFINITIONS = [
     accordIds: ['accord_helix_quiet_capital', 'accord_helix_permit_shell'],
     associatedDistrictIds: ['district_violet_ward', 'district_chrome_narrows'],
     associatedFrontTags: ['resources', 'security', 'heat_control', 'social'],
-    eventIds: [],
+    eventIds: GENERIC_FACTION_EVENT_IDS,
     flavor: {
       dossier:
         'Helix Meridian owns buildings, arteries, boardrooms, and several versions of the truth.',
@@ -52,7 +61,7 @@ export const FACTION_DEFINITIONS = [
     associatedRivalIds: ['rival_nyx_ardent'],
     associatedContactIds: ['contact_veyra_lux', 'contact_mina_glass'],
     associatedFrontTags: ['nightlife', 'social', 'loyalty'],
-    eventIds: [],
+    eventIds: GENERIC_FACTION_EVENT_IDS,
     flavor: {
       dossier: 'Velvet House does not own the nightlife. It owns the invitations.',
       visualTags: ['nightlife', 'invitations', 'guest_lists', 'velvet'],
@@ -71,7 +80,7 @@ export const FACTION_DEFINITIONS = [
     associatedVenueIds: ['venue_zero_mercy'],
     associatedRivalIds: ['rival_knox_marrow'],
     associatedFrontTags: ['resources', 'dominion', 'rival_pressure', 'security'],
-    eventIds: [],
+    eventIds: GENERIC_FACTION_EVENT_IDS,
     flavor: {
       dossier: 'Chrome Maw moves steel, bodies, fuel, and blame through the same loading doors.',
       visualTags: ['industrial', 'shipments', 'muscle', 'chrome'],
@@ -90,7 +99,7 @@ export const FACTION_DEFINITIONS = [
     associatedVenueIds: ['venue_black_halo_exchange'],
     associatedContactIds: ['contact_ciro_moth', 'contact_father_static'],
     associatedFrontTags: ['intel', 'weird', 'ruin'],
-    eventIds: [],
+    eventIds: GENERIC_FACTION_EVENT_IDS,
     flavor: {
       dossier:
         'Ghostline Communion calls itself a market because the word cult attracts regulators.',

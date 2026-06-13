@@ -1,7 +1,10 @@
-import { DISTRICT_ZERO_EVENTS } from '../content';
+import { DISTRICT_ZERO_EVENTS, getFactionDefinition } from '../content';
+import { materializeFactionState } from '../factions';
 import { addLedgerEntry } from '../ledger';
 import type {
   ContactId,
+  FactionId,
+  FactionState,
   FrontId,
   FrontState,
   GameLogEntry,
@@ -17,6 +20,11 @@ import {
   getFrontEventTargetWeight,
   selectFrontForEvent,
 } from './front-events';
+import {
+  getFactionEventEligibility,
+  getFactionEventTargetWeight,
+  selectFactionForEvent,
+} from './faction-events';
 import {
   buildEventWeightContext,
   calculateEventWeight,
@@ -588,6 +596,129 @@ describe('weekly event selection', () => {
     expect(getFrontEventEligibility(lowPressure, event).eligible).toBeFalse();
     expect(getFrontEventEligibility(highPressure, event).eligible).toBeTrue();
   });
+
+  it('gates faction events by active faction state', () => {
+    const demand = requireEvent('faction_demand');
+    const scrutiny = requireEvent('faction_scrutiny');
+    const market = requireEvent('market_access');
+    const blindSpot = requireEvent('institutional_blind_spot');
+    const base = newGame({ seed: 'FACTION-EVENT-GATES' });
+    const eligible = withFactionMetrics(base, 'faction_ashline_bureau', {
+      standing: 66,
+      suspicion: 60,
+      obligation: 50,
+    });
+    const inactiveFactionId = (
+      [
+        'faction_helix_meridian',
+        'faction_velvet_house',
+        'faction_chrome_maw',
+        'faction_ghostline_communion',
+      ] as const
+    ).find((factionId) => !base.activeFactionIds.includes(factionId))!;
+    const inactive = withInactiveFactionMetrics(base, inactiveFactionId, {
+      standing: 80,
+      suspicion: 80,
+      obligation: 80,
+    });
+
+    expect(getFactionEventEligibility(eligible, demand).eligibleFactionIds).toContain(
+      'faction_ashline_bureau',
+    );
+    expect(getFactionEventEligibility(eligible, scrutiny).eligibleFactionIds).toContain(
+      'faction_ashline_bureau',
+    );
+    expect(getFactionEventEligibility(eligible, market).eligibleFactionIds).toContain(
+      'faction_ashline_bureau',
+    );
+    expect(getFactionEventEligibility(eligible, blindSpot).eligible).toBeFalse();
+    expect(getWeightedEvents(inactive).some((candidate) => candidate.event.id === 'faction_demand'))
+      .withContext('inactive faction should not trigger demand')
+      .toBeFalse();
+  });
+
+  it('gates Accord Terms Shift by active accord state', () => {
+    const event = requireEvent('accord_terms_shift');
+    const base = newGame({ seed: 'FACTION-ACCORD-TERMS' });
+    const withAccord: GameState = {
+      ...base,
+      activeAccords: {
+        active_accord_ashline_clean_corridor_1: {
+          id: 'active_accord_ashline_clean_corridor_1',
+          definitionId: 'accord_ashline_clean_corridor',
+          factionId: 'faction_ashline_bureau',
+          startedWeek: 1,
+          remainingWeeks: 2,
+          firstWeeklyEffectWeek: 2,
+          source: { type: 'broker_accord' },
+        },
+      },
+      factions: {
+        ...base.factions,
+        faction_ashline_bureau: {
+          ...base.factions.faction_ashline_bureau!,
+          activeAccordIds: ['active_accord_ashline_clean_corridor_1'],
+        },
+      },
+    };
+
+    expect(getFactionEventEligibility(base, event).eligible).toBeFalse();
+    expect(getFactionEventEligibility(withAccord, event).eligibleFactionIds).toEqual([
+      'faction_ashline_bureau',
+    ]);
+  });
+
+  it('gates Proxy Conflict by associated rival pressure', () => {
+    const event = requireEvent('proxy_conflict');
+    const base = newGame({ seed: 'FACTION-PROXY' });
+    const withVelvet = withActiveFaction(base, 'faction_velvet_house');
+    const highPressure: GameState = {
+      ...withVelvet,
+      rivals: {
+        ...withVelvet.rivals,
+        rival_nyx_ardent: {
+          ...withVelvet.rivals.rival_nyx_ardent,
+          pressure: 55,
+        },
+      },
+    };
+
+    expect(getFactionEventEligibility(base, event).eligible).toBeFalse();
+    expect(getFactionEventEligibility(highPressure, event).eligibleFactionIds).toContain(
+      'faction_velvet_house',
+    );
+  });
+
+  it('selects faction event targets deterministically by seed and weight', () => {
+    const event = requireEvent('faction_demand');
+    const base = withActiveFaction(newGame({ seed: 'FACTION-TARGET' }), 'faction_velvet_house');
+    const state = withFactionMetrics(
+      withFactionMetrics(base, 'faction_ashline_bureau', {
+        obligation: 52,
+      }),
+      'faction_velvet_house',
+      { obligation: 80 },
+    );
+    const rng = createRng(state.seed, state.rngCursor);
+    const first = selectFactionForEvent(state, event, rng);
+    const second = selectFactionForEvent(state, event, rng);
+
+    expect(first).toEqual(second);
+    expect(first.factionId).toBeDefined();
+    expect(getFactionEventTargetWeight(state, event, 'faction_velvet_house')).toBeGreaterThan(
+      getFactionEventTargetWeight(state, event, 'faction_ashline_bureau'),
+    );
+  });
+
+  it('faction events consume the normal weekly event slot', () => {
+    const state = withFactionMetrics(newGame({ seed: 'FACTION-SLOT' }), 'faction_ashline_bureau', {
+      obligation: 95,
+    });
+    const selected = findSelection(state, 'faction_demand');
+
+    expect(selected.event.definitionId).toBe('faction_demand');
+    expect(selected.event.selectedFactionId).toBeDefined();
+  });
 });
 
 function requireEvent(eventId: string) {
@@ -647,6 +778,76 @@ function withRivalPressure(rivalId: RivalId, pressure: number): GameState {
       [rivalId]: {
         ...state.rivals[rivalId],
         pressure,
+      },
+    },
+  };
+}
+
+function withFactionMetrics(
+  state: GameState,
+  factionId: FactionId,
+  metrics: Partial<Pick<FactionState, 'standing' | 'suspicion' | 'obligation'>>,
+): GameState {
+  const faction = state.factions[factionId];
+
+  if (!faction) {
+    return state;
+  }
+
+  return {
+    ...state,
+    factions: {
+      ...state.factions,
+      [factionId]: {
+        ...faction,
+        ...metrics,
+      },
+    },
+  };
+}
+
+function withActiveFaction(state: GameState, factionId: FactionId): GameState {
+  if (state.activeFactionIds.includes(factionId)) {
+    return state;
+  }
+
+  const replaceableId = state.activeFactionIds.find(
+    (activeFactionId) => activeFactionId !== 'faction_ashline_bureau',
+  );
+  const definition = getFactionDefinition(factionId);
+
+  if (!replaceableId || !definition) {
+    return state;
+  }
+
+  const next = structuredClone(state);
+  next.activeFactionIds = next.activeFactionIds.map((activeFactionId) =>
+    activeFactionId === replaceableId ? factionId : activeFactionId,
+  );
+  delete next.factions[replaceableId];
+  next.factions[factionId] = materializeFactionState(definition);
+
+  return next;
+}
+
+function withInactiveFactionMetrics(
+  state: GameState,
+  factionId: FactionId,
+  metrics: Partial<Pick<FactionState, 'standing' | 'suspicion' | 'obligation'>>,
+): GameState {
+  const definition = getFactionDefinition(factionId);
+
+  if (!definition) {
+    return state;
+  }
+
+  return {
+    ...state,
+    factions: {
+      ...state.factions,
+      [factionId]: {
+        ...materializeFactionState(definition),
+        ...metrics,
       },
     },
   };

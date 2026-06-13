@@ -1025,6 +1025,36 @@ Unit tests:
 - Event choices preview and apply faction effects.
 - Faction events consume the normal weekly event slot.
 
+### Completion Record
+
+Completed June 13, 2026:
+
+- Added six generic faction event templates:
+  - `Faction Demand`
+  - `Faction Scrutiny`
+  - `Accord Terms Shift`
+  - `Market Access`
+  - `Proxy Conflict`
+  - `Institutional Blind Spot`
+- Extended event state with `selectedFactionId` and event definitions with faction eligibility
+  metadata and explicit choice faction effects.
+- Added faction event eligibility, deterministic target selection, selected faction naming,
+  selected faction rival resolution, and faction effect preview helpers.
+- Wired faction events into the weekly event weighting and selection pipeline so they use the
+  normal single weekly event slot and only select active eligible factions.
+- Added event choice faction effect preview rows in the UI and centralized faction effect
+  application during event resolution.
+- Added `{factionName}` interpolation for pending event display, event presentation logs, and
+  event choice logs.
+- Extended save validation for pending events with selected faction context.
+- Added focused tests for faction event eligibility gates, inactive faction exclusion,
+  active-accord gating, associated-rival gating, deterministic target selection, normal-slot
+  selection, event choice previews, faction metric application, and selected faction rival
+  pressure.
+- Verification completed: app/spec TypeScript, focused Phase 9 suite, full suite, local build,
+  Pages production build, docs check, and `git diff --check` passed.
+- No dev, Karma, or browser-debug process from this phase was left running.
+
 ### Review Gate
 
 Confirm faction events create visible pressure without overwhelming the event feed.

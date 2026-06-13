@@ -38,6 +38,14 @@ export {
   selectFrontForEvent,
 } from './front-events';
 export {
+  getFactionEventEligibility,
+  getFactionEventTargetWeight,
+  getSelectedFactionName,
+  previewEventFactionEffects,
+  resolveSelectedFactionRivalId,
+  selectFactionForEvent,
+} from './faction-events';
+export {
   buildEventWeightContext,
   calculateEventWeight,
   getWeightedEvents,
@@ -79,4 +87,8 @@ export type {
   ResolveEventChoiceResult,
 } from './resolve-event';
 export type { FrontEventEligibilityDiagnostics } from './front-events';
+export type {
+  FactionEffectPreviewRow,
+  FactionEventEligibilityDiagnostics,
+} from './faction-events';
 export type { OperativeEventEligibilityDiagnostics } from './operative-events';

@@ -1,4 +1,9 @@
-import { getContactDefinition, getFrontDefinition, getLedgerEntryDefinition } from '../content';
+import {
+  getContactDefinition,
+  getFactionDefinition,
+  getFrontDefinition,
+  getLedgerEntryDefinition,
+} from '../content';
 import type { GameEventInstance, GameState, QueuedOrder } from '../model';
 import { applyIdleStressRecovery, pruneRecentAssignments } from './stress';
 import { applyWeeklyDrift } from './weekly-drift';
@@ -132,9 +137,13 @@ function renderSelectedEventText(
   const selectedFrontDefinition = selectedFront
     ? getFrontDefinition(selectedFront.definitionId)
     : undefined;
+  const selectedFactionDefinition = event.selectedFactionId
+    ? getFactionDefinition(event.selectedFactionId)
+    : undefined;
 
   return text
     .replaceAll('{ledgerEntryName}', selectedLedgerDefinition?.name ?? 'Ledger Entry')
     .replaceAll('{contactName}', selectedContactDefinition?.name ?? 'Contact')
-    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front');
+    .replaceAll('{frontName}', selectedFrontDefinition?.name ?? 'Front')
+    .replaceAll('{factionName}', selectedFactionDefinition?.name ?? 'Faction');
 }

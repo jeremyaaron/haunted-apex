@@ -28,6 +28,11 @@ import {
   selectFrontForEvent,
   type FrontEventEligibilityDiagnostics,
 } from './front-events';
+import {
+  getFactionEventEligibility,
+  selectFactionForEvent,
+  type FactionEventEligibilityDiagnostics,
+} from './faction-events';
 
 const MAJOR_NEGATIVE_TAGS = new Set<EventTag>([
   'HEAT',
@@ -90,7 +95,14 @@ export type EventWeightModifierId =
   | 'front_eligible'
   | 'front_exposed'
   | 'front_hot'
-  | 'front_level_2';
+  | 'front_level_2'
+  | 'faction_eligible'
+  | 'faction_high_obligation'
+  | 'faction_high_suspicion'
+  | 'faction_active_accord'
+  | 'faction_high_standing'
+  | 'faction_rival_pressure'
+  | 'faction_blind_spot';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -106,6 +118,7 @@ export type EventWeightDiagnostics = {
   operativeEligibility?: OperativeEventEligibilityDiagnostics;
   contactEligibility?: ContactEventEligibilityDiagnostics;
   frontEligibility?: FrontEventEligibilityDiagnostics;
+  factionEligibility?: FactionEventEligibilityDiagnostics;
 };
 
 export function selectWeeklyEvent(state: GameState): EventSelection {
@@ -260,6 +273,9 @@ function calculateWeightedEvent(
       ...(event.front
         ? { frontEligibility: getFrontEventEligibility(state, event) }
         : {}),
+      ...(event.faction
+        ? { factionEligibility: getFactionEventEligibility(state, event) }
+        : {}),
     },
   };
 }
@@ -334,6 +350,45 @@ function getContextModifiers(
 
     if (eligibleFronts.some((front) => front.level === 2)) {
       modifiers.push({ id: 'front_level_2', amount: 2 });
+    }
+  }
+
+  if (event.faction) {
+    const factionEligibility = getFactionEventEligibility(state, event);
+    modifiers.push({ id: 'faction_eligible', amount: 0 });
+
+    if (factionEligibility.maxObligation >= 70) {
+      modifiers.push({ id: 'faction_high_obligation', amount: 8 });
+    } else if (factionEligibility.maxObligation >= 50) {
+      modifiers.push({ id: 'faction_high_obligation', amount: 4 });
+    }
+
+    if (factionEligibility.maxSuspicion >= 70) {
+      modifiers.push({ id: 'faction_high_suspicion', amount: 8 });
+    } else if (factionEligibility.maxSuspicion >= 60) {
+      modifiers.push({ id: 'faction_high_suspicion', amount: 4 });
+    }
+
+    if (factionEligibility.activeAccordCount > 0) {
+      modifiers.push({
+        id: 'faction_active_accord',
+        amount: Math.min(8, factionEligibility.activeAccordCount * 4),
+      });
+    }
+
+    if (factionEligibility.maxStanding >= 65) {
+      modifiers.push({ id: 'faction_high_standing', amount: 5 });
+    }
+
+    if (factionEligibility.maxAssociatedRivalPressure >= 50) {
+      modifiers.push({ id: 'faction_rival_pressure', amount: 5 });
+    }
+
+    if (
+      event.faction.kind === 'institutional_blind_spot' &&
+      factionEligibility.eligibleFactionIds.length > 0
+    ) {
+      modifiers.push({ id: 'faction_blind_spot', amount: 3 });
     }
   }
 
@@ -417,6 +472,10 @@ function isEligibleEvent(state: GameState, event: EventDefinition): boolean {
     return false;
   }
 
+  if (event.faction && !getFactionEventEligibility(state, event).eligible) {
+    return false;
+  }
+
   if (event.kind !== 'operative') {
     return true;
   }
@@ -436,18 +495,20 @@ function createSelection(
   const selectedLedgerEntry = selectLedgerEntryForEvent(state, selected.event);
   const selectedContactId = selectContactForEvent(state, selected.event);
   const selectedFront = selectFrontForEvent(state, selected.event, rng);
+  const selectedFaction = selectFactionForEvent(state, selected.event, selectedFront.rng);
 
   return {
     definition: selected.event,
-    rng: selectedFront.rng,
+    rng: selectedFaction.rng,
     diagnostics: selected.diagnostics,
     event: {
-      id: `event_${state.week}_${selectedFront.rng.cursor}`,
+      id: `event_${state.week}_${selectedFaction.rng.cursor}`,
       definitionId: selected.event.id,
       week: state.week,
       ...(selectedLedgerEntry ? { selectedLedgerEntryId: selectedLedgerEntry.id } : {}),
       ...(selectedContactId ? { selectedContactId } : {}),
       ...(selectedFront.frontId ? { selectedFrontId: selectedFront.frontId } : {}),
+      ...(selectedFaction.factionId ? { selectedFactionId: selectedFaction.factionId } : {}),
     },
   };
 }

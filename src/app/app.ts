@@ -24,6 +24,7 @@ import {
   type ContactServiceView,
   type EventChoiceDefinition,
   type FrontEffectPreviewRow,
+  type FactionEffectPreviewRow,
   type FrontInvestmentPanelView,
   type EventLedgerEffectPreviewRow,
   type LedgerContactDeltaRow,
@@ -386,6 +387,26 @@ export class App {
     }
 
     return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.frontEffects ?? [];
+  }
+
+  protected eventFactionRows(choiceId: string): FactionEffectPreviewRow[] {
+    const pendingEvent = this.game.state().pendingEvent;
+
+    if (!pendingEvent) {
+      return [];
+    }
+
+    return this.game.getEventChoicePreview(pendingEvent.id, choiceId)?.factionEffects ?? [];
+  }
+
+  protected eventFactionEffectText(row: FactionEffectPreviewRow): string {
+    return `${row.factionName} ${this.displayToken(row.id)} ${this.signed(row.value)}`;
+  }
+
+  protected eventFactionEffectIsWarning(row: FactionEffectPreviewRow): boolean {
+    return (
+      (row.id === 'suspicion' || row.id === 'obligation') ? row.value > 0 : row.value < 0
+    );
   }
 
   protected eventFrontEffectText(row: FrontEffectPreviewRow): string {

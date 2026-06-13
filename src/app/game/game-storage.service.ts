@@ -1094,7 +1094,10 @@ function isPendingEvent(value: unknown): boolean {
         getContactDefinition(value['selectedContactId'] as ContactId) !== undefined)) &&
     (value['selectedFrontId'] === undefined ||
       (typeof value['selectedFrontId'] === 'string' &&
-        getFrontDefinition(value['selectedFrontId'] as FrontId) !== undefined))
+        getFrontDefinition(value['selectedFrontId'] as FrontId) !== undefined)) &&
+    (value['selectedFactionId'] === undefined ||
+      (typeof value['selectedFactionId'] === 'string' &&
+        getFactionDefinition(value['selectedFactionId'] as FactionId) !== undefined))
   );
 }
 
