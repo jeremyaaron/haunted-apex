@@ -832,6 +832,34 @@ git diff --check
 
 Confirm selectors and facade behavior before wiring the Angular template.
 
+### Completion Notes
+
+- Added campaign selector view models:
+  - `CampaignHeaderView`
+  - `CampaignBriefingView`
+  - exact `CampaignEffectRow` starting shifts
+  - active-this-run labels
+  - favored-by-tension labels
+  - pressure pattern labels
+- Kept campaign presentation logic inside engine selectors instead of Angular templates.
+- Separated actual active run content from qualitative favored-by-tension content.
+- Added `GameFacade` campaign APIs:
+  - `campaignHeader`
+  - `campaignBriefing`
+  - `campaignBriefingOpen`
+  - `startNewRun(seed?, campaignTensionId?)`
+  - `dismissCampaignBriefing()`
+  - `openCampaignBriefing()`
+  - `closeCampaignBriefing()`
+- Persisted `openingBriefingShown = true` when dismissing the briefing.
+- Auto-opened briefing for new/loaded runs only when `openingBriefingShown` is false.
+- Added selector and facade tests for content, explicit Campaign start, briefing visibility,
+  dismissal persistence, and reopen/close behavior.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/selectors/*campaign*.spec.ts' --include='src/app/game/game.facade.spec.ts'`
+
 ## Phase 9: Opening Briefing UI, Header Identity, and New Run Campaign Selection
 
 ### Objective

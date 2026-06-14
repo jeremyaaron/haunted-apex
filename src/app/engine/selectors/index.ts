@@ -1,4 +1,15 @@
 export {
+  selectCampaignActiveThisRunLabels,
+  selectCampaignBriefingView,
+  selectCampaignHeaderView,
+  selectCampaignStartingEffectRows,
+} from './campaign';
+export type {
+  CampaignBriefingView,
+  CampaignEffectRow,
+  CampaignHeaderView,
+} from './campaign';
+export {
   isActiveContact,
   selectActiveContacts,
   selectContactState,
