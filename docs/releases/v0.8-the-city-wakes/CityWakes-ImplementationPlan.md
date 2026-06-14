@@ -1157,6 +1157,37 @@ git diff --check
 
 Confirm agents can play every Campaign Tension before balance tuning.
 
+### Phase 12 Completion Notes
+
+- Added additive campaign-aware scoring for all non-random agents.
+- Left RandomBot unchanged as the diagnostic baseline.
+- OperatorBot now reacts to Campaign Tension identity:
+  - Corp Crackdown: values Heat relief, Ashline safety Accords, security/Heat-control fronts,
+    lower-risk choices, and front exposure cooling.
+  - Nightlife War: values Veyra/Mina contact play, Loyalty protection, Velvet Accords, and
+    avoids feeding Nyx pressure.
+  - Ghostline Signal: strongly prefers targeted Gather Intel, values Ciro/Father Static,
+    Ghostline Accords, and Ruin relief.
+  - Industrial Cut: values Courier/Zero Mercy opportunities, money/violence/stability roles,
+    Heat relief, and earlier Knox caution.
+  - Dirty Capital: values Front establishment, resource/Heat-control fronts, Helix Accords,
+    and debt settlement when Helix obligation is high.
+- AggressiveBot gained smaller campaign nudges toward Nightlife War and Industrial Cut tempo
+  while retaining volatile Dominion-first behavior.
+- GreedyBot gained smaller campaign nudges toward Dirty Capital and Industrial Cut economy
+  while keeping Heat/Debt sensitivity.
+- CautiousBot gained campaign-specific safety preferences while preserving its conservative
+  Dominion-shortfall personality.
+- Added focused harness tests for representative campaign-specific preferences:
+  - OperatorBot targets Gather Intel during Ghostline Signal.
+  - CautiousBot values Ashline safety Accords during Corp Crackdown.
+  - GreedyBot pushes Front investment during Dirty Capital.
+  - AggressiveBot exploits Industrial Cut Front opportunities.
+- Verified all agents can still choose legal orders under existing harness coverage.
+- Verification completed:
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/harness/simulation-harness.spec.ts'`
+
 ## Phase 13: Campaign Balance and Texture Pass
 
 ### Objective

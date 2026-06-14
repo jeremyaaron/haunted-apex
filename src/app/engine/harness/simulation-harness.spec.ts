@@ -283,6 +283,71 @@ describe('simulation harness', () => {
     expect(choice?.target).toEqual({ type: 'recruit', id: 'op_vant_black' });
   });
 
+  it('makes OperatorBot target Gather Intel during Ghostline Signal', () => {
+    const state = newGame({
+      seed: 'HARNESS-OPERATOR-GHOSTLINE',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'gather_intel',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'ghostline'));
+
+    expect(choice?.actionId).toBe('gather_intel');
+    expect(choice?.target).toBeDefined();
+  });
+
+  it('makes CautiousBot value Ashline safety Accords during Corp Crackdown', () => {
+    const state = newGame({
+      seed: 'HARNESS-CAUTIOUS-CORP',
+      campaignTensionId: 'campaign_corp_crackdown',
+    });
+    state.pressures.heat = 78;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = CAUTIOUS_BOT.chooseOrder(state, options, createTestContext('CAUTIOUS', 'corp'));
+
+    expect(choice?.actionId).toBe('broker_accord');
+    expect(choice?.preview.brokerAccord?.ok ? choice.preview.brokerAccord.faction.id : undefined).toBe(
+      'faction_ashline_bureau',
+    );
+  });
+
+  it('makes GreedyBot push Front investment during Dirty Capital', () => {
+    const state = newGame({
+      seed: 'HARNESS-GREEDY-CAPITAL',
+      campaignTensionId: 'campaign_dirty_capital',
+    });
+    state.pressures.resources = 5200;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front' || option.actionId === 'run_small_job',
+    );
+    const choice = GREEDY_BOT.chooseOrder(state, options, createTestContext('GREEDY', 'capital'));
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(choice?.preview.frontInvestment?.ok).toBeTrue();
+  });
+
+  it('makes AggressiveBot exploit Industrial Cut Front opportunities', () => {
+    const state = newGame({
+      seed: 'HARNESS-AGGRESSIVE-INDUSTRIAL',
+      campaignTensionId: 'campaign_industrial_cut',
+    });
+    state.pressures.resources = 5200;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'industrial'));
+    const frontId = choice?.preview.frontInvestment?.ok
+      ? choice.preview.frontInvestment.definition.id
+      : undefined;
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(frontId).toBeDefined();
+    expect(['front_zero_mercy_cut', 'front_courier_line']).toContain(frontId ?? '');
+  });
+
   it('includes engine-validated Ledger use options when active entries exist', () => {
     const state = addLedgerEntry(newGame({ seed: 'HARNESS-LEDGER-OPTIONS' }), {
       definitionId: 'secret_patrol_schedule',
