@@ -986,6 +986,31 @@ git diff --check
 
 Confirm player-facing campaign notes before expanding harness reports.
 
+### Phase 10 Completion Notes
+
+- Added a campaign section to the run summary report model:
+  - city name
+  - Campaign Tension id/name
+  - campaign subtitle/premise metadata
+  - deterministic campaign notes
+  - campaign victory/loss flavor line where defined
+- Added concise run-end UI display for campaign identity and notes.
+- Added campaign identity and notes to copied/formatted run summary text.
+- Kept existing outcome, pressure, roster, Ledger, Front, Faction, and major-event summary
+  fields intact.
+- Implemented three deterministic notes for each locked v0.8 Campaign Tension:
+  - Corp Crackdown: final Heat, Ashline suspicion/obligation, Heat lockdown result
+  - Nightlife War: Nyx pressure, Contact interactions, final Loyalty
+  - Ghostline Signal: Secrets discovered, Ledger entries used, final Ruin
+  - Industrial Cut: final Resources, final Heat, Knox pressure
+  - Dirty Capital: owned Fronts, active debts/favors, Helix suspicion/obligation
+- Used final/current metrics only where the state does not yet track full pressure peaks.
+- Added focused run-summary tests for all five Campaign Tension note paths.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/selectors/run-summary.spec.ts'`
+
 ## Phase 11: Harness Campaign Grouping and Report Sections
 
 ### Objective

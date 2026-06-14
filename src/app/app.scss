@@ -727,6 +727,10 @@ dt {
   background: rgba(4, 7, 11, 0.42);
 }
 
+.run-report-campaign {
+  grid-column: 1 / -1;
+}
+
 .run-report-grid h4,
 .run-report-events h4 {
   margin: 0 0 8px;
@@ -736,9 +740,15 @@ dt {
 }
 
 .run-report-grid p,
+.run-report-grid li,
 .run-report-events li {
   color: #a9b4c0;
   font-size: 0.76rem;
+}
+
+.run-report-grid ul {
+  padding-left: 18px;
+  margin: 6px 0 0;
 }
 
 .run-report-events ul {

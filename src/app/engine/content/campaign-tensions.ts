@@ -236,7 +236,7 @@ export const CAMPAIGN_TENSION_DEFINITIONS = [
       favoredLabels: ['Resource fronts', 'Mina Glass', 'Captain Rafe Hollis', 'Money operatives'],
     },
     runSummaryFlavor: {
-      victoryLine: 'You spent the citys clean money before it could spend you.',
+      victoryLine: "You spent the city's clean money before it could spend you.",
       lossLine: 'The ledger made the capital honest at exactly the wrong time.',
       epitaphTemplates: [
         '{cityName} never gave you money. It rented you momentum.',

@@ -691,6 +691,8 @@ describe('App', () => {
     expect(gameOverPanel?.textContent).toContain('Victory');
     expect(gameOverPanel?.textContent).toContain('Outcome');
     expect(gameOverPanel?.textContent).toContain('Final Pressures');
+    expect(gameOverPanel?.textContent).toContain('Campaign');
+    expect(gameOverPanel?.textContent).toContain('Corp Crackdown');
     expect(gameOverPanel?.textContent).toContain('Roster');
     expect(gameOverPanel?.textContent).toContain('Ledger');
     expect(gameOverPanel?.textContent).toContain('Fronts');
@@ -707,7 +709,7 @@ describe('App', () => {
 
     expect(gameOverPanel?.textContent).toContain('Loss');
     expect(gameOverPanel?.textContent).toContain('Heat Lockdown');
-    expect(gameOverPanel?.textContent).toContain('The city looked back');
+    expect(gameOverPanel?.textContent).toContain('Ashline found the shape of you');
   });
 
   it('copies the run report through the clipboard path', async () => {
@@ -1176,7 +1178,10 @@ function consumeLedgerEntry(state: GameState, entryId: string): GameState {
 }
 
 function buildGameOverState(result: 'victory' | 'loss'): GameState {
-  const withLedger = addLedgerEntry(newGame({ seed: `UI-RUN-SUMMARY-${result.toUpperCase()}` }), {
+  const withLedger = addLedgerEntry(newGame({
+    seed: `UI-RUN-SUMMARY-${result.toUpperCase()}`,
+    campaignTensionId: 'campaign_corp_crackdown',
+  }), {
     definitionId: 'debt_owes_liaison',
     source: {
       type: 'event',

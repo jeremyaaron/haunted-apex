@@ -701,6 +701,26 @@
             </div>
 
             <div class="run-report-grid">
+              <section class="run-report-campaign">
+                <h4>Campaign</h4>
+                <dl>
+                  <div>
+                    <dt>City</dt>
+                    <dd>{{ report.campaign.cityName }}</dd>
+                  </div>
+                  <div>
+                    <dt>Tension</dt>
+                    <dd>{{ report.campaign.tensionName }}</dd>
+                  </div>
+                </dl>
+                <p>{{ report.campaign.subtitle }}</p>
+                <ul>
+                  @for (note of report.campaign.notes; track note) {
+                    <li>{{ note }}</li>
+                  }
+                </ul>
+              </section>
+
               <section>
                 <h4>Outcome</h4>
                 <dl>
