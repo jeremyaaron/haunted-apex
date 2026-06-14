@@ -1072,6 +1072,46 @@ campaign_system_usage
 
 Confirm campaign report shape before campaign-aware agent scoring.
 
+### Phase 11 Completion Notes
+
+- Added Campaign Tension support to harness run options:
+  - `simulateRun({ campaignTensionId })` runs a specific Campaign Tension.
+  - `simulateBatch({ campaignTensionId })` runs one specific Campaign Tension for each agent.
+  - `simulateBatch({ campaignTensionIds })` expands each agent across a supplied Campaign
+    Tension set, including all locked v0.8 tensions.
+  - Default `simulateBatch` behavior remains seeded random campaign selection.
+- Added campaign grouping to `HarnessBatchReport`:
+  - `campaignSummaries`
+  - `campaignAgentSummaries`
+  - `campaignLossCauses`
+  - `campaignActionUsage`
+  - `campaignEvents`
+  - `campaignSystemUsage`
+- Appended campaign report sections to formatted harness CSV output:
+  - `campaign_summary`
+  - `campaign_agent_summary`
+  - `campaign_loss_causes`
+  - `campaign_action_usage`
+  - `campaign_events`
+  - `campaign_system_usage`
+- Preserved all existing harness output sections and default UI harness behavior.
+- Reused existing per-run subsystem counters for campaign usage averages:
+  - Broker Accord uses
+  - Contact uses
+  - Front establishments/upgrades/cooling
+  - Ledger discoveries/uses
+  - Secret discoveries
+  - Faction, Front, Contact, and Operative event selections
+- Added focused harness tests for:
+  - explicit Campaign Tension simulation
+  - campaign sections in formatted output
+  - campaign summary totals matching total runs
+  - all-Campaign batch expansion by agent
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/harness/simulation-harness.spec.ts'`
+
 ## Phase 12: Campaign-Aware Agent Strategy
 
 ### Objective

@@ -1,5 +1,6 @@
 import {
   ACCORD_DEFINITIONS,
+  CAMPAIGN_TENSION_DEFINITIONS,
   DISTRICT_ZERO_ACTIONS,
   FACTION_DEFINITIONS,
   FRONT_DEFINITIONS,
@@ -23,6 +24,7 @@ import type {
   AccordId,
   ActionId,
   ActionTarget,
+  CampaignTensionId,
   ContactId,
   ContactOptionKind,
   DistrictId,
@@ -73,6 +75,7 @@ import {
 export type HarnessRunOptions = {
   seed: string;
   agent: StrategyAgent;
+  campaignTensionId?: CampaignTensionId;
   collectTrace?: boolean;
 };
 
@@ -109,6 +112,8 @@ export type HarnessBatchOptions = {
   agents: readonly StrategyAgent[];
   runsPerAgent: number;
   seedPrefix?: string;
+  campaignTensionId?: CampaignTensionId;
+  campaignTensionIds?: readonly CampaignTensionId[];
 };
 
 export type AgentBatchSummary = {
@@ -165,6 +170,73 @@ export type HarnessBatchReport = {
   runsPerAgent: number;
   totalRuns: number;
   summaries: AgentBatchSummary[];
+  campaignSummaries: CampaignBatchSummary[];
+  campaignAgentSummaries: CampaignAgentBatchSummary[];
+  campaignLossCauses: CampaignLossCauseReport[];
+  campaignActionUsage: CampaignActionUsageReport[];
+  campaignEvents: CampaignEventReport[];
+  campaignSystemUsage: CampaignSystemUsageReport[];
+};
+
+export type CampaignBatchSummary = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  incomplete: number;
+  winRate: number;
+  averageWeeksPlayed: number;
+  averageFinalPressures: Pressures;
+};
+
+export type CampaignAgentBatchSummary = CampaignBatchSummary & {
+  agentId: string;
+  agentLabel: string;
+};
+
+export type CampaignLossCauseReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  agentId: string;
+  cause: GameOverReason | 'agent_stalled' | 'none';
+  count: number;
+};
+
+export type CampaignActionUsageReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  agentId: string;
+  actionId: ActionId;
+  uses: number;
+  averageUses: number;
+};
+
+export type CampaignEventReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  eventTitle: string;
+  presentations: number;
+  averagePresentations: number;
+};
+
+export type CampaignSystemUsageReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  agentId: string;
+  runs: number;
+  averageBrokerAccordUses: number;
+  averageManageContactUses: number;
+  averageFrontEstablishments: number;
+  averageFrontUpgrades: number;
+  averageFrontLayLowOrders: number;
+  averageLedgerDiscoveries: number;
+  averageLedgerUses: number;
+  averageSecretDiscoveries: number;
+  averageFactionEvents: number;
+  averageFrontEvents: number;
+  averageContactEvents: number;
+  averageOperativeEvents: number;
 };
 
 export type TargetRunStats = {
@@ -623,7 +695,7 @@ const TARGET_TAG_MODIFIERS = new Set([
 const RIVAL_PRESSURE_MODIFIERS = new Set(['nyx_pressure', 'knox_pressure']);
 
 export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
-  let state = newGame({ seed: options.seed });
+  let state = newGame({ seed: options.seed, campaignTensionId: options.campaignTensionId });
   const startingRosterIds = state.operatives.map((operative) => operative.id);
   const initialHirePoolIds = [...state.hirePool];
   const operativeStats = createInitialOperativeStats(startingRosterIds, initialHirePoolIds);
@@ -768,26 +840,54 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
 
 export function simulateBatch(options: HarnessBatchOptions): HarnessBatchReport {
   const seedPrefix = options.seedPrefix ?? 'HARNESS';
+  const campaignTensionIds = resolveHarnessCampaignTensionIds(options);
+  const allRuns: HarnessRunResult[] = [];
   const summaries = options.agents.map((agent) => {
     const runs: HarnessRunResult[] = [];
 
-    for (let index = 0; index < options.runsPerAgent; index += 1) {
-      runs.push(
-        simulateRun({
-          agent,
-          seed: `${seedPrefix}-${agent.id}-${index + 1}`,
-        }),
-      );
+    for (const campaignTensionId of campaignTensionIds) {
+      for (let index = 0; index < options.runsPerAgent; index += 1) {
+        const campaignSeedSegment = campaignTensionId ? `-${campaignTensionId}` : '';
+        runs.push(
+          simulateRun({
+            agent,
+            campaignTensionId,
+            seed: `${seedPrefix}-${agent.id}${campaignSeedSegment}-${index + 1}`,
+          }),
+        );
+      }
     }
+
+    allRuns.push(...runs);
 
     return summarizeAgentRuns(agent, runs);
   });
 
   return {
     runsPerAgent: options.runsPerAgent,
-    totalRuns: options.runsPerAgent * options.agents.length,
+    totalRuns: allRuns.length,
     summaries,
+    campaignSummaries: summarizeCampaignRuns(allRuns),
+    campaignAgentSummaries: summarizeCampaignAgentRuns(allRuns),
+    campaignLossCauses: summarizeCampaignLossCauses(allRuns),
+    campaignActionUsage: summarizeCampaignActionUsage(allRuns),
+    campaignEvents: summarizeCampaignEvents(allRuns),
+    campaignSystemUsage: summarizeCampaignSystemUsage(allRuns),
   };
+}
+
+function resolveHarnessCampaignTensionIds(
+  options: HarnessBatchOptions,
+): readonly (CampaignTensionId | undefined)[] {
+  if (options.campaignTensionIds) {
+    return options.campaignTensionIds;
+  }
+
+  if (options.campaignTensionId) {
+    return [options.campaignTensionId];
+  }
+
+  return [undefined];
 }
 
 export function formatBatchReport(report: HarnessBatchReport): string {
@@ -1617,7 +1717,134 @@ export function formatBatchReport(report: HarnessBatchReport): string {
     }
   }
 
+  lines.push(
+    '',
+    'campaign_summary',
+    'campaignId,campaignName,runs,wins,losses,incomplete,winRate,avgWeeks,avgDominion,avgHeat,avgLoyalty,avgResources,avgIntel,avgRuin',
+  );
+
+  for (const summary of report.campaignSummaries) {
+    lines.push(formatCampaignSummaryRow(summary));
+  }
+
+  lines.push(
+    '',
+    'campaign_agent_summary',
+    'agent,campaignId,runs,wins,losses,incomplete,winRate,avgWeeks,avgDominion,avgHeat,avgLoyalty,avgResources,avgIntel,avgRuin',
+  );
+
+  for (const summary of report.campaignAgentSummaries) {
+    lines.push([summary.agentId, ...formatCampaignSummaryCells(summary)].join(','));
+  }
+
+  lines.push(
+    '',
+    'campaign_loss_causes',
+    'campaignId,campaignName,agent,cause,count',
+  );
+
+  for (const loss of report.campaignLossCauses) {
+    lines.push(
+      [
+        loss.campaignId,
+        csvCell(loss.campaignName),
+        loss.agentId,
+        loss.cause,
+        loss.count,
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'campaign_action_usage',
+    'campaignId,campaignName,agent,actionId,uses,avgUses',
+  );
+
+  for (const action of report.campaignActionUsage) {
+    lines.push(
+      [
+        action.campaignId,
+        csvCell(action.campaignName),
+        action.agentId,
+        action.actionId,
+        action.uses,
+        action.averageUses.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'campaign_events',
+    'campaignId,campaignName,eventTitle,presentations,avgPresentations',
+  );
+
+  for (const event of report.campaignEvents) {
+    lines.push(
+      [
+        event.campaignId,
+        csvCell(event.campaignName),
+        csvCell(event.eventTitle),
+        event.presentations,
+        event.averagePresentations.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'campaign_system_usage',
+    'campaignId,campaignName,agent,runs,avgBrokerAccordUses,avgManageContactUses,avgFrontEstablishments,avgFrontUpgrades,avgFrontLayLowOrders,avgLedgerDiscoveries,avgLedgerUses,avgSecretDiscoveries,avgFactionEvents,avgFrontEvents,avgContactEvents,avgOperativeEvents',
+  );
+
+  for (const usage of report.campaignSystemUsage) {
+    lines.push(
+      [
+        usage.campaignId,
+        csvCell(usage.campaignName),
+        usage.agentId,
+        usage.runs,
+        usage.averageBrokerAccordUses.toFixed(2),
+        usage.averageManageContactUses.toFixed(2),
+        usage.averageFrontEstablishments.toFixed(2),
+        usage.averageFrontUpgrades.toFixed(2),
+        usage.averageFrontLayLowOrders.toFixed(2),
+        usage.averageLedgerDiscoveries.toFixed(2),
+        usage.averageLedgerUses.toFixed(2),
+        usage.averageSecretDiscoveries.toFixed(2),
+        usage.averageFactionEvents.toFixed(2),
+        usage.averageFrontEvents.toFixed(2),
+        usage.averageContactEvents.toFixed(2),
+        usage.averageOperativeEvents.toFixed(2),
+      ].join(','),
+    );
+  }
+
   return lines.join('\n');
+}
+
+function formatCampaignSummaryRow(summary: CampaignBatchSummary): string {
+  return formatCampaignSummaryCells(summary).join(',');
+}
+
+function formatCampaignSummaryCells(summary: CampaignBatchSummary): string[] {
+  return [
+    summary.campaignId,
+    csvCell(summary.campaignName),
+    `${summary.runs}`,
+    `${summary.wins}`,
+    `${summary.losses}`,
+    `${summary.incomplete}`,
+    summary.winRate.toFixed(3),
+    summary.averageWeeksPlayed.toFixed(2),
+    summary.averageFinalPressures.dominion.toFixed(2),
+    summary.averageFinalPressures.heat.toFixed(2),
+    summary.averageFinalPressures.loyalty.toFixed(2),
+    summary.averageFinalPressures.resources.toFixed(2),
+    summary.averageFinalPressures.intel.toFixed(2),
+    summary.averageFinalPressures.ruin.toFixed(2),
+  ];
 }
 
 export function getLegalOrderOptions(state: GameState): LegalOrderOption[] {
@@ -1981,6 +2208,393 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     factionEventReports: sortFactionEventReports([...factionEventReports.values()]),
     factionSetReports: finalizeFactionSetReports(factionSetReports),
   };
+}
+
+type CampaignSummaryAccumulator = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  incomplete: number;
+  weeksPlayed: number;
+  pressureTotals: Pressures;
+};
+
+type CampaignAgentSummaryAccumulator = CampaignSummaryAccumulator & {
+  agentId: string;
+  agentLabel: string;
+};
+
+type CampaignSystemUsageAccumulator = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  agentId: string;
+  runs: number;
+  brokerAccordUses: number;
+  manageContactUses: number;
+  frontEstablishments: number;
+  frontUpgrades: number;
+  frontLayLowOrders: number;
+  ledgerDiscoveries: number;
+  ledgerUses: number;
+  secretDiscoveries: number;
+  factionEvents: number;
+  frontEvents: number;
+  contactEvents: number;
+  operativeEvents: number;
+};
+
+function summarizeCampaignRuns(runs: readonly HarnessRunResult[]): CampaignBatchSummary[] {
+  const reports = new Map<CampaignTensionId, CampaignSummaryAccumulator>();
+
+  for (const run of runs) {
+    addCampaignSummaryRun(reports, run);
+  }
+
+  return sortCampaignReports([...reports.values()].map(finalizeCampaignSummary));
+}
+
+function summarizeCampaignAgentRuns(runs: readonly HarnessRunResult[]): CampaignAgentBatchSummary[] {
+  const reports = new Map<string, CampaignAgentSummaryAccumulator>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+    const key = `${run.agentId}:${campaignId}`;
+    const current = reports.get(key) ?? {
+      ...createCampaignSummaryAccumulator(campaignId),
+      agentId: run.agentId,
+      agentLabel: run.agentLabel,
+    };
+    addRunToCampaignSummary(current, run);
+    reports.set(key, current);
+  }
+
+  return [...reports.values()]
+    .map((report) => ({
+      ...finalizeCampaignSummary(report),
+      agentId: report.agentId,
+      agentLabel: report.agentLabel,
+    }))
+    .sort(
+      (left, right) =>
+        left.agentId.localeCompare(right.agentId) ||
+        compareCampaignIds(left.campaignId, right.campaignId),
+    );
+}
+
+function summarizeCampaignLossCauses(
+  runs: readonly HarnessRunResult[],
+): CampaignLossCauseReport[] {
+  const grouped = new Map<string, CampaignLossCauseReport>();
+  const campaignAgentKeys = new Map<string, { campaignId: CampaignTensionId; agentId: string }>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+    campaignAgentKeys.set(`${campaignId}:${run.agentId}`, { campaignId, agentId: run.agentId });
+
+    if (!run.reason || run.outcome === 'victory') {
+      continue;
+    }
+
+    const key = `${campaignId}:${run.agentId}:${run.reason}`;
+    const current = grouped.get(key) ?? {
+      campaignId,
+      campaignName: getCampaignName(campaignId),
+      agentId: run.agentId,
+      cause: run.reason,
+      count: 0,
+    };
+    current.count += 1;
+    grouped.set(key, current);
+  }
+
+  for (const { campaignId, agentId } of campaignAgentKeys.values()) {
+    const hasLoss = [...grouped.values()].some(
+      (report) => report.campaignId === campaignId && report.agentId === agentId,
+    );
+
+    if (!hasLoss) {
+      grouped.set(`${campaignId}:${agentId}:none`, {
+        campaignId,
+        campaignName: getCampaignName(campaignId),
+        agentId,
+        cause: 'none',
+        count: 0,
+      });
+    }
+  }
+
+  return [...grouped.values()].sort(
+    (left, right) =>
+      compareCampaignIds(left.campaignId, right.campaignId) ||
+      left.agentId.localeCompare(right.agentId) ||
+      left.cause.localeCompare(right.cause),
+  );
+}
+
+function summarizeCampaignActionUsage(
+  runs: readonly HarnessRunResult[],
+): CampaignActionUsageReport[] {
+  const grouped = new Map<string, { runs: number; uses: Record<ActionId, number> }>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+    const key = `${campaignId}:${run.agentId}`;
+    const current = grouped.get(key) ?? {
+      runs: 0,
+      uses: createEmptyActionUsage(),
+    };
+    current.runs += 1;
+
+    for (const action of DISTRICT_ZERO_ACTIONS) {
+      current.uses[action.id] += run.actionUsage[action.id];
+    }
+
+    grouped.set(key, current);
+  }
+
+  return [...grouped.entries()]
+    .flatMap(([key, value]) => {
+      const [campaignId, agentId] = key.split(':') as [CampaignTensionId, string];
+
+      return DISTRICT_ZERO_ACTIONS.map((action) => ({
+        campaignId,
+        campaignName: getCampaignName(campaignId),
+        agentId,
+        actionId: action.id,
+        uses: value.uses[action.id],
+        averageUses: averageCount(value.uses[action.id], value.runs),
+      }));
+    })
+    .sort(
+      (left, right) =>
+        compareCampaignIds(left.campaignId, right.campaignId) ||
+        left.agentId.localeCompare(right.agentId) ||
+        left.actionId.localeCompare(right.actionId),
+    );
+}
+
+function summarizeCampaignEvents(runs: readonly HarnessRunResult[]): CampaignEventReport[] {
+  const campaignRuns = countRunsByCampaign(runs);
+  const grouped = new Map<string, CampaignEventReport>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+
+    for (const entry of run.finalState.eventLog) {
+      if (entry.type !== 'event_presented') {
+        continue;
+      }
+
+      const key = `${campaignId}:${entry.title}`;
+      const current = grouped.get(key) ?? {
+        campaignId,
+        campaignName: getCampaignName(campaignId),
+        eventTitle: entry.title,
+        presentations: 0,
+        averagePresentations: 0,
+      };
+      current.presentations += 1;
+      grouped.set(key, current);
+    }
+  }
+
+  return [...grouped.values()]
+    .map((event) => ({
+      ...event,
+      averagePresentations: averageCount(
+        event.presentations,
+        campaignRuns.get(event.campaignId) ?? 0,
+      ),
+    }))
+    .sort(
+      (left, right) =>
+        compareCampaignIds(left.campaignId, right.campaignId) ||
+        left.eventTitle.localeCompare(right.eventTitle),
+    );
+}
+
+function summarizeCampaignSystemUsage(
+  runs: readonly HarnessRunResult[],
+): CampaignSystemUsageReport[] {
+  const grouped = new Map<string, CampaignSystemUsageAccumulator>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+    const key = `${campaignId}:${run.agentId}`;
+    const current = grouped.get(key) ?? {
+      campaignId,
+      campaignName: getCampaignName(campaignId),
+      agentId: run.agentId,
+      runs: 0,
+      brokerAccordUses: 0,
+      manageContactUses: 0,
+      frontEstablishments: 0,
+      frontUpgrades: 0,
+      frontLayLowOrders: 0,
+      ledgerDiscoveries: 0,
+      ledgerUses: 0,
+      secretDiscoveries: 0,
+      factionEvents: 0,
+      frontEvents: 0,
+      contactEvents: 0,
+      operativeEvents: 0,
+    };
+    current.runs += 1;
+    current.brokerAccordUses += run.factionStats.brokerAccordOrders;
+    current.manageContactUses += sumContactUses(run.contactStats);
+    current.frontEstablishments += run.frontStats.establishOrders;
+    current.frontUpgrades += run.frontStats.upgradeOrders;
+    current.frontLayLowOrders += run.frontStats.layLowOrders;
+    current.ledgerDiscoveries += run.ledgerStats.entriesCreated;
+    current.ledgerUses += run.ledgerStats.entriesConsumed;
+    current.secretDiscoveries += run.ledgerStats.secretDiscoveries;
+    current.factionEvents += sumRecordValues(run.factionStats.factionEventsSelected);
+    current.frontEvents += sumRecordValues(run.frontStats.frontEventsSelected);
+    current.contactEvents += sumRecordValues(run.contactStats.contactEventsSelected);
+    current.operativeEvents += sumOperativeEventSelections(run.operativeEventStats);
+    grouped.set(key, current);
+  }
+
+  return [...grouped.values()]
+    .map((usage) => ({
+      campaignId: usage.campaignId,
+      campaignName: usage.campaignName,
+      agentId: usage.agentId,
+      runs: usage.runs,
+      averageBrokerAccordUses: averageCount(usage.brokerAccordUses, usage.runs),
+      averageManageContactUses: averageCount(usage.manageContactUses, usage.runs),
+      averageFrontEstablishments: averageCount(usage.frontEstablishments, usage.runs),
+      averageFrontUpgrades: averageCount(usage.frontUpgrades, usage.runs),
+      averageFrontLayLowOrders: averageCount(usage.frontLayLowOrders, usage.runs),
+      averageLedgerDiscoveries: averageCount(usage.ledgerDiscoveries, usage.runs),
+      averageLedgerUses: averageCount(usage.ledgerUses, usage.runs),
+      averageSecretDiscoveries: averageCount(usage.secretDiscoveries, usage.runs),
+      averageFactionEvents: averageCount(usage.factionEvents, usage.runs),
+      averageFrontEvents: averageCount(usage.frontEvents, usage.runs),
+      averageContactEvents: averageCount(usage.contactEvents, usage.runs),
+      averageOperativeEvents: averageCount(usage.operativeEvents, usage.runs),
+    }))
+    .sort(
+      (left, right) =>
+        compareCampaignIds(left.campaignId, right.campaignId) ||
+        left.agentId.localeCompare(right.agentId),
+    );
+}
+
+function addCampaignSummaryRun(
+  reports: Map<CampaignTensionId, CampaignSummaryAccumulator>,
+  run: HarnessRunResult,
+): void {
+  const campaignId = run.finalState.campaign.tensionId;
+  const current = reports.get(campaignId) ?? createCampaignSummaryAccumulator(campaignId);
+  addRunToCampaignSummary(current, run);
+  reports.set(campaignId, current);
+}
+
+function createCampaignSummaryAccumulator(
+  campaignId: CampaignTensionId,
+): CampaignSummaryAccumulator {
+  return {
+    campaignId,
+    campaignName: getCampaignName(campaignId),
+    runs: 0,
+    wins: 0,
+    losses: 0,
+    incomplete: 0,
+    weeksPlayed: 0,
+    pressureTotals: createEmptyPressureTotals(),
+  };
+}
+
+function addRunToCampaignSummary(
+  summary: CampaignSummaryAccumulator,
+  run: HarnessRunResult,
+): void {
+  summary.runs += 1;
+  summary.wins += run.outcome === 'victory' ? 1 : 0;
+  summary.losses += run.outcome === 'loss' ? 1 : 0;
+  summary.incomplete += run.outcome === 'incomplete' ? 1 : 0;
+  summary.weeksPlayed += run.weeksPlayed;
+
+  for (const pressure of PRESSURE_IDS) {
+    summary.pressureTotals[pressure] += run.finalState.pressures[pressure];
+  }
+}
+
+function finalizeCampaignSummary(summary: CampaignSummaryAccumulator): CampaignBatchSummary {
+  return {
+    campaignId: summary.campaignId,
+    campaignName: summary.campaignName,
+    runs: summary.runs,
+    wins: summary.wins,
+    losses: summary.losses,
+    incomplete: summary.incomplete,
+    winRate: summary.runs > 0 ? summary.wins / summary.runs : 0,
+    averageWeeksPlayed: averageCount(summary.weeksPlayed, summary.runs),
+    averageFinalPressures: averagePressures(summary.pressureTotals, summary.runs),
+  };
+}
+
+function sortCampaignReports<T extends { campaignId: CampaignTensionId }>(reports: T[]): T[] {
+  return reports.sort((left, right) => compareCampaignIds(left.campaignId, right.campaignId));
+}
+
+function countRunsByCampaign(
+  runs: readonly HarnessRunResult[],
+): Map<CampaignTensionId, number> {
+  const counts = new Map<CampaignTensionId, number>();
+
+  for (const run of runs) {
+    const campaignId = run.finalState.campaign.tensionId;
+    counts.set(campaignId, (counts.get(campaignId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function getCampaignName(campaignId: CampaignTensionId): string {
+  return (
+    CAMPAIGN_TENSION_DEFINITIONS.find((campaign) => campaign.id === campaignId)?.name ??
+    campaignId
+  );
+}
+
+function compareCampaignIds(left: CampaignTensionId, right: CampaignTensionId): number {
+  return campaignSortIndex(left) - campaignSortIndex(right) || left.localeCompare(right);
+}
+
+function campaignSortIndex(campaignId: CampaignTensionId): number {
+  const index = CAMPAIGN_TENSION_DEFINITIONS.findIndex(
+    (campaign) => campaign.id === campaignId,
+  );
+
+  return index >= 0 ? index : CAMPAIGN_TENSION_DEFINITIONS.length;
+}
+
+function sumContactUses(stats: ContactRunStats): number {
+  return Object.values(stats.usage).reduce((sum, usage) => sum + usage.uses, 0);
+}
+
+function sumRecordValues(values: Partial<Record<string, number>>): number {
+  let sum = 0;
+
+  for (const value of Object.values(values)) {
+    sum += value ?? 0;
+  }
+
+  return sum;
+}
+
+function sumOperativeEventSelections(
+  stats: Partial<Record<EventId, OperativeEventRunStats>>,
+): number {
+  return Object.values(stats).reduce((sum, event) => sum + (event?.selectedCount ?? 0), 0);
+}
+
+function averageCount(value: number, runs: number): number {
+  return runs > 0 ? value / runs : 0;
 }
 
 export function getRosterCompositionKey(operativeIds: readonly OperativeId[]): string {
