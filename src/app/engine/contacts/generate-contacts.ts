@@ -1,11 +1,13 @@
 import { CONTACT_DEFINITIONS } from '../content';
 import type {
+  CampaignGenerationBias,
+  CampaignRoleTag,
   ContactDefinition,
   ContactId,
   ContactRoleTag,
   ContactState,
 } from '../model';
-import { createRng, nextInt } from '../rng';
+import { createRng, nextFloat, nextInt } from '../rng';
 
 export const ACTIVE_CONTACT_COUNT = 3;
 
@@ -20,9 +22,17 @@ export type GeneratedContactNetwork = {
   activeContactIds: ContactId[];
 };
 
+export type ContactGenerationBias = Pick<
+  CampaignGenerationBias,
+  'requiredContactIds' | 'weightedContactIds'
+> & {
+  roleTags?: readonly CampaignRoleTag[];
+};
+
 export function generateContacts(
   seed: string,
   definitions: readonly ContactDefinition[] = CONTACT_DEFINITIONS,
+  bias: ContactGenerationBias = {},
 ): GeneratedContactNetwork {
   const candidates = buildCoveredCombinations(definitions);
 
@@ -30,11 +40,7 @@ export function generateContacts(
     throw new Error('Contact generation requires at least one coverage-complete combination.');
   }
 
-  const roll = nextInt(
-    createRng(`${seed}:contacts`),
-    0,
-    candidates.length - 1,
-  );
+  const activeContactIds = selectActiveContactIds(seed, definitions, candidates, bias);
 
   return {
     contacts: Object.fromEntries(
@@ -43,7 +49,7 @@ export function generateContacts(
         materializeContactState(definition),
       ]),
     ) as Record<ContactId, ContactState>,
-    activeContactIds: [...candidates[roll.value]],
+    activeContactIds,
   };
 }
 
@@ -97,4 +103,83 @@ function buildCoveredCombinations(
   }
 
   return combinations;
+}
+
+function selectActiveContactIds(
+  seed: string,
+  definitions: readonly ContactDefinition[],
+  candidates: readonly (readonly ContactId[])[],
+  bias: ContactGenerationBias,
+): ContactId[] {
+  if (!hasContactBias(bias)) {
+    const roll = nextInt(createRng(`${seed}:contacts`), 0, candidates.length - 1);
+    return [...candidates[roll.value]];
+  }
+
+  const requiredContactIds = [...new Set(bias.requiredContactIds ?? [])];
+  const eligibleCandidates = candidates.filter((candidate) =>
+    requiredContactIds.every((contactId) => candidate.includes(contactId)),
+  );
+  const safeCandidates = eligibleCandidates.length > 0 ? eligibleCandidates : candidates;
+  const weights = safeCandidates.map((candidate) =>
+    getCombinationWeight(candidate, definitions, bias),
+  );
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const roll = nextFloat(createRng(`${seed}:contacts`));
+  let threshold = roll.value * totalWeight;
+
+  for (let index = 0; index < safeCandidates.length; index += 1) {
+    threshold -= weights[index];
+
+    if (threshold <= 0) {
+      return [...safeCandidates[index]];
+    }
+  }
+
+  return [...safeCandidates[safeCandidates.length - 1]];
+}
+
+function hasContactBias(bias: ContactGenerationBias): boolean {
+  return (
+    (bias.requiredContactIds?.length ?? 0) > 0 ||
+    Object.keys(bias.weightedContactIds ?? {}).length > 0 ||
+    (bias.roleTags?.length ?? 0) > 0
+  );
+}
+
+function getCombinationWeight(
+  contactIds: readonly ContactId[],
+  definitions: readonly ContactDefinition[],
+  bias: ContactGenerationBias,
+): number {
+  return Math.max(
+    1,
+    1 +
+      contactIds.reduce(
+        (sum, contactId) =>
+          sum +
+          (bias.weightedContactIds?.[contactId] ?? 0) +
+          getRoleTagWeight(contactId, definitions, bias.roleTags ?? []),
+        0,
+      ),
+  );
+}
+
+function getRoleTagWeight(
+  contactId: ContactId,
+  definitions: readonly ContactDefinition[],
+  roleTags: readonly CampaignRoleTag[],
+): number {
+  const definition = definitions.find((candidate) => candidate.id === contactId);
+
+  if (!definition) {
+    return 0;
+  }
+
+  const contactRoleTags = new Set(definition.roleTags);
+
+  return roleTags.reduce(
+    (sum, roleTag) => sum + (contactRoleTags.has(roleTag as ContactRoleTag) ? 5 : 0),
+    0,
+  );
 }

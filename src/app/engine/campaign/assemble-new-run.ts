@@ -30,8 +30,11 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
     : selectCampaignTension(seed);
   const city = generateCityIdentity(seed, campaignTension);
   const roster = generateRoster(seed);
-  const contactNetwork = generateContacts(seed);
-  const factionNetwork = generateFactions(seed);
+  const contactNetwork = generateContacts(seed, undefined, {
+    ...campaignTension.generationBias,
+    roleTags: campaignTension.roleTags,
+  });
+  const factionNetwork = generateFactions(seed, undefined, campaignTension.generationBias);
   const frontNetwork = generateFrontNetwork(seed);
   const rivals = initializeRivals();
 

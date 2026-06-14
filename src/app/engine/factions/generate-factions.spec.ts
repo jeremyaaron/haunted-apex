@@ -1,4 +1,4 @@
-import { FACTION_DEFINITIONS } from '../content';
+import { CAMPAIGN_TENSION_DEFINITIONS, FACTION_DEFINITIONS } from '../content';
 import {
   ACTIVE_FACTION_COUNT,
   ALWAYS_ACTIVE_FACTION_ID,
@@ -47,4 +47,49 @@ describe('generateFactions', () => {
       expect(network.factions[factionId]).toBeUndefined();
     }
   });
+
+  it('includes required Campaign factions while preserving active count', () => {
+    for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
+      const network = generateFactions('CAMPAIGN-FACTIONS', FACTION_DEFINITIONS, campaign.generationBias);
+
+      expect(network.activeFactionIds.length).withContext(campaign.id).toBe(ACTIVE_FACTION_COUNT);
+      expect(new Set(network.activeFactionIds).size).withContext(campaign.id).toBe(
+        ACTIVE_FACTION_COUNT,
+      );
+      expect(network.activeFactionIds).withContext(campaign.id).toContain(
+        ALWAYS_ACTIVE_FACTION_ID,
+      );
+
+      for (const factionId of campaign.generationBias.requiredFactionIds ?? []) {
+        expect(network.activeFactionIds).withContext(campaign.id).toContain(factionId);
+      }
+    }
+  });
+
+  it('uses weighted seeded selection for non-required Campaign factions', () => {
+    const baseline = countFactionSelections();
+    const biased = countFactionSelections({
+      weightedFactionIds: {
+        faction_chrome_maw: 30,
+      },
+    });
+
+    expect(biased.faction_chrome_maw).toBeGreaterThan(baseline.faction_chrome_maw);
+  });
 });
+
+function countFactionSelections(
+  bias: Parameters<typeof generateFactions>[2] = {},
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+
+  for (let index = 1; index <= 120; index += 1) {
+    const network = generateFactions(`FACTION-BIAS-${index}`, FACTION_DEFINITIONS, bias);
+
+    for (const factionId of network.activeFactionIds) {
+      counts[factionId] = (counts[factionId] ?? 0) + 1;
+    }
+  }
+
+  return counts;
+}
