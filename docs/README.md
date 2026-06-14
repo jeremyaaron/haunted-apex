@@ -63,3 +63,4 @@
 - [`v0.8A.md`](releases/v0.8-the-city-wakes/v0.8A.md): locked mechanical decisions.
 - [`CityWakes-TDD.md`](releases/v0.8-the-city-wakes/CityWakes-TDD.md): technical design.
 - [`CityWakes-ImplementationPlan.md`](releases/v0.8-the-city-wakes/CityWakes-ImplementationPlan.md): phased implementation plan.
+- [`CityWakes-ReleaseNotes.md`](releases/v0.8-the-city-wakes/CityWakes-ReleaseNotes.md): release notes draft.

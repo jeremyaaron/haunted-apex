@@ -1398,6 +1398,64 @@ inspect city/tension summary output
 inspect campaign harness sections
 ```
 
+### Completion Record
+
+Completed June 14, 2026:
+
+- Added the v0.8 release notes draft:
+
+```text
+docs/releases/v0.8-the-city-wakes/CityWakes-ReleaseNotes.md
+```
+
+- Updated root and docs README links so The City Wakes release notes are discoverable.
+- Left package version policy unchanged. Runtime release identity remains controlled by
+  `CURRENT_GAME_VERSION`, GitHub tags, and GitHub Releases.
+- Preserved the existing Pages workflow and verified the production Pages subpath build.
+- Ran a final scripted campaign smoke check covering:
+
+```text
+all five specific Campaign Tensions
+Campaign header and briefing view resolution
+opening Campaign modifier logs
+active/favored briefing sections
+Ghostline Signal targeted Gather Intel secret-discovery bonus
+```
+
+- Captured a final 100-runs-per-agent random Campaign harness snapshot with seed prefix
+  `V08-PHASE14-FINAL-RANDOM`:
+
+```text
+Random:           0% wins, avg Dominion 46.66, avg Heat 29.65
+Aggressive:      34% wins, avg Dominion 87.14, avg Heat 94.89
+Cautious:         0% wins, avg Dominion 16.84, avg Heat 2.08
+Greedy:          17% wins, avg Dominion 79.56, avg Heat 79.26
+Operator / Sane: 57% wins, avg Dominion 86.82, avg Heat 81.34
+```
+
+- Captured a final 100-runs-per-Campaign-Tension OperatorBot snapshot with seed prefix
+  `V08-PHASE14-FINAL-CAMPAIGN`:
+
+```text
+Corp Crackdown:   72% wins
+Nightlife War:    43% wins
+Ghostline Signal: 51% wins
+Industrial Cut:   70% wins
+Dirty Capital:    75% wins
+```
+
+- Final validation passed:
+
+```text
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
 ### Review Gate
 
 Merge to `main`, wait for Pages deployment, smoke test the deployed build, then tag `v0.8.0`
