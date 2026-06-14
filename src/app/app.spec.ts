@@ -948,6 +948,19 @@ describe('App', () => {
     expect(readStoredState()?.campaign.tensionId).toBe('campaign_ghostline_signal');
   });
 
+  it('renders campaign event feed tags as player-facing labels', () => {
+    storeState(newGame({ seed: 'APP-CAMPAIGN-TAGS', campaignTensionId: 'campaign_nightlife_war' }));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const eventFeed = compiled.querySelector<HTMLElement>('.fallout-panel');
+
+    expect(eventFeed?.textContent).toContain('Campaign');
+    expect(eventFeed?.textContent).toContain('Nightlife War');
+    expect(eventFeed?.textContent).not.toContain('campaign_nightlife_war');
+    expect(eventFeed?.textContent).not.toContain('CAMPAIGN_NIGHTLIFE_WAR');
+  });
+
   it('dismisses and reopens the Campaign briefing panel', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

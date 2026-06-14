@@ -763,6 +763,19 @@ export class App {
     return values.map((value) => this.displayToken(value)).join(' / ');
   }
 
+  protected logTagLabel(tag: string): string {
+    const normalizedTag = tag.toLowerCase();
+    const campaign = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (definition) => definition.id === normalizedTag,
+    );
+
+    if (campaign) {
+      return campaign.name;
+    }
+
+    return this.displayToken(normalizedTag);
+  }
+
   protected unavailableReason(reason: string | undefined): string {
     switch (reason) {
       case 'roster_full':

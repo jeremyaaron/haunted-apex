@@ -1808,7 +1808,7 @@
             @if (entry.tags?.length) {
               <div class="log-tags">
                 @for (tag of entry.tags; track $index) {
-                  <span>{{ tag }}</span>
+                  <span>{{ logTagLabel(tag) }}</span>
                 }
               </div>
             }
