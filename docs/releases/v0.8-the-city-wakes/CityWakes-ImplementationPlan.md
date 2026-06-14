@@ -920,6 +920,25 @@ verify header city/tension
 
 Confirm the new-run and briefing flow before changing summaries and harness output.
 
+### Completion Notes
+
+- Added a header Campaign Tension selector with Random as the default and the five locked Campaign
+  Tensions as explicit choices.
+- Passed an explicit `campaignTensionId` only when a specific Campaign is selected.
+- Added persistent city/Campaign identity to the header.
+- Added a player-facing Campaign briefing panel that auto-opens for undismissed runs.
+- Added briefing dismissal, local close, and reopen controls.
+- Rendered exact starting shifts, pressure pattern, active-this-run labels, and favored-by-tension
+  labels from facade selector data.
+- Kept raw generation weights out of the UI.
+- Kept debug details behind the existing hidden debug toggle.
+- Added app tests for specific Campaign selection, persisted briefing dismissal, briefing reopen,
+  header identity, and existing facade behavior.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/app.spec.ts' --include='src/app/game/game.facade.spec.ts'`
+
 ## Phase 10: Run Summary and Player-Facing Campaign Notes
 
 ### Objective

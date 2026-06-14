@@ -932,6 +932,46 @@ describe('App', () => {
     );
   });
 
+  it('starts a specific Campaign Tension from the header selector', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    selectValue(compiled, '.campaign-control select', 'campaign_ghostline_signal');
+    clickButton(compiled, 'New Run');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.header-deck')?.textContent).toContain('Ghostline Signal');
+    expect(compiled.textContent).toContain('The Ghostline is awake');
+    expect(readStoredState()?.campaign.tensionId).toBe('campaign_ghostline_signal');
+  });
+
+  it('dismisses and reopens the Campaign briefing panel', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Campaign Briefing',
+    );
+
+    clickButton(compiled, 'Dismiss Briefing');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.campaign-briefing')).toBeNull();
+    expect(readStoredState()?.campaign.openingBriefingShown).toBeTrue();
+
+    clickButton(compiled, 'Campaign');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Active This Run',
+    );
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Favored By Tension',
+    );
+  });
+
   it('shows exact Ledger effects on event choices', () => {
     const state: GameState = {
       ...newGame({ seed: 'PHASE-8-EVENT-LEDGER' }),
@@ -1099,6 +1139,16 @@ function storeState(state: ReturnType<typeof newGame>): void {
       state,
     }),
   );
+}
+
+function readStoredState(): GameState | undefined {
+  const raw = localStorage.getItem(CURRENT_RUN_STORAGE_KEY);
+
+  if (!raw) {
+    return undefined;
+  }
+
+  return (JSON.parse(raw) as { state: GameState }).state;
 }
 
 function consumeLedgerEntry(state: GameState, entryId: string): GameState {
