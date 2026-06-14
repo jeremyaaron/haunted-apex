@@ -29,13 +29,18 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
     ? getCampaignTensionDefinitionOrThrow(config.campaignTensionId)
     : selectCampaignTension(seed);
   const city = generateCityIdentity(seed, campaignTension);
-  const roster = generateRoster(seed);
+  const roster = generateRoster(
+    seed,
+    undefined,
+    undefined,
+    campaignTension.generationBias,
+  );
   const contactNetwork = generateContacts(seed, undefined, {
     ...campaignTension.generationBias,
     roleTags: campaignTension.roleTags,
   });
   const factionNetwork = generateFactions(seed, undefined, campaignTension.generationBias);
-  const frontNetwork = generateFrontNetwork(seed);
+  const frontNetwork = generateFrontNetwork(seed, undefined, campaignTension.generationBias);
   const rivals = initializeRivals();
 
   const state: GameState = {

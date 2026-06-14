@@ -74,7 +74,7 @@ describe('generateFactions', () => {
       },
     });
 
-    expect(biased.faction_chrome_maw).toBeGreaterThan(baseline.faction_chrome_maw);
+    expect(biased['faction_chrome_maw']).toBeGreaterThan(baseline['faction_chrome_maw']);
   });
 });
 

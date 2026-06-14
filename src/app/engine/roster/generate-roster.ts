@@ -1,5 +1,6 @@
 import { getTraitDefinition, ROSTER_OPERATIVES } from '../content';
 import type {
+  CampaignGenerationBias,
   GeneratedRoster,
   OperativeDefinition,
   OperativeId,
@@ -25,14 +26,20 @@ export const REQUIRED_STARTING_TAG_GROUPS: readonly (readonly OperativeRoleTag[]
   ['violence', 'money', 'stability'],
 ];
 
+export type RosterGenerationBias = Pick<
+  CampaignGenerationBias,
+  'weightedOperativeIds' | 'weightedOperativeTags'
+>;
+
 export function generateRoster(
   seed: string,
   definitions: readonly OperativeDefinition[] = ROSTER_OPERATIVES,
   config: RosterGenerationConfig = DEFAULT_ROSTER_GENERATION_CONFIG,
+  bias: RosterGenerationBias = {},
 ): GeneratedRoster {
   validateGenerationInputs(definitions, config);
 
-  const ordered = createWeightedOrdering(seed, definitions, config.rarityWeights);
+  const ordered = createWeightedOrdering(seed, definitions, config.rarityWeights, bias);
   const selected =
     findValidCombination(ordered.definitions, config) ??
     findValidCombination([...definitions].sort((a, b) => a.id.localeCompare(b.id)), config);
@@ -92,6 +99,7 @@ function createWeightedOrdering(
   seed: string,
   definitions: readonly OperativeDefinition[],
   rarityWeights: RosterGenerationConfig['rarityWeights'],
+  bias: RosterGenerationBias,
 ): {
   definitions: OperativeDefinition[];
   rng: RngState;
@@ -102,7 +110,7 @@ function createWeightedOrdering(
 
   while (remaining.length > 0) {
     const totalWeight = remaining.reduce(
-      (total, definition) => total + rarityWeights[definition.rarity],
+      (total, definition) => total + getOperativeGenerationWeight(definition, rarityWeights, bias),
       0,
     );
     const roll = nextFloat(rng);
@@ -110,7 +118,7 @@ function createWeightedOrdering(
     let selectedIndex = remaining.length - 1;
 
     for (let index = 0; index < remaining.length; index += 1) {
-      cursor -= rarityWeights[remaining[index].rarity];
+      cursor -= getOperativeGenerationWeight(remaining[index], rarityWeights, bias);
 
       if (cursor < 0) {
         selectedIndex = index;
@@ -127,6 +135,20 @@ function createWeightedOrdering(
     definitions: ordered,
     rng,
   };
+}
+
+function getOperativeGenerationWeight(
+  definition: OperativeDefinition,
+  rarityWeights: RosterGenerationConfig['rarityWeights'],
+  bias: RosterGenerationBias,
+): number {
+  const idWeight = bias.weightedOperativeIds?.[definition.id] ?? 0;
+  const tagWeight = definition.roleTags.reduce(
+    (total, roleTag) => total + (bias.weightedOperativeTags?.[roleTag] ?? 0),
+    0,
+  );
+
+  return Math.max(1, rarityWeights[definition.rarity] + idWeight + tagWeight);
 }
 
 function findValidCombination(

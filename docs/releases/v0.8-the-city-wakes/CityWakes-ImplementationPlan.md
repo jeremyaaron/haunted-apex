@@ -629,6 +629,26 @@ git diff --check
 
 Confirm all generators remain deterministic and coverage-valid before campaign event weighting.
 
+### Completion Notes
+
+- Extended roster generation with optional Campaign bias using operative ID and operative role-tag
+  weights.
+- Preserved existing un-biased roster behavior while allowing Campaign tensions to steer both
+  starting roster selection and hire-pool ordering.
+- Kept all roster validity gates intact: starting size, hire-pool size, rare cap, required tag
+  groups, Intel capability, and Heat-control capability.
+- Extended front opportunity generation with optional Campaign bias using front definition ID and
+  front role-tag weights.
+- Preserved The Pale Circuit as the starting owned Front, four generated opportunities, and
+  front opportunity coverage rules.
+- Wired Campaign generation bias into `assembleNewRun` for roster and front generation.
+- Added focused tests for Campaign-biased roster validity, Campaign-biased front opportunity
+  validity, and statistical directional lift for weighted operatives and fronts.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/roster/generate-roster.spec.ts' --include='src/app/engine/fronts/generate-front-opportunities.spec.ts' --include='src/app/engine/campaign/*.spec.ts'`
+
 ## Phase 6: Campaign Event Weight Modifiers
 
 ### Objective

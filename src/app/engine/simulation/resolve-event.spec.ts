@@ -42,7 +42,9 @@ describe('resolveEventChoice', () => {
       jasmine.objectContaining({
         type: 'event_choice',
         title: 'Accept the favor',
-        body: 'Response to A Favor in Violet Light. Ledger: Creates Debt: Owes the Liaison.',
+        body:
+          'Response to A Favor in Violet Light. Ledger: Creates Debt: Owes the Liaison. ' +
+          'Contact: Veyra Lux: trust -3, volatility +3.',
       }),
     );
   });

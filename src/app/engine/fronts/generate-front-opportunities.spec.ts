@@ -1,4 +1,9 @@
-import { FRONT_DEFINITIONS, getDistrictDefinition, getVenueDefinition } from '../content';
+import {
+  CAMPAIGN_TENSION_DEFINITIONS,
+  FRONT_DEFINITIONS,
+  getDistrictDefinition,
+  getVenueDefinition,
+} from '../content';
 import {
   FRONT_OPPORTUNITY_COUNT,
   generateFrontNetwork,
@@ -82,4 +87,61 @@ describe('generateFrontNetwork', () => {
       }),
     );
   });
+
+  it('preserves opportunity count and coverage when Campaign bias is applied', () => {
+    for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
+      const network = generateFrontNetwork(
+        `FRONT-CAMPAIGN-${campaign.id}`,
+        FRONT_DEFINITIONS,
+        campaign.generationBias,
+      );
+      const opportunityDefinitionIds = network.frontOpportunities.map(
+        (opportunity) => opportunity.definitionId,
+      );
+
+      expect(Object.keys(network.fronts)).withContext(campaign.id).toEqual([STARTING_FRONT_ID]);
+      expect(network.frontOpportunities.length)
+        .withContext(campaign.id)
+        .toBe(FRONT_OPPORTUNITY_COUNT);
+      expect(new Set(opportunityDefinitionIds).size)
+        .withContext(campaign.id)
+        .toBe(FRONT_OPPORTUNITY_COUNT);
+      expect(opportunityDefinitionIds).withContext(campaign.id).not.toContain(STARTING_FRONT_ID);
+      expect(satisfiesFrontOpportunityCoverage(FRONT_DEFINITIONS, opportunityDefinitionIds))
+        .withContext(campaign.id)
+        .toBeTrue();
+    }
+  });
+
+  it('makes weighted Campaign front opportunities more likely across seeded runs', () => {
+    const industrial = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (campaign) => campaign.id === 'campaign_industrial_cut',
+    )!;
+    const baseline = countFrontOpportunitySelections();
+    const biased = countFrontOpportunitySelections(industrial.generationBias);
+    const baselineWeightedSelections =
+      baseline.front_zero_mercy_cut + baseline.front_courier_line;
+    const biasedWeightedSelections =
+      biased.front_zero_mercy_cut + biased.front_courier_line;
+
+    expect(biasedWeightedSelections).toBeGreaterThan(baselineWeightedSelections);
+  });
 });
+
+function countFrontOpportunitySelections(
+  bias: Parameters<typeof generateFrontNetwork>[2] = {},
+): Record<(typeof FRONT_DEFINITIONS)[number]['id'], number> {
+  const appearances = Object.fromEntries(
+    FRONT_DEFINITIONS.map((definition) => [definition.id, 0]),
+  ) as Record<(typeof FRONT_DEFINITIONS)[number]['id'], number>;
+
+  for (let index = 1; index <= 300; index += 1) {
+    const network = generateFrontNetwork(`FRONT-BIAS-${index}`, FRONT_DEFINITIONS, bias);
+
+    for (const opportunity of network.frontOpportunities) {
+      appearances[opportunity.definitionId] += 1;
+    }
+  }
+
+  return appearances;
+}
