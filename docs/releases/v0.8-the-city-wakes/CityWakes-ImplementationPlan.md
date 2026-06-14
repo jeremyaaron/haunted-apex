@@ -761,6 +761,27 @@ git diff --check
 
 Confirm Ghostline bonus is narrow, previewed, and shared before UI work.
 
+### Completion Notes
+
+- Extended `SecretDiscoveryPreview` with structured `bonusRows` so the UI can render Campaign
+  bonus copy without parsing text.
+- Added the Ghostline Signal targeted Gather Intel bonus through `previewSecretDiscovery`, which is
+  already shared by preview and resolution.
+- Read the bonus amount from the active Campaign Tension definition via
+  `targetedGatherIntelSecretDiscoveryBonus`.
+- Kept the bonus narrow:
+  - only `campaign_ghostline_signal`
+  - only `gather_intel`
+  - only district/venue/rival targeted orders
+  - no event/contact/accord/front-created Secret paths touched
+- Rendered `Campaign Bonus: Ghostline Signal +8%` in the action card Secret Chance preview.
+- Added focused tests for targeted Ghostline previews, non-Ghostline and untargeted negatives,
+  final chance clamping, resolver/preview chance alignment, selector output, and DOM rendering.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/ledger/secret-discovery.spec.ts' --include='src/app/engine/selectors/previews.spec.ts' --include='src/app/engine/simulation/resolve-action.spec.ts'`
+
 ## Phase 8: Campaign Selectors, Briefing View, and GameFacade State
 
 ### Objective

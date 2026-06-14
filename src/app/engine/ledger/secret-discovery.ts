@@ -1,4 +1,5 @@
 import {
+  getCampaignTensionDefinition,
   getDistrictDefinition,
   getRivalDefinition,
   getVenueDefinition,
@@ -22,6 +23,12 @@ export type SecretDiscoveryCandidate = {
   duplicateCount: number;
 };
 
+export type SecretDiscoveryBonusRow = {
+  source: 'campaign';
+  label: string;
+  amount: number;
+};
+
 export type SecretDiscoveryPreview =
   | {
       eligible: true;
@@ -29,12 +36,14 @@ export type SecretDiscoveryPreview =
       target: DiscoveryTarget;
       candidateDefinitionIds: LedgerEntryDefinitionId[];
       candidates: SecretDiscoveryCandidate[];
+      bonusRows: SecretDiscoveryBonusRow[];
     }
   | {
       eligible: false;
       chance: 0;
       candidateDefinitionIds: [];
       candidates: [];
+      bonusRows: [];
     };
 
 export type ResolveSecretDiscoveryResult = {
@@ -65,11 +74,13 @@ export function previewSecretDiscovery(
   const operative = order.assignedOperativeId
     ? state.operatives.find((candidate) => candidate.id === order.assignedOperativeId)
     : undefined;
+  const campaignBonus = getCampaignSecretDiscoveryBonus(state, order);
   const chance = clampChance(
     18 +
       Math.floor(state.pressures.intel / 10) +
       getTargetIntelDiscoveryBonus(order.target) -
-      getAssignedOperativeStressPenalty(operative),
+      getAssignedOperativeStressPenalty(operative) +
+      campaignBonus.amount,
   );
 
   return {
@@ -78,6 +89,15 @@ export function previewSecretDiscovery(
     target: { ...order.target },
     candidateDefinitionIds: candidates.map((candidate) => candidate.definitionId),
     candidates,
+    bonusRows: campaignBonus.amount > 0
+      ? [
+          {
+            source: 'campaign',
+            label: campaignBonus.label,
+            amount: campaignBonus.amount,
+          },
+        ]
+      : [],
   };
 }
 
@@ -329,6 +349,30 @@ function getAssignedOperativeStressPenalty(operative?: OperativeState): number {
   }
 }
 
+function getCampaignSecretDiscoveryBonus(
+  state: GameState,
+  order: Pick<QueuedOrder, 'actionId' | 'target'>,
+): { label: string; amount: number } {
+  if (
+    state.campaign.tensionId !== 'campaign_ghostline_signal' ||
+    order.actionId !== 'gather_intel' ||
+    !isDiscoveryTarget(order.target)
+  ) {
+    return {
+      label: '',
+      amount: 0,
+    };
+  }
+
+  const campaign = getCampaignTensionDefinition(state.campaign.tensionId);
+  const amount = campaign?.targetedGatherIntelSecretDiscoveryBonus ?? 0;
+
+  return {
+    label: 'Campaign Bonus: Ghostline Signal',
+    amount,
+  };
+}
+
 function countActiveDefinitionInstances(
   state: GameState,
   definitionId: LedgerEntryDefinitionId,
@@ -354,5 +398,6 @@ function ineligible(): SecretDiscoveryPreview {
     chance: 0,
     candidateDefinitionIds: [],
     candidates: [],
+    bonusRows: [],
   };
 }

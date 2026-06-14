@@ -914,6 +914,24 @@ describe('App', () => {
     );
   });
 
+  it('shows the Ghostline Signal Campaign bonus for targeted Gather Intel', () => {
+    storeState(newGame({
+      seed: 'APP-GHOSTLINE-SECRET',
+      campaignTensionId: 'campaign_ghostline_signal',
+    }));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gatherCard = findCard(compiled, '.action-card', 'Gather Intel');
+
+    selectValue(gatherCard, '.target-control select', 'district:district_ghostline_market');
+    fixture.detectChanges();
+
+    expect(gatherCard.querySelector('.secret-preview')?.textContent).toContain(
+      'Campaign Bonus: Ghostline Signal +8%',
+    );
+  });
+
   it('shows exact Ledger effects on event choices', () => {
     const state: GameState = {
       ...newGame({ seed: 'PHASE-8-EVENT-LEDGER' }),

@@ -76,7 +76,10 @@ describe('action previews', () => {
   });
 
   it('previews targeted Gather Intel Secret chance', () => {
-    const state = newGame({ seed: 'SECRET-ACTION-PREVIEW' });
+    const state = newGame({
+      seed: 'SECRET-ACTION-PREVIEW',
+      campaignTensionId: 'campaign_nightlife_war',
+    });
     const untargeted = getActionPreview(state, 'gather_intel');
     const targeted = getActionPreview(state, 'gather_intel', undefined, {
       type: 'district',
@@ -88,6 +91,32 @@ describe('action previews', () => {
       jasmine.objectContaining({
         eligible: true,
         chance: 23,
+        bonusRows: [],
+      }),
+    );
+  });
+
+  it('previews the Ghostline Signal Campaign Secret chance bonus', () => {
+    const state = newGame({
+      seed: 'SECRET-ACTION-GHOSTLINE-PREVIEW',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+    const targeted = getActionPreview(state, 'gather_intel', undefined, {
+      type: 'district',
+      id: 'district_ghostline_market',
+    });
+
+    expect(targeted?.secretDiscovery).toEqual(
+      jasmine.objectContaining({
+        eligible: true,
+        chance: 31,
+        bonusRows: [
+          {
+            source: 'campaign',
+            label: 'Campaign Bonus: Ghostline Signal',
+            amount: 8,
+          },
+        ],
       }),
     );
   });

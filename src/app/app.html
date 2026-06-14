@@ -257,6 +257,9 @@
                     <small
                       >{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small
                     >
+                    @for (bonus of discovery.bonusRows; track bonus.label) {
+                      <small>{{ bonus.label }} +{{ bonus.amount }}%</small>
+                    }
                   </div>
                 }
               }
