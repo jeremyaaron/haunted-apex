@@ -22,6 +22,8 @@ import {
   selectActiveContacts,
   selectAssignmentOptions,
   selectActionTargetOptions,
+  selectCampaignBriefingView,
+  selectCampaignHeaderView,
   selectFactionPanelView,
   selectFrontPanelView,
   selectLedgerPanelView,
@@ -35,6 +37,9 @@ import {
   type ActionPreview,
   type ActionTarget,
   type ActionTargetOption,
+  type CampaignBriefingView,
+  type CampaignHeaderView,
+  type CampaignTensionId,
   type ContactView,
   type EventChoiceAvailability,
   type EventChoicePreview,
@@ -53,7 +58,7 @@ import {
 import { GameStorageService, type LoadCurrentRunResult } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected an older save. v0.7.0 - The Accords changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.8.0 - The City Wakes changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',
@@ -65,6 +70,9 @@ export class GameFacade {
     this.initialLoadResult.status === 'loaded' ? this.initialLoadResult.state : newGame(),
   );
   private readonly selectedOperativeId = signal<OperativeId | undefined>(undefined);
+  private readonly campaignBriefingOpenSignal = signal(
+    !this.stateSignal().campaign.openingBriefingShown,
+  );
 
   readonly state = this.stateSignal.asReadonly();
   readonly compatibilityNotice = signal<string | undefined>(
@@ -76,6 +84,13 @@ export class GameFacade {
   readonly fronts = computed(() => selectFrontPanelView(this.stateSignal()));
   readonly contacts = computed<ContactView[]>(() => selectActiveContacts(this.stateSignal()));
   readonly factions = computed<FactionPanelView>(() => selectFactionPanelView(this.stateSignal()));
+  readonly campaignHeader = computed<CampaignHeaderView>(() =>
+    selectCampaignHeaderView(this.stateSignal()),
+  );
+  readonly campaignBriefing = computed<CampaignBriefingView>(() =>
+    selectCampaignBriefingView(this.stateSignal()),
+  );
+  readonly campaignBriefingOpen = this.campaignBriefingOpenSignal.asReadonly();
   readonly runSummary = computed<RunSummaryReport | undefined>(() => {
     const state = this.stateSignal();
 
@@ -135,8 +150,16 @@ export class GameFacade {
   startNewGame(config: NewGameConfig = {}): GameState {
     const state = newGame(config);
     this.selectedOperativeId.set(undefined);
+    this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
     this.setAndSave(state);
     return state;
+  }
+
+  startNewRun(seed?: string, campaignTensionId?: CampaignTensionId): GameState {
+    return this.startNewGame({
+      ...(seed ? { seed } : {}),
+      ...(campaignTensionId ? { campaignTensionId } : {}),
+    });
   }
 
   loadCurrentRun(): boolean {
@@ -145,6 +168,7 @@ export class GameFacade {
     if (result.status === 'loaded') {
       this.stateSignal.set(result.state);
       this.selectedOperativeId.set(undefined);
+      this.campaignBriefingOpenSignal.set(!result.state.campaign.openingBriefingShown);
       return true;
     }
 
@@ -152,6 +176,7 @@ export class GameFacade {
       const state = newGame();
       this.stateSignal.set(state);
       this.selectedOperativeId.set(undefined);
+      this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
       this.compatibilityNotice.set(SAVE_COMPATIBILITY_NOTICE);
       this.storage.saveCurrentRun(state);
     }
@@ -174,6 +199,32 @@ export class GameFacade {
 
   dismissCompatibilityNotice(): void {
     this.compatibilityNotice.set(undefined);
+  }
+
+  dismissCampaignBriefing(): void {
+    const state = this.stateSignal();
+
+    if (state.campaign.openingBriefingShown) {
+      this.campaignBriefingOpenSignal.set(false);
+      return;
+    }
+
+    this.setAndSave({
+      ...state,
+      campaign: {
+        ...state.campaign,
+        openingBriefingShown: true,
+      },
+    });
+    this.campaignBriefingOpenSignal.set(false);
+  }
+
+  openCampaignBriefing(): void {
+    this.campaignBriefingOpenSignal.set(true);
+  }
+
+  closeCampaignBriefing(): void {
+    this.campaignBriefingOpenSignal.set(false);
   }
 
   selectOperative(operativeId: OperativeId | undefined): void {

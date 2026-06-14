@@ -1,4 +1,4 @@
-import type { ActiveAccordId, FrontState, GameState } from '../model';
+import type { ActiveAccordId, CampaignTensionId, FrontState, GameState } from '../model';
 import { addLedgerEntry } from '../ledger';
 import { newGame } from '../simulation';
 import { buildRunSummary, formatRunSummary } from './run-summary';
@@ -18,6 +18,9 @@ describe('run summary report', () => {
     expect(report.mostAssignedOperative?.assignments).toBeGreaterThan(0);
     expect(report.mvpOperative?.name).toBe(report.mostAssignedOperative?.name);
     expect(report.mostDangerousRival?.name).toBe('Nyx Ardent');
+    expect(report.campaign.cityName).toBe(state.campaign.cityName);
+    expect(report.campaign.tensionName).not.toBe('');
+    expect(report.campaign.notes.length).toBe(3);
     expect(report.ledger.created).toBe(2);
     expect(report.ledger.consumed).toBe(1);
     expect(report.ledger.unresolvedDebts).toBe(1);
@@ -49,6 +52,9 @@ describe('run summary report', () => {
     );
     expect(report.majorEvents).toContain('Week 5: Debt Comes Due: Owes the Liaison');
     expect(report.text).toContain('Seed: RUN-SUMMARY-VICTORY');
+    expect(report.text).toContain('Campaign:');
+    expect(report.text).toContain(`City: ${state.campaign.cityName}`);
+    expect(report.text).toContain('Campaign Notes:');
     expect(report.text).toContain('Unresolved Debts: 1');
     expect(report.text).toContain('Front Network:');
     expect(report.text).toContain('New Fronts Established: 1');
@@ -70,13 +76,198 @@ describe('run summary report', () => {
 
     expect(report.result).toBe('loss');
     expect(report.reason).toBe('heat_lockdown');
-    expect(report.epitaph).toContain('city looked back');
+    expect(report.epitaph).toContain('Ashline');
     expect(report.text).toContain('Result: Loss (Heat Lockdown)');
+  });
+
+  it('builds deterministic campaign notes for every Campaign Tension path', () => {
+    const expectations: Record<CampaignTensionId, readonly string[]> = {
+      campaign_corp_crackdown: [
+        'Final Heat: 81',
+        'Ashline Bureau: Suspicion 74, Obligation 76',
+        'Heat lockdown: No',
+      ],
+      campaign_nightlife_war: [
+        'Nyx Ardent Pressure: 64',
+        'Contact interactions: 2',
+        'Final Loyalty: 43',
+      ],
+      campaign_ghostline_signal: [
+        'Secrets discovered: 1',
+        'Ledger entries used: 1',
+        'Final Ruin: 37',
+      ],
+      campaign_industrial_cut: [
+        'Final Resources: 4200',
+        'Final Heat: 81',
+        'Knox Marrow Pressure: 52',
+      ],
+      campaign_dirty_capital: [
+        'Owned Fronts: 1',
+        'Active Debts/Favors: 1/1',
+        'Helix Meridian: Suspicion 58, Obligation 71',
+      ],
+    };
+
+    for (const [campaignTensionId, notes] of Object.entries(expectations) as [
+      CampaignTensionId,
+      readonly string[],
+    ][]) {
+      const report = buildRunSummary(buildCampaignCompletedState(campaignTensionId));
+
+      expect(report.campaign.tensionId).withContext(campaignTensionId).toBe(campaignTensionId);
+      expect(report.campaign.notes).withContext(campaignTensionId).toEqual([...notes]);
+      expect(report.text).withContext(campaignTensionId).toContain(notes[0]);
+      expect(report.campaign.flavorLine).withContext(campaignTensionId).toBeDefined();
+      expect(report.epitaph).withContext(campaignTensionId).toBe(report.campaign.flavorLine ?? '');
+    }
   });
 });
 
+function buildCampaignCompletedState(campaignTensionId: CampaignTensionId): GameState {
+  const withSecret = addLedgerEntry(newGame({
+    seed: `RUN-SUMMARY-${campaignTensionId}`,
+    campaignTensionId,
+  }), {
+    definitionId: 'secret_dead_channel_trace',
+    source: {
+      type: 'action',
+      actionId: 'gather_intel',
+    },
+  });
+  const withDebt = addLedgerEntry(withSecret, {
+    definitionId: 'debt_owes_liaison',
+    source: {
+      type: 'event',
+      eventId: 'liaison_favor',
+      choiceId: 'accept_the_favor',
+    },
+  });
+  const withFavor = addLedgerEntry(withDebt, {
+    definitionId: 'favor_hidden_route',
+    source: {
+      type: 'event',
+      eventId: 'ledger_favor_returned',
+      choiceId: 'save_the_favor',
+    },
+  });
+  const consumedSecret = withFavor.ledger.entries.find(
+    (entry) => entry.definitionId === 'secret_dead_channel_trace',
+  );
+
+  return {
+    ...withFavor,
+    week: 7,
+    phase: 'GAME_OVER',
+    gameOver: {
+      result: 'victory',
+      reason: 'dominion_victory',
+    },
+    pressures: {
+      dominion: 92,
+      heat: 81,
+      loyalty: 43,
+      resources: 4200,
+      intel: 18,
+      ruin: 37,
+    },
+    rivals: {
+      ...withFavor.rivals,
+      rival_nyx_ardent: {
+        ...withFavor.rivals.rival_nyx_ardent,
+        pressure: 64,
+      },
+      rival_knox_marrow: {
+        ...withFavor.rivals.rival_knox_marrow,
+        pressure: 52,
+      },
+    },
+    contacts: {
+      ...withFavor.contacts,
+      contact_veyra_lux: {
+        ...withFavor.contacts.contact_veyra_lux,
+        recentInteractions: [
+          {
+            week: 4,
+            optionId: 'cultivate',
+            kind: 'cultivate',
+            label: 'Cultivate Trust',
+            effectsSummary: { trust: 5 },
+          },
+          {
+            week: 5,
+            optionId: 'private_room_access',
+            kind: 'request_service',
+            label: 'Private Room Access',
+            effectsSummary: { trust: -6, volatility: 8 },
+          },
+        ],
+      },
+    },
+    ledger: {
+      ...withFavor.ledger,
+      consumedCount: 1,
+      entries: withFavor.ledger.entries.map((entry) =>
+        entry.id === consumedSecret?.id
+          ? {
+              ...entry,
+              consumed: true,
+              consumedWeek: 6,
+              consumedBy: {
+                type: 'action',
+                actionId: 'work_the_ledger',
+                useOptionId: 'open_dead_channel',
+              },
+            }
+          : entry,
+      ),
+    },
+    fronts: {
+      ...withFavor.fronts,
+      front_pale_circuit: withFavor.fronts.front_pale_circuit
+        ? {
+            ...withFavor.fronts.front_pale_circuit,
+            active: true,
+            level: 2,
+            exposure: 34,
+          }
+        : withFavor.fronts.front_pale_circuit,
+    },
+    factions: {
+      ...withFavor.factions,
+      faction_ashline_bureau: {
+        ...(withFavor.factions.faction_ashline_bureau ?? {
+          id: 'faction_ashline_bureau',
+          standing: 50,
+          usedAccordIds: [],
+          activeAccordIds: [],
+          flags: {},
+          recentInteractions: [],
+        }),
+        suspicion: 74,
+        obligation: 76,
+      },
+      faction_helix_meridian: {
+        ...(withFavor.factions.faction_helix_meridian ?? {
+          id: 'faction_helix_meridian',
+          standing: 50,
+          usedAccordIds: [],
+          activeAccordIds: [],
+          flags: {},
+          recentInteractions: [],
+        }),
+        suspicion: 58,
+        obligation: 71,
+      },
+    },
+  };
+}
+
 function buildCompletedState(result: 'victory' | 'loss'): GameState {
-  const base = newGame({ seed: `RUN-SUMMARY-${result.toUpperCase()}` });
+  const base = newGame({
+    seed: `RUN-SUMMARY-${result.toUpperCase()}`,
+    campaignTensionId: 'campaign_corp_crackdown',
+  });
   const activeAccordId: ActiveAccordId = 'active_accord_ashline_clean_corridor_1';
   const withSecret = addLedgerEntry(base, {
     definitionId: 'secret_dead_channel_trace',

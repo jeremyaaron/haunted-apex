@@ -133,8 +133,8 @@ describe('Ledger use preview and resolution', () => {
       heat: -12,
       intel: -2,
     });
-    expect(result.state.pressures.heat).toBe(6);
-    expect(result.state.pressures.intel).toBe(8);
+    expect(result.state.pressures.heat).toBe(state.pressures.heat - 12);
+    expect(result.state.pressures.intel).toBe(state.pressures.intel - 2);
     expect(result.state.ledger.entries[0].consumed).toBeTrue();
   });
 
@@ -158,7 +158,7 @@ describe('Ledger use preview and resolution', () => {
       loyalty: 2,
       intel: -1,
     });
-    expect(result.state.pressures.loyalty).toBe(70);
+    expect(result.state.pressures.loyalty).toBe(state.pressures.loyalty + 2);
     expect(result.state.ledger.entries[0].consumed).toBeTrue();
   });
 

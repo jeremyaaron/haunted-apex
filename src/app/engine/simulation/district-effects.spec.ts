@@ -94,13 +94,23 @@ describe('targeted action consequences', () => {
   });
 
   it('does not add rival pressure for uncontrolled territory', () => {
-    const state = applyConsequences('run_small_job', {
-      type: 'venue',
-      id: 'venue_black_halo_exchange',
-    });
+    const initial = newGame({ seed: 'VIOLET-ASH-1047' });
+    const state = applyTargetedActionConsequences(
+      initial,
+      'run_small_job',
+      {
+        type: 'venue',
+        id: 'venue_black_halo_exchange',
+      },
+      {},
+    );
 
-    expect(state.rivals.rival_nyx_ardent.pressure).toBe(0);
-    expect(state.rivals.rival_knox_marrow.pressure).toBe(0);
+    expect(state.rivals.rival_nyx_ardent.pressure).toBe(
+      initial.rivals.rival_nyx_ardent.pressure,
+    );
+    expect(state.rivals.rival_knox_marrow.pressure).toBe(
+      initial.rivals.rival_knox_marrow.pressure,
+    );
   });
 
   it('adds pressure for a direct rival target without changing districts', () => {

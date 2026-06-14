@@ -691,6 +691,8 @@ describe('App', () => {
     expect(gameOverPanel?.textContent).toContain('Victory');
     expect(gameOverPanel?.textContent).toContain('Outcome');
     expect(gameOverPanel?.textContent).toContain('Final Pressures');
+    expect(gameOverPanel?.textContent).toContain('Campaign');
+    expect(gameOverPanel?.textContent).toContain('Corp Crackdown');
     expect(gameOverPanel?.textContent).toContain('Roster');
     expect(gameOverPanel?.textContent).toContain('Ledger');
     expect(gameOverPanel?.textContent).toContain('Fronts');
@@ -707,7 +709,7 @@ describe('App', () => {
 
     expect(gameOverPanel?.textContent).toContain('Loss');
     expect(gameOverPanel?.textContent).toContain('Heat Lockdown');
-    expect(gameOverPanel?.textContent).toContain('The city looked back');
+    expect(gameOverPanel?.textContent).toContain('Ashline found the shape of you');
   });
 
   it('copies the run report through the clipboard path', async () => {
@@ -914,6 +916,77 @@ describe('App', () => {
     );
   });
 
+  it('shows the Ghostline Signal Campaign bonus for targeted Gather Intel', () => {
+    storeState(newGame({
+      seed: 'APP-GHOSTLINE-SECRET',
+      campaignTensionId: 'campaign_ghostline_signal',
+    }));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const gatherCard = findCard(compiled, '.action-card', 'Gather Intel');
+
+    selectValue(gatherCard, '.target-control select', 'district:district_ghostline_market');
+    fixture.detectChanges();
+
+    expect(gatherCard.querySelector('.secret-preview')?.textContent).toContain(
+      'Campaign Bonus: Ghostline Signal +8%',
+    );
+  });
+
+  it('starts a specific Campaign Tension from the header selector', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    selectValue(compiled, '.campaign-control select', 'campaign_ghostline_signal');
+    clickButton(compiled, 'New Run');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.header-deck')?.textContent).toContain('Ghostline Signal');
+    expect(compiled.textContent).toContain('The Ghostline is awake');
+    expect(readStoredState()?.campaign.tensionId).toBe('campaign_ghostline_signal');
+  });
+
+  it('renders campaign event feed tags as player-facing labels', () => {
+    storeState(newGame({ seed: 'APP-CAMPAIGN-TAGS', campaignTensionId: 'campaign_nightlife_war' }));
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const eventFeed = compiled.querySelector<HTMLElement>('.fallout-panel');
+
+    expect(eventFeed?.textContent).toContain('Campaign');
+    expect(eventFeed?.textContent).toContain('Nightlife War');
+    expect(eventFeed?.textContent).not.toContain('campaign_nightlife_war');
+    expect(eventFeed?.textContent).not.toContain('CAMPAIGN_NIGHTLIFE_WAR');
+  });
+
+  it('dismisses and reopens the Campaign briefing panel', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Campaign Briefing',
+    );
+
+    clickButton(compiled, 'Dismiss Briefing');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.campaign-briefing')).toBeNull();
+    expect(readStoredState()?.campaign.openingBriefingShown).toBeTrue();
+
+    clickButton(compiled, 'Campaign');
+    fixture.detectChanges();
+
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Active This Run',
+    );
+    expect(compiled.querySelector('.campaign-briefing')?.textContent).toContain(
+      'Favored By Tension',
+    );
+  });
+
   it('shows exact Ledger effects on event choices', () => {
     const state: GameState = {
       ...newGame({ seed: 'PHASE-8-EVENT-LEDGER' }),
@@ -1083,6 +1156,16 @@ function storeState(state: ReturnType<typeof newGame>): void {
   );
 }
 
+function readStoredState(): GameState | undefined {
+  const raw = localStorage.getItem(CURRENT_RUN_STORAGE_KEY);
+
+  if (!raw) {
+    return undefined;
+  }
+
+  return (JSON.parse(raw) as { state: GameState }).state;
+}
+
 function consumeLedgerEntry(state: GameState, entryId: string): GameState {
   return {
     ...state,
@@ -1108,7 +1191,10 @@ function consumeLedgerEntry(state: GameState, entryId: string): GameState {
 }
 
 function buildGameOverState(result: 'victory' | 'loss'): GameState {
-  const withLedger = addLedgerEntry(newGame({ seed: `UI-RUN-SUMMARY-${result.toUpperCase()}` }), {
+  const withLedger = addLedgerEntry(newGame({
+    seed: `UI-RUN-SUMMARY-${result.toUpperCase()}`,
+    campaignTensionId: 'campaign_corp_crackdown',
+  }), {
     definitionId: 'debt_owes_liaison',
     source: {
       type: 'event',

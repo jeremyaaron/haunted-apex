@@ -1,4 +1,15 @@
 export {
+  selectCampaignActiveThisRunLabels,
+  selectCampaignBriefingView,
+  selectCampaignHeaderView,
+  selectCampaignStartingEffectRows,
+} from './campaign';
+export type {
+  CampaignBriefingView,
+  CampaignEffectRow,
+  CampaignHeaderView,
+} from './campaign';
+export {
   isActiveContact,
   selectActiveContacts,
   selectContactState,
@@ -87,6 +98,7 @@ export type {
 export { calculateRivalPressureGain, getRivalPressureTier } from './rivals';
 export { buildRunSummary, formatRunSummary } from './run-summary';
 export type {
+  RunSummaryCampaign,
   RunSummaryFront,
   RunSummaryLedgerEntry,
   RunSummaryOperative,

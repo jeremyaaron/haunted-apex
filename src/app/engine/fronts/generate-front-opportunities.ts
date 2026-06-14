@@ -4,6 +4,7 @@ import {
   getVenueDefinition,
 } from '../content';
 import type {
+  CampaignGenerationBias,
   FrontDefinition,
   FrontDefinitionId,
   FrontId,
@@ -12,7 +13,7 @@ import type {
   FrontState,
   RivalId,
 } from '../model';
-import { createRng, nextInt } from '../rng';
+import { createRng, nextFloat, nextInt } from '../rng';
 
 export const OWNED_FRONT_CAP = 3;
 export const FRONT_OPPORTUNITY_COUNT = 4;
@@ -29,9 +30,15 @@ export type GeneratedFrontNetwork = {
   frontOpportunities: FrontOpportunity[];
 };
 
+export type FrontGenerationBias = Pick<
+  CampaignGenerationBias,
+  'weightedFrontDefinitionIds' | 'weightedFrontTags'
+>;
+
 export function generateFrontNetwork(
   seed: string,
   definitions: readonly FrontDefinition[] = FRONT_DEFINITIONS,
+  bias: FrontGenerationBias = {},
 ): GeneratedFrontNetwork {
   const startingDefinition = getRequiredDefinition(STARTING_FRONT_ID, definitions);
   const opportunityDefinitions = definitions.filter(
@@ -43,13 +50,15 @@ export function generateFrontNetwork(
     throw new Error('Front generation requires at least one coverage-complete opportunity set.');
   }
 
-  const roll = nextInt(createRng(`${seed}:fronts`), 0, candidates.length - 1);
+  const selectedOpportunitySet = hasFrontBias(bias)
+    ? selectWeightedOpportunitySet(seed, candidates, bias)
+    : candidates[nextInt(createRng(`${seed}:fronts`), 0, candidates.length - 1).value];
 
   return {
     fronts: {
       [STARTING_FRONT_ID]: materializeStartingFront(startingDefinition),
     },
-    frontOpportunities: candidates[roll.value].map(materializeFrontOpportunity),
+    frontOpportunities: selectedOpportunitySet.map(materializeFrontOpportunity),
   };
 }
 
@@ -151,6 +160,53 @@ function materializeFrontOpportunity(definition: FrontDefinition): FrontOpportun
     ...(venueId ? { venueId } : {}),
     ...(relatedRivalId ? { relatedRivalId } : {}),
   };
+}
+
+function selectWeightedOpportunitySet(
+  seed: string,
+  candidates: readonly (readonly FrontDefinition[])[],
+  bias: FrontGenerationBias,
+): readonly FrontDefinition[] {
+  const totalWeight = candidates.reduce(
+    (total, candidate) => total + getOpportunitySetWeight(candidate, bias),
+    0,
+  );
+  const roll = nextFloat(createRng(`${seed}:fronts`));
+  let cursor = roll.value * totalWeight;
+
+  for (const candidate of candidates) {
+    cursor -= getOpportunitySetWeight(candidate, bias);
+
+    if (cursor < 0) {
+      return candidate;
+    }
+  }
+
+  return candidates[candidates.length - 1];
+}
+
+function getOpportunitySetWeight(
+  definitions: readonly FrontDefinition[],
+  bias: FrontGenerationBias,
+): number {
+  const weight = definitions.reduce((total, definition) => {
+    const idWeight = bias.weightedFrontDefinitionIds?.[definition.id] ?? 0;
+    const tagWeight = definition.roleTags.reduce(
+      (tagTotal, roleTag) => tagTotal + (bias.weightedFrontTags?.[roleTag] ?? 0),
+      0,
+    );
+
+    return total + idWeight + tagWeight;
+  }, 1);
+
+  return Math.max(1, weight);
+}
+
+function hasFrontBias(bias: FrontGenerationBias): boolean {
+  return (
+    Object.values(bias.weightedFrontDefinitionIds ?? {}).some((weight) => weight !== 0) ||
+    Object.values(bias.weightedFrontTags ?? {}).some((weight) => weight !== 0)
+  );
 }
 
 function getRelatedRivalId(

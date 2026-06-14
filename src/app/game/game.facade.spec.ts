@@ -27,6 +27,17 @@ describe('GameFacade', () => {
     expect(readStoredState()).toEqual(state);
   });
 
+  it('starts a new run with an optional explicit Campaign Tension', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startNewRun('GHOSTLINE-RUN', 'campaign_ghostline_signal');
+
+    expect(state.seed).toBe('GHOSTLINE-RUN');
+    expect(state.campaign.tensionId).toBe('campaign_ghostline_signal');
+    expect(facade.campaignHeader().tensionName).toBe('Ghostline Signal');
+    expect(facade.campaignBriefing().favoredByTension).toContain('Ciro Moth');
+    expect(readStoredState()).toEqual(state);
+  });
+
   it('loads a valid current run on construction', () => {
     const saved = newGame({ seed: 'SAVED-SEED' });
     storeEnvelope(saved);
@@ -34,6 +45,23 @@ describe('GameFacade', () => {
     const facade = TestBed.inject(GameFacade);
 
     expect(facade.state()).toEqual(saved);
+    expect(facade.campaignBriefingOpen()).toBeTrue();
+  });
+
+  it('does not auto-open briefing for loaded saves that already dismissed it', () => {
+    const saved = {
+      ...newGame({ seed: 'SAVED-DISMISSED' }),
+      campaign: {
+        ...newGame({ seed: 'SAVED-DISMISSED' }).campaign,
+        openingBriefingShown: true,
+      },
+    };
+    storeEnvelope(saved);
+
+    const facade = TestBed.inject(GameFacade);
+
+    expect(facade.state()).toEqual(saved);
+    expect(facade.campaignBriefingOpen()).toBeFalse();
   });
 
   it('falls back to a new run when saved data is invalid', () => {
@@ -43,7 +71,7 @@ describe('GameFacade', () => {
 
     expect(facade.state().week).toBe(1);
     expect(facade.state().phase).toBe('COMMAND');
-    expect(facade.state().pressures.dominion).toBe(12);
+    expect(facade.state().campaign.tensionId).toBeDefined();
     expect(facade.compatibilityNotice()).toBe(SAVE_COMPATIBILITY_NOTICE);
     expect(readStoredState()).toEqual(facade.state());
   });
@@ -68,6 +96,30 @@ describe('GameFacade', () => {
 
     expect(facade.compatibilityNotice()).toBeUndefined();
     expect(facade.state()).toBe(state);
+  });
+
+  it('dismisses, persists, reopens, and closes the Campaign briefing', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startNewRun('BRIEFING-LIFECYCLE', 'campaign_nightlife_war');
+
+    expect(state.campaign.openingBriefingShown).toBeFalse();
+    expect(facade.campaignBriefingOpen()).toBeTrue();
+
+    facade.dismissCampaignBriefing();
+
+    expect(facade.campaignBriefingOpen()).toBeFalse();
+    expect(facade.state().campaign.openingBriefingShown).toBeTrue();
+    expect(readStoredState()?.campaign.openingBriefingShown).toBeTrue();
+
+    facade.openCampaignBriefing();
+
+    expect(facade.campaignBriefingOpen()).toBeTrue();
+    expect(facade.state().campaign.openingBriefingShown).toBeTrue();
+
+    facade.closeCampaignBriefing();
+
+    expect(facade.campaignBriefingOpen()).toBeFalse();
+    expect(facade.state().campaign.openingBriefingShown).toBeTrue();
   });
 
   it('queues and removes an order through the engine', () => {
@@ -221,7 +273,9 @@ describe('GameFacade', () => {
     expect(facade.state().queuedOrders).toEqual([]);
     expect(facade.state().recentActivity).toEqual([]);
     expect(facade.districts().every((district) => district.heat === district.baseHeat)).toBeTrue();
-    expect(facade.rivals().every((rival) => rival.pressure === 0)).toBeTrue();
+    expect(facade.rivals().map((rival) => rival.pressure)).toEqual(
+      Object.values(reset.rivals).map((rival) => rival.pressure),
+    );
     expect(readStoredState()).toEqual(reset);
   });
 

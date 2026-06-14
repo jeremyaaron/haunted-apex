@@ -23,9 +23,9 @@ describe('resolveEventChoice', () => {
     expect(result.state.week).toBe(2);
     expect(result.state.phase).toBe('COMMAND');
     expect(result.state.pendingEvent).toBeUndefined();
-    expect(result.state.pressures.intel).toBe(20);
-    expect(result.state.pressures.dominion).toBe(15);
-    expect(result.state.pressures.ruin).toBe(2);
+    expect(result.state.pressures.intel).toBe(state.pressures.intel + 10);
+    expect(result.state.pressures.dominion).toBe(state.pressures.dominion + 3);
+    expect(result.state.pressures.ruin).toBe(state.pressures.ruin + 2);
     expect(result.state.flags['owes_liaison']).toBeTrue();
     expect(result.state.ledger.entries[0]).toEqual(
       jasmine.objectContaining({
@@ -42,7 +42,9 @@ describe('resolveEventChoice', () => {
       jasmine.objectContaining({
         type: 'event_choice',
         title: 'Accept the favor',
-        body: 'Response to A Favor in Violet Light. Ledger: Creates Debt: Owes the Liaison.',
+        body:
+          'Response to A Favor in Violet Light. Ledger: Creates Debt: Owes the Liaison. ' +
+          'Contact: Veyra Lux: trust -3, volatility +3.',
       }),
     );
   });
@@ -56,8 +58,8 @@ describe('resolveEventChoice', () => {
       return;
     }
 
-    expect(result.state.pressures.resources).toBe(4000);
-    expect(result.state.pressures.heat).toBe(8);
+    expect(result.state.pressures.resources).toBe(state.pressures.resources - 1000);
+    expect(result.state.pressures.heat).toBe(state.pressures.heat - 10);
   });
 
   it('subtracts tech_or_intel costs from Intel in v0', () => {
@@ -69,8 +71,8 @@ describe('resolveEventChoice', () => {
       return;
     }
 
-    expect(result.state.pressures.intel).toBe(12);
-    expect(result.state.pressures.heat).toBe(20);
+    expect(result.state.pressures.intel).toBe(state.pressures.intel + 2);
+    expect(result.state.pressures.heat).toBe(state.pressures.heat + 2);
   });
 
   it('rejects unaffordable event choices', () => {

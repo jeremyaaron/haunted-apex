@@ -1,4 +1,8 @@
-import { getOperativeDefinition, ROSTER_OPERATIVES } from '../content';
+import {
+  CAMPAIGN_TENSION_DEFINITIONS,
+  getOperativeDefinition,
+  ROSTER_OPERATIVES,
+} from '../content';
 import type { OperativeDefinition } from '../model';
 import {
   DEFAULT_ROSTER_GENERATION_CONFIG,
@@ -85,6 +89,49 @@ describe('roster generation', () => {
       /no valid starting roster satisfies role, Intel, Heat-control, and rarity requirements/,
     );
   });
+
+  it('preserves roster validity when Campaign bias is applied', () => {
+    for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
+      const roster = generateRoster(
+        `ROSTER-CAMPAIGN-${campaign.id}`,
+        ROSTER_OPERATIVES,
+        DEFAULT_ROSTER_GENERATION_CONFIG,
+        campaign.generationBias,
+      );
+      const startingDefinitions = roster.startingOperativeIds.map(requireOperative);
+      const allIds = [...roster.startingOperativeIds, ...roster.hirePoolIds];
+
+      expect(roster.startingOperativeIds.length)
+        .withContext(campaign.id)
+        .toBe(DEFAULT_ROSTER_GENERATION_CONFIG.startingRosterSize);
+      expect(roster.hirePoolIds.length)
+        .withContext(campaign.id)
+        .toBe(DEFAULT_ROSTER_GENERATION_CONFIG.hirePoolSize);
+      expect(new Set(allIds).size).withContext(campaign.id).toBe(allIds.length);
+      expect(isValidStartingRoster(startingDefinitions))
+        .withContext(campaign.id)
+        .toBeTrue();
+    }
+  });
+
+  it('makes weighted Campaign operatives more likely across seeded runs', () => {
+    const ghostline = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (campaign) => campaign.id === 'campaign_ghostline_signal',
+    )!;
+    const weightedIds = ['op_juno_hex', 'op_echo_saint', 'op_orchid_seven'] as const;
+    const baseline = countStartingRosterSelections();
+    const biased = countStartingRosterSelections(ghostline.generationBias);
+    const baselineWeightedSelections = weightedIds.reduce(
+      (total, operativeId) => total + baseline[operativeId],
+      0,
+    );
+    const biasedWeightedSelections = weightedIds.reduce(
+      (total, operativeId) => total + biased[operativeId],
+      0,
+    );
+
+    expect(biasedWeightedSelections).toBeGreaterThan(baselineWeightedSelections);
+  });
 });
 
 function requireOperative(
@@ -97,4 +144,27 @@ function requireOperative(
   }
 
   return definition;
+}
+
+function countStartingRosterSelections(
+  bias: Parameters<typeof generateRoster>[3] = {},
+): Record<(typeof ROSTER_OPERATIVES)[number]['id'], number> {
+  const appearances = Object.fromEntries(
+    ROSTER_OPERATIVES.map((definition) => [definition.id, 0]),
+  ) as Record<(typeof ROSTER_OPERATIVES)[number]['id'], number>;
+
+  for (let index = 1; index <= 300; index += 1) {
+    const roster = generateRoster(
+      `ROSTER-BIAS-${index}`,
+      ROSTER_OPERATIVES,
+      DEFAULT_ROSTER_GENERATION_CONFIG,
+      bias,
+    );
+
+    for (const operativeId of roster.startingOperativeIds) {
+      appearances[operativeId] += 1;
+    }
+  }
+
+  return appearances;
 }

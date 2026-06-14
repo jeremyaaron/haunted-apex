@@ -24,6 +24,12 @@ export type {
 } from './agents';
 export type {
   AgentBatchSummary,
+  CampaignActionUsageReport,
+  CampaignAgentBatchSummary,
+  CampaignBatchSummary,
+  CampaignEventReport,
+  CampaignLossCauseReport,
+  CampaignSystemUsageReport,
   ContactEventReport,
   ContactFinalRunStats,
   ContactLedgerReport,

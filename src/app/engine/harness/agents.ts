@@ -76,7 +76,9 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
       aggressiveWeights(state),
       {},
       (option) =>
-        scoreAggressiveTarget(state, option) + scoreAggressiveAccordOrder(state, option),
+        scoreAggressiveTarget(state, option) +
+        scoreAggressiveAccordOrder(state, option) +
+        scoreAggressiveCampaignOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -85,7 +87,7 @@ export const AGGRESSIVE_BOT: StrategyAgent = {
       context,
       aggressiveWeights(state),
       true,
-      scoreAggressiveEventChoice,
+      (choice) => scoreAggressiveEventChoice(choice) + scoreAggressiveCampaignEventChoice(state, choice),
     ),
 };
 
@@ -108,7 +110,8 @@ export const CAUTIOUS_BOT: StrategyAgent = {
         scoreCautiousLedgerOrder(state, option) +
         scoreCautiousContactOrder(state, option) +
         scoreCautiousFrontOrder(state, option) +
-        scoreCautiousAccordOrder(state, option),
+        scoreCautiousAccordOrder(state, option) +
+        scoreCautiousCampaignOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -117,7 +120,7 @@ export const CAUTIOUS_BOT: StrategyAgent = {
       context,
       cautiousWeights(state),
       true,
-      scoreCautiousEventChoice,
+      (choice) => scoreCautiousEventChoice(choice) + scoreCautiousCampaignEventChoice(state, choice),
     ),
 };
 
@@ -137,7 +140,8 @@ export const GREEDY_BOT: StrategyAgent = {
         scoreGreedyLedgerOrder(state, option) +
         scoreGreedyContactOrder(state, option) +
         scoreGreedyFrontOrder(state, option) +
-        scoreGreedyAccordOrder(state, option),
+        scoreGreedyAccordOrder(state, option) +
+        scoreGreedyCampaignOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoringChoice(
@@ -146,7 +150,7 @@ export const GREEDY_BOT: StrategyAgent = {
       context,
       greedyWeights(state),
       true,
-      scoreGreedyEventChoice,
+      (choice) => scoreGreedyEventChoice(choice) + scoreGreedyCampaignEventChoice(state, choice),
     ),
 };
 
@@ -168,12 +172,14 @@ export const OPERATOR_BOT: StrategyAgent = {
         scoreOperatorLedgerOrder(state, option) +
         scoreOperatorContactOrder(state, option) +
         scoreOperatorFrontOrder(state, option) +
-        scoreOperatorAccordOrder(state, option),
+        scoreOperatorAccordOrder(state, option) +
+        scoreOperatorCampaignOrder(state, option),
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
       scoreOperatorPressureMove(state.pressures, mergeChoiceDelta(option.choice), 0) +
-      scoreOperatorEventChoice(option.choice),
+      scoreOperatorEventChoice(option.choice) +
+      scoreOperatorCampaignEventChoice(state, option.choice),
     ),
 };
 
@@ -1335,6 +1341,349 @@ function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): n
     losingPenalty -
     usagePenalty
   );
+}
+
+function scoreAggressiveCampaignOrder(state: GameState, option: LegalOrderOption): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_nightlife_war':
+      return (
+        scoreContactIds(option, { contact_veyra_lux: 42, contact_mina_glass: 32 }) +
+        scoreTargetRival(option, 'rival_nyx_ardent', -18) +
+        scoreDominionTempo(option, 4)
+      );
+    case 'campaign_industrial_cut':
+      return (
+        scoreFrontIds(option, { front_zero_mercy_cut: 46, front_courier_line: 32 }) +
+        scoreOperativeRoles(option, { violence: 14, money: 10 }) +
+        scoreTargetRival(option, 'rival_knox_marrow', state.pressures.heat >= 80 ? -18 : 8) +
+        scoreDominionTempo(option, 5)
+      );
+    case 'campaign_corp_crackdown':
+      return state.pressures.heat >= 82
+        ? scoreHeatReliefOrder(option, 9) + scoreAccordIds(option, { accord_ashline_clean_corridor: 36 })
+        : 0;
+    case 'campaign_ghostline_signal':
+      return option.actionId === 'gather_intel' && option.target ? 16 : 0;
+    case 'campaign_dirty_capital':
+      return scoreFrontRolesFromOption(option, { resources: 12, dominion: 8 });
+  }
+}
+
+function scoreCautiousCampaignOrder(state: GameState, option: LegalOrderOption): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_corp_crackdown':
+      return (
+        scoreHeatReliefOrder(option, 12) +
+        scoreAccordIds(option, {
+          accord_ashline_clean_corridor: 58,
+          accord_ashline_inspection_delay: 44,
+        }) +
+        scoreFrontRolesFromOption(option, { heat_control: 28, security: 18 })
+      );
+    case 'campaign_nightlife_war':
+      return (
+        scoreLoyaltyReliefOrder(state, option, 10) +
+        scoreTargetRival(option, 'rival_nyx_ardent', -28) +
+        scoreContactIds(option, { contact_veyra_lux: 14, contact_mina_glass: 12 })
+      );
+    case 'campaign_ghostline_signal':
+      return (
+        scoreRuinReliefOrder(state, option, 12) +
+        scoreContactIds(option, { contact_father_static: 34, contact_ciro_moth: 22 }) +
+        (option.actionId === 'gather_intel' && option.target && state.pressures.ruin < 24 ? 10 : 0)
+      );
+    case 'campaign_industrial_cut':
+      return scoreHeatReliefOrder(option, 9) + scoreTargetRival(option, 'rival_knox_marrow', -24);
+    case 'campaign_dirty_capital':
+      return (
+        scoreAccordIds(option, { accord_helix_permit_shell: 34 }) +
+        scoreLedgerDebtSettlement(option, 28) +
+        scoreFrontRolesFromOption(option, { heat_control: 18, resources: 10 })
+      );
+  }
+}
+
+function scoreGreedyCampaignOrder(state: GameState, option: LegalOrderOption): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_dirty_capital':
+      return (
+        scoreFrontRolesFromOption(option, { resources: 52, heat_control: 16 }) +
+        scoreFrontMode(option, 'establish', state.week <= 5 ? 58 : 24) +
+        scoreAccordIds(option, { accord_helix_quiet_capital: 46, accord_helix_permit_shell: 28 }) +
+        scoreLedgerDebtSettlement(
+          option,
+          (state.factions.faction_helix_meridian?.obligation ?? 0) >= 65 ? 42 : 0,
+        )
+      );
+    case 'campaign_industrial_cut':
+      return (
+        scoreFrontIds(option, { front_zero_mercy_cut: 44, front_courier_line: 54 }) +
+        scoreOperativeRoles(option, { money: 16, violence: 10 }) +
+        scoreTargetRival(option, 'rival_knox_marrow', state.pressures.heat >= 84 ? -22 : 10)
+      );
+    case 'campaign_ghostline_signal':
+      return (
+        (option.actionId === 'gather_intel' && option.target ? 24 : 0) +
+        scoreRuinReliefOrder(state, option, 7)
+      );
+    case 'campaign_nightlife_war':
+      return scoreContactIds(option, { contact_veyra_lux: 20, contact_mina_glass: 18 });
+    case 'campaign_corp_crackdown':
+      return state.pressures.heat >= 84 ? scoreHeatReliefOrder(option, 10) : 0;
+  }
+}
+
+function scoreOperatorCampaignOrder(state: GameState, option: LegalOrderOption): number {
+  const frontCoolingBias =
+    option.preview.frontExposure && state.pressures.heat >= 65 ? 55 : 0;
+  const stableTempoBias =
+    state.pressures.heat <= 58 && state.pressures.loyalty >= 38 && state.pressures.resources >= 900
+      ? scoreDominionTempo(option, 8)
+      : 0;
+  const resourceRecoveryBias =
+    option.actionId === 'run_small_job' && state.pressures.resources <= 1400 ? 95 : 0;
+
+  switch (state.campaign.tensionId) {
+    case 'campaign_corp_crackdown':
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        scoreHeatReliefOrder(option, state.pressures.heat >= 60 ? 16 : 7) +
+        scoreAccordIds(option, {
+          accord_ashline_clean_corridor: 74,
+          accord_ashline_inspection_delay: 58,
+        }) +
+        scoreFrontRolesFromOption(option, { heat_control: 36, security: 26 }) -
+        Math.max(0, option.preview.riskChance - 8) * 1.6
+      );
+    case 'campaign_nightlife_war':
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        scoreContactIds(option, { contact_veyra_lux: 40, contact_mina_glass: 34 }) +
+        scoreLoyaltyReliefOrder(state, option, 11) +
+        scoreTargetRival(option, 'rival_nyx_ardent', -34) +
+        scoreAccordIds(option, { accord_velvet_guest_list: 42, accord_velvet_silence: 30 }) +
+        (state.pressures.resources <= 1800 && option.actionId === 'manage_contact' ? -36 : 0)
+      );
+    case 'campaign_ghostline_signal':
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        (option.actionId === 'gather_intel' && option.target && state.pressures.intel < 45 ? 50 : 0) +
+        (option.actionId === 'gather_intel' && state.pressures.intel >= 55 ? -72 : 0) +
+        (state.week >= 5 ? scoreDominionTempo(option, 12) : 0) +
+        scoreRuinReliefOrder(state, option, 12) +
+        scoreContactIds(option, { contact_father_static: 38, contact_ciro_moth: 36 }) +
+        scoreAccordIds(option, {
+          accord_ghostline_dead_channel: 42,
+          accord_ghostline_mercy_static: 34,
+        })
+      );
+    case 'campaign_industrial_cut':
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        scoreFrontIds(option, {
+          front_zero_mercy_cut: state.pressures.heat >= 70 ? -38 : 30,
+          front_courier_line: 48,
+        }) +
+        scoreTargetRival(option, 'rival_knox_marrow', state.pressures.heat >= 66 ? -32 : -8) +
+        scoreHeatReliefOrder(option, state.pressures.heat >= 66 ? 12 : 4) +
+        scoreOperativeRoles(option, { violence: 12, money: 12, stability: 8 })
+      );
+    case 'campaign_dirty_capital':
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        scoreFrontRolesFromOption(option, { resources: 42, heat_control: 24, dominion: 18 }) +
+        scoreFrontMode(option, 'establish', state.week <= 4 ? 72 : 20) +
+        scoreAccordIds(option, { accord_helix_quiet_capital: 52, accord_helix_permit_shell: 44 }) +
+        scoreLedgerDebtSettlement(
+          option,
+          (state.factions.faction_helix_meridian?.obligation ?? 0) >= 60 ? 52 : 18,
+        )
+      );
+  }
+}
+
+function scoreAggressiveCampaignEventChoice(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_nightlife_war':
+      return scoreChoiceDelta(choice, { dominion: 2.2, loyalty: 1.4 }) + scoreChoiceDebt(choice, -8);
+    case 'campaign_industrial_cut':
+      return scoreChoiceDelta(choice, { resources: 0.025, dominion: 2.4, heat: -0.8 });
+    case 'campaign_corp_crackdown':
+      return state.pressures.heat >= 78 ? scoreChoiceDelta(choice, { heat: -4 }) : 0;
+    case 'campaign_ghostline_signal':
+      return scoreChoiceDelta(choice, { intel: 1.2, ruin: state.pressures.ruin >= 24 ? -3 : -0.5 });
+    case 'campaign_dirty_capital':
+      return scoreChoiceDelta(choice, { resources: 0.02, dominion: 1.2 });
+  }
+}
+
+function scoreCautiousCampaignEventChoice(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_corp_crackdown':
+      return scoreChoiceDelta(choice, { heat: -5, loyalty: 1.2 }) + scoreChoiceDebt(choice, -24);
+    case 'campaign_nightlife_war':
+      return scoreChoiceDelta(choice, { loyalty: 4, heat: -1.5 }) + scoreChoiceDebt(choice, -18);
+    case 'campaign_ghostline_signal':
+      return scoreChoiceDelta(choice, { ruin: -5, intel: 0.8 }) + scoreChoiceDebt(choice, -12);
+    case 'campaign_industrial_cut':
+      return scoreChoiceDelta(choice, { heat: -4, resources: 0.006 });
+    case 'campaign_dirty_capital':
+      return scoreChoiceDebt(choice, -28) + scoreChoiceDelta(choice, { resources: 0.006, heat: -1 });
+  }
+}
+
+function scoreGreedyCampaignEventChoice(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_dirty_capital':
+      return scoreChoiceDelta(choice, { resources: 0.045, dominion: 1.1 }) + scoreChoiceDebt(choice, -8);
+    case 'campaign_industrial_cut':
+      return scoreChoiceDelta(choice, { resources: 0.04, dominion: 1.8, heat: state.pressures.heat >= 82 ? -3 : -0.6 });
+    case 'campaign_ghostline_signal':
+      return scoreChoiceDelta(choice, { intel: 1.8, ruin: state.pressures.ruin >= 28 ? -4 : -0.4 });
+    case 'campaign_nightlife_war':
+      return scoreChoiceDelta(choice, { intel: 1.2, loyalty: 1.1 });
+    case 'campaign_corp_crackdown':
+      return state.pressures.heat >= 84 ? scoreChoiceDelta(choice, { heat: -4 }) : 0;
+  }
+}
+
+function scoreOperatorCampaignEventChoice(
+  state: GameState,
+  choice: EventChoiceDefinition,
+): number {
+  switch (state.campaign.tensionId) {
+    case 'campaign_corp_crackdown':
+      return scoreChoiceDelta(choice, { heat: state.pressures.heat >= 60 ? -6 : -2, loyalty: 1.2 }) + scoreChoiceDebt(choice, -16);
+    case 'campaign_nightlife_war':
+      return scoreChoiceDelta(choice, { loyalty: 4, dominion: 1.4, heat: -1.4 }) + scoreChoiceDebt(choice, -12);
+    case 'campaign_ghostline_signal':
+      return scoreChoiceDelta(choice, { intel: 1.2, ruin: state.pressures.ruin >= 20 ? -5 : -1.5 }) + scoreChoiceDebt(choice, -8);
+    case 'campaign_industrial_cut':
+      return scoreChoiceDelta(choice, { resources: 0.018, heat: state.pressures.heat >= 66 ? -4 : -1, dominion: 1.6 });
+    case 'campaign_dirty_capital':
+      return scoreChoiceDelta(choice, { resources: 0.018, dominion: 1.4, heat: -1.2 }) + scoreChoiceDebt(choice, -14);
+  }
+}
+
+function scoreContactIds(option: LegalOrderOption, values: Record<string, number>): number {
+  const contact = option.preview.contactUse;
+
+  if (!contact?.ok) {
+    return 0;
+  }
+
+  return values[contact.contactId] ?? 0;
+}
+
+function scoreFrontIds(option: LegalOrderOption, values: Record<string, number>): number {
+  const investment = option.preview.frontInvestment;
+
+  if (!investment?.ok) {
+    return 0;
+  }
+
+  return values[investment.definition.id] ?? 0;
+}
+
+function scoreFrontRolesFromOption(
+  option: LegalOrderOption,
+  values: Partial<Record<FrontRoleTag, number>>,
+): number {
+  const investment = option.preview.frontInvestment;
+
+  if (!investment?.ok) {
+    return 0;
+  }
+
+  return scoreFrontRoles(investment.definition.roleTags, values);
+}
+
+function scoreFrontMode(
+  option: LegalOrderOption,
+  mode: 'establish' | 'upgrade',
+  value: number,
+): number {
+  const investment = option.preview.frontInvestment;
+  return investment?.ok && investment.mode === mode ? value : 0;
+}
+
+function scoreAccordIds(option: LegalOrderOption, values: Record<string, number>): number {
+  const accord = getResolvedAccordPreview(option);
+
+  if (!accord) {
+    return 0;
+  }
+
+  return values[accord.definition.id] ?? 0;
+}
+
+function scoreOperativeRoles(
+  option: LegalOrderOption,
+  values: Partial<Record<OperativeRoleTag, number>>,
+): number {
+  const operativeId =
+    option.preview.selectedOperative?.operativeId ??
+    (option.target?.type === 'recruit' ? option.target.id : undefined);
+
+  return operativeId ? scoreRoles(getRoleTags(operativeId), values) : 0;
+}
+
+function scoreTargetRival(
+  option: LegalOrderOption,
+  rivalId: string,
+  value: number,
+): number {
+  return option.preview.rivalAttention?.rivalId === rivalId ? value : 0;
+}
+
+function scoreDominionTempo(option: LegalOrderOption, multiplier: number): number {
+  return (getOrderNetDelta(option).dominion ?? 0) * multiplier;
+}
+
+function scoreHeatReliefOrder(option: LegalOrderOption, multiplier: number): number {
+  const heatDelta = getOrderNetDelta(option).heat ?? 0;
+  return heatDelta < 0 ? Math.abs(heatDelta) * multiplier : 0;
+}
+
+function scoreLoyaltyReliefOrder(
+  state: GameState,
+  option: LegalOrderOption,
+  multiplier: number,
+): number {
+  const loyaltyDelta = getOrderNetDelta(option).loyalty ?? 0;
+  return state.pressures.loyalty <= 45 && loyaltyDelta > 0 ? loyaltyDelta * multiplier : 0;
+}
+
+function scoreRuinReliefOrder(
+  state: GameState,
+  option: LegalOrderOption,
+  multiplier: number,
+): number {
+  const ruinDelta = getOrderNetDelta(option).ruin ?? 0;
+  return state.pressures.ruin >= 18 && ruinDelta < 0 ? Math.abs(ruinDelta) * multiplier : 0;
+}
+
+function scoreLedgerDebtSettlement(option: LegalOrderOption, value: number): number {
+  const ledger = option.preview.ledgerUse;
+  return ledger?.ok && ledger.definition.kind === 'debt' ? value : 0;
+}
+
+function scoreChoiceDelta(choice: EventChoiceDefinition, weights: PressureWeights): number {
+  return scoreDelta(mergeChoiceDelta(choice), weights);
+}
+
+function scoreChoiceDebt(choice: EventChoiceDefinition, value: number): number {
+  return (choice.ledgerEffects ?? []).some(
+    (effect) =>
+      effect.type === 'create' &&
+      getLedgerEntryDefinition(effect.definitionId)?.kind === 'debt',
+  )
+    ? value
+    : 0;
 }
 
 function getResolvedAccordPreview(option: LegalOrderOption): Extract<

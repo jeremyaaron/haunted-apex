@@ -18,6 +18,16 @@ export type {
 } from './actions';
 export type { RecentActivityEntry } from './activity';
 export type {
+  CampaignEventWeightModifier,
+  CampaignGenerationBias,
+  CampaignRoleTag,
+  CampaignState,
+  CampaignTensionDefinition,
+  CampaignTensionId,
+  CityIdentity,
+  CityProfile,
+} from './campaign';
+export type {
   ContactArchetype,
   ContactDefinition,
   ContactGenerationTag,

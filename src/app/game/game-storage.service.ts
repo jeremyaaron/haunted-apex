@@ -9,6 +9,7 @@ import {
   FRONT_DEFINITIONS,
   getAccordDefinition,
   getActionDefinition,
+  getCampaignTensionDefinition,
   getContactDefinition,
   getDistrictDefinition,
   getEventDefinition,
@@ -25,6 +26,8 @@ import {
   type ActionId,
   type ActionTarget,
   type ActiveAccordId,
+  type CampaignTensionId,
+  type CityProfile,
   type ContactId,
   type ContactMetricDelta,
   type ContactOptionKind,
@@ -45,9 +48,10 @@ import {
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 7;
-export const CURRENT_GAME_VERSION = '0.7.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.7:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 8;
+export const CURRENT_GAME_VERSION = '0.8.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.8:current-run';
+export const LEGACY_V07_STORAGE_KEY = 'haunted-apex:v0.7:current-run';
 export const LEGACY_V06_STORAGE_KEY = 'haunted-apex:v0.6:current-run';
 export const LEGACY_V05_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
 export const LEGACY_V04_STORAGE_KEY = 'haunted-apex:v0.4:current-run';
@@ -104,6 +108,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V07_STORAGE_KEY);
       storage.removeItem(LEGACY_V06_STORAGE_KEY);
       storage.removeItem(LEGACY_V05_STORAGE_KEY);
       storage.removeItem(LEGACY_V04_STORAGE_KEY);
@@ -136,6 +141,19 @@ export class GameStorageService implements GameStorage {
         storage.removeItem(CURRENT_RUN_STORAGE_KEY);
         return { status: 'invalid' };
       }
+    }
+
+    if (storage.getItem(LEGACY_V07_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V07_STORAGE_KEY);
+      storage.removeItem(LEGACY_V06_STORAGE_KEY);
+      storage.removeItem(LEGACY_V05_STORAGE_KEY);
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 7,
+      };
     }
 
     if (storage.getItem(LEGACY_V06_STORAGE_KEY) !== null) {
@@ -194,6 +212,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V07_STORAGE_KEY);
     storage?.removeItem(LEGACY_V06_STORAGE_KEY);
     storage?.removeItem(LEGACY_V05_STORAGE_KEY);
     storage?.removeItem(LEGACY_V04_STORAGE_KEY);
@@ -216,7 +235,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 7 &&
+    value['schemaVersion'] === 8 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -224,6 +243,7 @@ function isGameState(value: unknown): value is GameState {
     isPositiveInteger(value['maxWeeks']) &&
     isTurnPhase(value['phase']) &&
     isPositiveInteger(value['commandPointsPerWeek']) &&
+    isCampaignState(value['campaign']) &&
     isPressures(value['pressures']) &&
     isOperatives(value['operatives']) &&
     isHirePool(value['hirePool'], value['operatives']) &&
@@ -240,6 +260,111 @@ function isGameState(value: unknown): value is GameState {
     isEventLog(value['eventLog']) &&
     isFlags(value['flags']) &&
     isGameOver(value['gameOver'])
+  );
+}
+
+function isCampaignState(campaign: unknown): boolean {
+  if (
+    !isRecord(campaign) ||
+    typeof campaign['tensionId'] !== 'string' ||
+    !getCampaignTensionDefinition(campaign['tensionId'] as CampaignTensionId) ||
+    typeof campaign['cityName'] !== 'string' ||
+    campaign['cityName'].trim() === '' ||
+    !isCityProfile(campaign['cityProfile']) ||
+    typeof campaign['openingBriefingShown'] !== 'boolean' ||
+    !isAppliedCampaignModifiers(campaign['appliedModifiers']) ||
+    !isRecord(campaign['activeContent']) ||
+    !isFlags(campaign['flags'])
+  ) {
+    return false;
+  }
+
+  const definition = getCampaignTensionDefinition(campaign['tensionId'] as CampaignTensionId);
+
+  if (!definition?.cityProfileOptions.includes(campaign['cityProfile'] as CityProfile)) {
+    return false;
+  }
+
+  const activeContent = campaign['activeContent'];
+
+  return (
+    isStringArray(activeContent['factionIds']) &&
+    unique(activeContent['factionIds']) &&
+    activeContent['factionIds'].every((id) => getFactionDefinition(id as FactionId)) &&
+    isStringArray(activeContent['rivalIds']) &&
+    unique(activeContent['rivalIds']) &&
+    activeContent['rivalIds'].every((id) => getRivalDefinition(id as RivalId)) &&
+    isStringArray(activeContent['contactIds']) &&
+    unique(activeContent['contactIds']) &&
+    activeContent['contactIds'].every((id) => getContactDefinition(id as ContactId)) &&
+    isStringArray(activeContent['frontDefinitionIds']) &&
+    unique(activeContent['frontDefinitionIds']) &&
+    activeContent['frontDefinitionIds'].every((id) => getFrontDefinition(id as FrontDefinitionId)) &&
+    isStringArray(activeContent['startingOperativeIds']) &&
+    unique(activeContent['startingOperativeIds']) &&
+    activeContent['startingOperativeIds'].every((id) => getOperativeDefinition(id as OperativeId))
+  );
+}
+
+function isCityProfile(value: unknown): value is CityProfile {
+  return (
+    value === 'rain_noir' ||
+    value === 'violet_nightlife' ||
+    value === 'ghost_market' ||
+    value === 'industrial_chrome' ||
+    value === 'corporate_spire'
+  );
+}
+
+function isAppliedCampaignModifiers(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    (value['startingPressureDelta'] === undefined ||
+      isPressureDelta(value['startingPressureDelta'])) &&
+    (value['factionModifiers'] === undefined ||
+      isCampaignFactionModifiers(value['factionModifiers'])) &&
+    (value['rivalPressureModifiers'] === undefined ||
+      isCampaignRivalPressureModifiers(value['rivalPressureModifiers'])) &&
+    (value['contactMetricModifiers'] === undefined ||
+      isCampaignContactMetricModifiers(value['contactMetricModifiers']))
+  );
+}
+
+function isCampaignFactionModifiers(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([factionId, delta]) =>
+        getFactionDefinition(factionId as FactionId) !== undefined &&
+        isRecord(delta) &&
+        Object.entries(delta).every(
+          ([metric, amount]) =>
+            ['standing', 'suspicion', 'obligation'].includes(metric) && isFiniteNumber(amount),
+        ),
+    )
+  );
+}
+
+function isCampaignRivalPressureModifiers(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([rivalId, amount]) =>
+        getRivalDefinition(rivalId as RivalId) !== undefined && isFiniteNumber(amount),
+    )
+  );
+}
+
+function isCampaignContactMetricModifiers(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(
+      ([contactId, delta]) =>
+        getContactDefinition(contactId as ContactId) !== undefined && isContactMetricDelta(delta),
+    )
   );
 }
 
@@ -509,7 +634,8 @@ function isFactionInteractionSourceType(value: unknown): boolean {
     value === 'action' ||
     value === 'front' ||
     value === 'contact' ||
-    value === 'ledger'
+    value === 'ledger' ||
+    value === 'campaign'
   );
 }
 
@@ -1130,6 +1256,7 @@ function isEventLog(value: unknown): boolean {
 
 function isGameLogEntryType(value: unknown): boolean {
   return (
+    value === 'campaign' ||
     value === 'order_queued' ||
     value === 'order_resolved' ||
     value === 'ledger' ||
@@ -1163,6 +1290,10 @@ function isGameOver(value: unknown): boolean {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function unique(value: readonly string[]): boolean {
+  return new Set(value).size === value.length;
 }
 
 function parseActionTarget(value: unknown): ActionTarget | undefined {

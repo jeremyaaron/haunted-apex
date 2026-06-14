@@ -12,7 +12,7 @@ import {
   simulateBatch,
   simulateRun,
 } from './index';
-import { CONTACT_DEFINITIONS, FACTION_DEFINITIONS } from '../content';
+import { CAMPAIGN_TENSION_DEFINITIONS, CONTACT_DEFINITIONS, FACTION_DEFINITIONS } from '../content';
 import { materializeContactState } from '../contacts';
 import { materializeFactionState } from '../factions';
 import { addLedgerEntry } from '../ledger';
@@ -25,6 +25,7 @@ import type {
   FrontState,
   GameState,
   FactionId,
+  CampaignTensionId,
 } from '../model';
 import { newGame, queueOrder } from '../simulation';
 
@@ -53,6 +54,17 @@ describe('simulation harness', () => {
     expect(first.contactStats).toEqual(second.contactStats);
     expect(first.frontStats).toEqual(second.frontStats);
     expect(first.trace.length).toBeGreaterThan(0);
+  });
+
+  it('can simulate a specific Campaign Tension directly', () => {
+    const run = simulateRun({
+      agent: RANDOM_BOT,
+      seed: 'HARNESS-SPECIFIC-CAMPAIGN',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+
+    expect(run.finalState.campaign.tensionId).toBe('campaign_ghostline_signal');
+    expect(run.finalState.campaign.cityProfile).toBe('ghost_market');
   });
 
   it('normalizes roster composition keys independent of generation order', () => {
@@ -269,6 +281,71 @@ describe('simulation harness', () => {
 
     expect(choice?.actionId).toBe('recruit_operative');
     expect(choice?.target).toEqual({ type: 'recruit', id: 'op_vant_black' });
+  });
+
+  it('makes OperatorBot target Gather Intel during Ghostline Signal', () => {
+    const state = newGame({
+      seed: 'HARNESS-OPERATOR-GHOSTLINE',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'gather_intel',
+    );
+    const choice = OPERATOR_BOT.chooseOrder(state, options, createTestContext('OPERATOR', 'ghostline'));
+
+    expect(choice?.actionId).toBe('gather_intel');
+    expect(choice?.target).toBeDefined();
+  });
+
+  it('makes CautiousBot value Ashline safety Accords during Corp Crackdown', () => {
+    const state = newGame({
+      seed: 'HARNESS-CAUTIOUS-CORP',
+      campaignTensionId: 'campaign_corp_crackdown',
+    });
+    state.pressures.heat = 78;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'broker_accord',
+    );
+    const choice = CAUTIOUS_BOT.chooseOrder(state, options, createTestContext('CAUTIOUS', 'corp'));
+
+    expect(choice?.actionId).toBe('broker_accord');
+    expect(choice?.preview.brokerAccord?.ok ? choice.preview.brokerAccord.faction.id : undefined).toBe(
+      'faction_ashline_bureau',
+    );
+  });
+
+  it('makes GreedyBot push Front investment during Dirty Capital', () => {
+    const state = newGame({
+      seed: 'HARNESS-GREEDY-CAPITAL',
+      campaignTensionId: 'campaign_dirty_capital',
+    });
+    state.pressures.resources = 5200;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front' || option.actionId === 'run_small_job',
+    );
+    const choice = GREEDY_BOT.chooseOrder(state, options, createTestContext('GREEDY', 'capital'));
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(choice?.preview.frontInvestment?.ok).toBeTrue();
+  });
+
+  it('makes AggressiveBot exploit Industrial Cut Front opportunities', () => {
+    const state = newGame({
+      seed: 'HARNESS-AGGRESSIVE-INDUSTRIAL',
+      campaignTensionId: 'campaign_industrial_cut',
+    });
+    state.pressures.resources = 5200;
+    const options = getLegalOrderOptions(state).filter(
+      (option) => option.actionId === 'invest_front',
+    );
+    const choice = AGGRESSIVE_BOT.chooseOrder(state, options, createTestContext('AGGRO', 'industrial'));
+    const frontId = choice?.preview.frontInvestment?.ok
+      ? choice.preview.frontInvestment.definition.id
+      : undefined;
+
+    expect(choice?.actionId).toBe('invest_front');
+    expect(frontId).toBeDefined();
+    expect(['front_zero_mercy_cut', 'front_courier_line']).toContain(frontId ?? '');
   });
 
   it('includes engine-validated Ledger use options when active entries exist', () => {
@@ -746,6 +823,18 @@ describe('simulation harness', () => {
     expect(output).toContain('operative_danger');
     expect(output).toContain('operative_events');
     expect(output).toContain('hire_pool_selection');
+    expect(output).toContain('campaign_summary');
+    expect(output).toContain('campaign_agent_summary');
+    expect(output).toContain('campaign_loss_causes');
+    expect(output).toContain('campaign_action_usage');
+    expect(output).toContain('campaign_events');
+    expect(output).toContain('campaign_system_usage');
+    expect(report.campaignSummaries.length).toBeGreaterThan(0);
+    expect(report.campaignAgentSummaries.length).toBeGreaterThan(0);
+    expect(report.campaignSystemUsage.length).toBeGreaterThan(0);
+    expect(
+      report.campaignSummaries.reduce((total, summary) => total + summary.runs, 0),
+    ).toBe(report.totalRuns);
 
     for (const summary of report.summaries) {
       const actionCount = Object.values(summary.actionUsage).reduce(
@@ -808,6 +897,32 @@ describe('simulation harness', () => {
         0,
       ),
     ).toBeGreaterThan(0);
+  });
+
+  it('can expand a batch across every Campaign Tension for each agent', () => {
+    const campaignTensionIds = CAMPAIGN_TENSION_DEFINITIONS.map(
+      (campaign) => campaign.id,
+    ) as CampaignTensionId[];
+    const report = simulateBatch({
+      agents: [RANDOM_BOT],
+      runsPerAgent: 1,
+      campaignTensionIds,
+      seedPrefix: 'HARNESS-ALL-CAMPAIGNS',
+    });
+    const output = formatBatchReport(report);
+
+    expect(report.totalRuns).toBe(campaignTensionIds.length);
+    expect(report.campaignSummaries.map((summary) => summary.campaignId)).toEqual(
+      campaignTensionIds,
+    );
+    expect(report.campaignAgentSummaries.length).toBe(campaignTensionIds.length);
+    expect(report.campaignLossCauses.length).toBe(campaignTensionIds.length);
+    expect(report.campaignSystemUsage.length).toBe(campaignTensionIds.length);
+
+    for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
+      expect(output).toContain(campaign.id);
+      expect(output).toContain(campaign.name);
+    }
   });
 
   it('produces identical expanded summaries for the same batch seed prefix', () => {

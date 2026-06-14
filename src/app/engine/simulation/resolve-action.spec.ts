@@ -186,7 +186,9 @@ describe('resolveQueuedOrder operative territory modifiers', () => {
     });
 
     expect(rookResult.state.districts.district_violet_ward.control).toBe(26);
-    expect(irisResult.state.rivals.rival_nyx_ardent.pressure).toBe(16);
+    expect(irisResult.state.rivals.rival_nyx_ardent.pressure).toBe(
+      base.rivals.rival_nyx_ardent.pressure + 16,
+    );
   });
 });
 

@@ -2,7 +2,13 @@ import { addLedgerEntry } from './add-ledger-entry';
 import { previewSecretDiscovery } from './secret-discovery';
 import { newGame, resolveQueuedOrder } from '../simulation';
 import { materializeOperativeState } from '../roster';
-import type { ActionTarget, GameState, LedgerEntryDefinitionId, QueuedOrder } from '../model';
+import type {
+  ActionTarget,
+  CampaignTensionId,
+  GameState,
+  LedgerEntryDefinitionId,
+  QueuedOrder,
+} from '../model';
 
 describe('Secret discovery', () => {
   const ghostlineTarget = {
@@ -19,7 +25,7 @@ describe('Secret discovery', () => {
   } as const satisfies ActionTarget;
 
   it('does not preview a Secret chance for untargeted Gather Intel', () => {
-    const preview = previewSecretDiscovery(newGame({ seed: 'SECRET-UNTARGETED' }), {
+    const preview = previewSecretDiscovery(testGame('SECRET-UNTARGETED'), {
       actionId: 'gather_intel',
     });
 
@@ -28,11 +34,12 @@ describe('Secret discovery', () => {
       chance: 0,
       candidateDefinitionIds: [],
       candidates: [],
+      bonusRows: [],
     });
   });
 
   it('previews an exact targeted Gather Intel Secret chance', () => {
-    const preview = previewSecretDiscovery(newGame({ seed: 'SECRET-TARGETED' }), {
+    const preview = previewSecretDiscovery(testGame('SECRET-TARGETED'), {
       actionId: 'gather_intel',
       target: ghostlineTarget,
     });
@@ -41,14 +48,76 @@ describe('Secret discovery', () => {
       jasmine.objectContaining({
         eligible: true,
         chance: 23,
+        bonusRows: [],
       }),
     );
     expect(preview.candidateDefinitionIds).toContain('secret_ghostline_buyer_list');
     expect(preview.candidateDefinitionIds).toContain('secret_dead_channel_trace');
   });
 
+  it('adds the Ghostline Signal Campaign bonus to targeted Gather Intel only', () => {
+    const nightlife = testGame('SECRET-GHOSTLINE-BONUS');
+    const ghostline = newGame({
+      seed: 'SECRET-GHOSTLINE-BONUS',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+    const untargeted = previewSecretDiscovery(ghostline, {
+      actionId: 'gather_intel',
+    });
+    const targetedNightlife = previewSecretDiscovery(nightlife, {
+      actionId: 'gather_intel',
+      target: ghostlineTarget,
+    });
+    const targetedGhostline = previewSecretDiscovery(ghostline, {
+      actionId: 'gather_intel',
+      target: ghostlineTarget,
+    });
+
+    expect(untargeted.eligible).toBeFalse();
+    expect(untargeted.bonusRows).toEqual([]);
+    expect(targetedNightlife.chance).toBe(23);
+    expect(targetedNightlife.bonusRows).toEqual([]);
+    expect(targetedGhostline.chance).toBe(31);
+    expect(targetedGhostline.bonusRows).toEqual([
+      {
+        source: 'campaign',
+        label: 'Campaign Bonus: Ghostline Signal',
+        amount: 8,
+      },
+    ]);
+  });
+
+  it('clamps the Ghostline Signal Campaign bonus inside the final Secret chance', () => {
+    const state = {
+      ...newGame({
+        seed: 'SECRET-GHOSTLINE-CLAMP',
+        campaignTensionId: 'campaign_ghostline_signal',
+      }),
+      pressures: {
+        ...newGame({
+          seed: 'SECRET-GHOSTLINE-CLAMP',
+          campaignTensionId: 'campaign_ghostline_signal',
+        }).pressures,
+        intel: 260,
+      },
+    };
+    const preview = previewSecretDiscovery(state, {
+      actionId: 'gather_intel',
+      target: ghostlineTarget,
+    });
+
+    expect(preview.chance).toBe(45);
+    expect(preview.bonusRows).toEqual([
+      {
+        source: 'campaign',
+        label: 'Campaign Bonus: Ghostline Signal',
+        amount: 8,
+      },
+    ]);
+  });
+
   it('responds to target context and assigned operative Stress', () => {
-    const base = newGame({ seed: 'SECRET-STRESS' });
+    const base = testGame('SECRET-STRESS');
     const state = {
       ...base,
       operatives: [
@@ -78,7 +147,7 @@ describe('Secret discovery', () => {
   });
 
   it('reduces duplicate candidate weight without blocking non-unique repeats', () => {
-    const base = newGame({ seed: 'SECRET-DUPLICATE' });
+    const base = testGame('SECRET-DUPLICATE');
     const duplicate = addLedgerEntry(base, {
       definitionId: 'secret_patrol_schedule',
       source: {
@@ -107,7 +176,7 @@ describe('Secret discovery', () => {
   });
 
   it('does not rediscover active unique definitions', () => {
-    const state = addLedgerEntry(newGame({ seed: 'SECRET-UNIQUE' }), {
+    const state = addLedgerEntry(testGame('SECRET-UNIQUE'), {
       definitionId: 'secret_nyx_velvet_ledger',
       source: {
         type: 'action',
@@ -148,6 +217,28 @@ describe('Secret discovery', () => {
     );
   });
 
+  it('resolves Secret discovery with the same Ghostline Campaign chance shown in preview', () => {
+    const seeded = findDiscoverySeed(
+      ghostlineTarget,
+      undefined,
+      'campaign_ghostline_signal',
+    );
+    const order = createGatherIntelOrder(ghostlineTarget);
+    const preview = previewSecretDiscovery(seeded, order);
+    const result = resolveQueuedOrder(seeded, order);
+    const entry = result.state.ledger.entries.at(-1);
+
+    expect(preview.eligible).toBeTrue();
+    expect(preview.bonusRows).toEqual([
+      {
+        source: 'campaign',
+        label: 'Campaign Bonus: Ghostline Signal',
+        amount: 8,
+      },
+    ]);
+    expect(entry?.flags?.['discoveryChance']).toBe(preview.chance);
+  });
+
   it('does not reduce raw Intel gain when discovery succeeds', () => {
     const seeded = findDiscoverySeed(ghostlineTarget);
     const order = createGatherIntelOrder(ghostlineTarget);
@@ -168,9 +259,13 @@ describe('Secret discovery', () => {
   function findDiscoverySeed(
     target: ActionTarget,
     expectedDefinitionId?: LedgerEntryDefinitionId,
+    campaignTensionId: CampaignTensionId = 'campaign_nightlife_war',
   ): GameState {
     for (let index = 1; index <= 500; index += 1) {
-      const state = newGame({ seed: `SECRET-FIND-${index}` });
+      const state = newGame({
+        seed: `SECRET-FIND-${index}`,
+        campaignTensionId,
+      });
       const result = resolveQueuedOrder(state, createGatherIntelOrder(target));
       const entry = result.state.ledger.entries[0];
 
@@ -186,3 +281,7 @@ describe('Secret discovery', () => {
     throw new Error('Expected to find a deterministic Secret discovery seed.');
   }
 });
+
+function testGame(seed: string): GameState {
+  return newGame({ seed, campaignTensionId: 'campaign_nightlife_war' });
+}

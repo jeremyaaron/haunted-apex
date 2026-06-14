@@ -54,7 +54,7 @@ export type FactionMetricDelta = {
 
 export type FactionInteraction = {
   week: number;
-  sourceType: 'accord' | 'event' | 'action' | 'front' | 'contact' | 'ledger';
+  sourceType: 'accord' | 'event' | 'action' | 'front' | 'contact' | 'ledger' | 'campaign';
   sourceId: string;
   standingDelta?: number;
   suspicionDelta?: number;

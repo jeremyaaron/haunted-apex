@@ -1,4 +1,5 @@
 import {
+  getCampaignTensionDefinition,
   getAccordDefinition,
   getFactionDefinition,
   getFrontDefinition,
@@ -17,6 +18,7 @@ import type {
   GameState,
   FactionId,
   FactionStatus,
+  CampaignTensionId,
   LedgerEntry,
   LedgerEntryKind,
   OperativeId,
@@ -72,6 +74,16 @@ export type RunSummaryFaction = {
   highObligation: boolean;
 };
 
+export type RunSummaryCampaign = {
+  tensionId: CampaignTensionId;
+  tensionName: string;
+  cityName: string;
+  subtitle: string;
+  premise: string;
+  notes: string[];
+  flavorLine?: string;
+};
+
 export type RunSummaryReport = {
   title: string;
   seed: string;
@@ -84,6 +96,7 @@ export type RunSummaryReport = {
   mostAssignedOperative?: RunSummaryOperative;
   mvpOperative?: RunSummaryOperative;
   mostDangerousRival?: RunSummaryRival;
+  campaign: RunSummaryCampaign;
   ledger: {
     created: number;
     consumed: number;
@@ -131,6 +144,12 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
   const ledgerEntries = state.ledger.entries.map(toLedgerReportEntry);
   const frontSummary = buildFrontSummary(state);
   const factionSummary = buildFactionSummary(state);
+  const campaignSummary = buildCampaignSummary(
+    state,
+    gameOver,
+    frontSummary,
+    factionSummary,
+  );
   const reportWithoutText = {
     title: `Haunted Apex Run Report - ${formatResult(gameOver.result)}`,
     seed: state.seed,
@@ -143,6 +162,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
     mostAssignedOperative,
     mvpOperative,
     mostDangerousRival: selectMostDangerousRival(state),
+    campaign: campaignSummary,
     ledger: {
       created: state.ledger.entries.length,
       consumed: state.ledger.entries.filter((entry) => entry.consumed).length,
@@ -154,7 +174,7 @@ export function buildRunSummary(state: GameState): RunSummaryReport {
     fronts: frontSummary,
     factions: factionSummary,
     majorEvents: selectMajorEvents(state),
-    epitaph: selectEpitaph(state, gameOver),
+    epitaph: campaignSummary.flavorLine ?? selectEpitaph(state, gameOver),
   };
   const text = formatRunSummary(reportWithoutText);
 
@@ -173,6 +193,14 @@ export function formatRunSummary(
     `Result: ${formatResult(report.result)} (${formatToken(report.reason)})`,
     `Ended Week: ${report.endedWeek}`,
     `Seed: ${report.seed}`,
+    '',
+    'Campaign:',
+    `- City: ${report.campaign.cityName}`,
+    `- Tension: ${report.campaign.tensionName}`,
+    `- Premise: ${report.campaign.subtitle}`,
+    '',
+    'Campaign Notes:',
+    ...report.campaign.notes.map((note) => `- ${note}`),
     '',
     'Final Pressures:',
     ...PRESSURE_IDS.map((id) => `- ${formatToken(id)}: ${report.finalPressures[id]}`),
@@ -218,6 +246,90 @@ export function formatRunSummary(
   ];
 
   return lines.join('\n');
+}
+
+function buildCampaignSummary(
+  state: GameState,
+  gameOver: GameOverState,
+  frontSummary: RunSummaryReport['fronts'],
+  factionSummary: RunSummaryReport['factions'],
+): RunSummaryCampaign {
+  const definition = getCampaignTensionDefinition(state.campaign.tensionId);
+  const tensionName = definition?.name ?? formatToken(state.campaign.tensionId);
+  const notes = selectCampaignNotes(state, frontSummary, factionSummary);
+  const flavorLine =
+    gameOver.result === 'victory'
+      ? definition?.runSummaryFlavor?.victoryLine
+      : definition?.runSummaryFlavor?.lossLine;
+
+  return {
+    tensionId: state.campaign.tensionId,
+    tensionName,
+    cityName: state.campaign.cityName,
+    subtitle: definition?.subtitle ?? 'The city writes its own pressure pattern.',
+    premise: definition?.description ?? state.campaign.cityName,
+    notes,
+    flavorLine,
+  };
+}
+
+function selectCampaignNotes(
+  state: GameState,
+  frontSummary: RunSummaryReport['fronts'],
+  factionSummary: RunSummaryReport['factions'],
+): string[] {
+  switch (state.campaign.tensionId) {
+    case 'campaign_corp_crackdown':
+      return [
+        `Final Heat: ${state.pressures.heat}`,
+        formatFactionMetricNote(state, 'faction_ashline_bureau', 'Ashline Bureau'),
+        `Heat lockdown: ${state.gameOver?.reason === 'heat_lockdown' ? 'Yes' : 'No'}`,
+      ];
+    case 'campaign_nightlife_war':
+      return [
+        `Nyx Ardent Pressure: ${state.rivals.rival_nyx_ardent.pressure}`,
+        `Contact interactions: ${countContactInteractions(state)}`,
+        `Final Loyalty: ${state.pressures.loyalty}`,
+      ];
+    case 'campaign_ghostline_signal':
+      return [
+        `Secrets discovered: ${countLedgerKind(state, 'secret')}`,
+        `Ledger entries used: ${state.ledger.consumedCount}`,
+        `Final Ruin: ${state.pressures.ruin}`,
+      ];
+    case 'campaign_industrial_cut':
+      return [
+        `Final Resources: ${state.pressures.resources}`,
+        `Final Heat: ${state.pressures.heat}`,
+        `Knox Marrow Pressure: ${state.rivals.rival_knox_marrow.pressure}`,
+      ];
+    case 'campaign_dirty_capital':
+      return [
+        `Owned Fronts: ${frontSummary.owned}`,
+        `Active Debts/Favors: ${countActiveLedgerKind(state, 'debt')}/${countActiveLedgerKind(state, 'favor')}`,
+        formatFactionMetricNote(state, 'faction_helix_meridian', 'Helix Meridian'),
+      ];
+  }
+
+  return [
+    `Final Dominion: ${state.pressures.dominion}`,
+    `Final Heat: ${state.pressures.heat}`,
+    `Active Factions: ${factionSummary.active}`,
+  ];
+}
+
+function formatFactionMetricNote(
+  state: GameState,
+  factionId: FactionId,
+  label: string,
+): string {
+  const faction = state.factions[factionId];
+
+  if (!faction) {
+    return `${label}: inactive`;
+  }
+
+  return `${label}: Suspicion ${faction.suspicion}, Obligation ${faction.obligation}`;
 }
 
 function buildFactionSummary(state: GameState): RunSummaryReport['factions'] {
@@ -315,6 +427,17 @@ function selectMostDangerousRival(state: GameState): RunSummaryRival | undefined
 
 function countActiveLedgerKind(state: GameState, kind: LedgerEntryKind): number {
   return state.ledger.entries.filter((entry) => entry.kind === kind && !entry.consumed).length;
+}
+
+function countLedgerKind(state: GameState, kind: LedgerEntryKind): number {
+  return state.ledger.entries.filter((entry) => entry.kind === kind).length;
+}
+
+function countContactInteractions(state: GameState): number {
+  return Object.values(state.contacts).reduce(
+    (sum, contact) => sum + contact.recentInteractions.length,
+    0,
+  );
 }
 
 function toLedgerReportEntry(entry: LedgerEntry): RunSummaryLedgerEntry {

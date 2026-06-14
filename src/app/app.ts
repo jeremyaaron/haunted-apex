@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import {
   PRESSURE_IDS,
   STRATEGY_AGENTS,
+  CAMPAIGN_TENSION_DEFINITIONS,
   DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   formatBatchReport,
   generateRoster,
@@ -16,6 +17,7 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type AppliedModifierSource,
+  type CampaignTensionId,
   type ContactEffectPreviewRow,
   type ContactCostRow,
   type ContactMetricDeltaView,
@@ -48,6 +50,11 @@ type ActionCardUiView = ActionCardView & {
   targetOptions: ActionTargetOption[];
 };
 
+type CampaignSelectionOption = {
+  id: '' | CampaignTensionId;
+  label: string;
+};
+
 @Component({
   selector: 'app-root',
   imports: [FormsModule, NgTemplateOutlet],
@@ -62,6 +69,17 @@ export class App {
   protected readonly debugVisible = signal(false);
   protected readonly copyReportStatus = signal<'idle' | 'success' | 'failure'>('idle');
   protected seedInput = 'VIOLET-ASH-1047';
+  protected selectedCampaignTensionId: '' | CampaignTensionId = '';
+  protected readonly campaignSelectionOptions: CampaignSelectionOption[] = [
+    {
+      id: '',
+      label: 'Random Campaign Tension',
+    },
+    ...CAMPAIGN_TENSION_DEFINITIONS.map((campaign) => ({
+      id: campaign.id,
+      label: campaign.name,
+    })),
+  ];
 
   protected readonly actionViews = computed(() =>
     this.game.actionCards().map((card) => this.withSelectedOperative(card)),
@@ -162,13 +180,30 @@ export class App {
   protected startNewRun(): void {
     this.clearTransientSelections();
     this.copyReportStatus.set('idle');
-    this.game.startNewGame(this.seedInput.trim() ? { seed: this.seedInput } : {});
+    this.game.startNewRun(this.normalizedSeed(), this.selectedCampaignTensionId || undefined);
   }
 
   protected resetRun(): void {
     this.clearTransientSelections();
     this.copyReportStatus.set('idle');
-    this.game.resetCurrentRun(this.seedInput.trim() ? { seed: this.seedInput } : {});
+    this.game.resetCurrentRun({
+      ...(this.normalizedSeed() ? { seed: this.normalizedSeed() } : {}),
+      ...(this.selectedCampaignTensionId
+        ? { campaignTensionId: this.selectedCampaignTensionId }
+        : {}),
+    });
+  }
+
+  protected dismissCampaignBriefing(): void {
+    this.game.dismissCampaignBriefing();
+  }
+
+  protected openCampaignBriefing(): void {
+    this.game.openCampaignBriefing();
+  }
+
+  protected closeCampaignBriefing(): void {
+    this.game.closeCampaignBriefing();
   }
 
   protected setSelectedOperative(actionId: ActionId, operativeId: string): void {
@@ -323,6 +358,10 @@ export class App {
 
   protected dismissCompatibilityNotice(): void {
     this.game.dismissCompatibilityNotice();
+  }
+
+  private normalizedSeed(): string | undefined {
+    return this.seedInput.trim() || undefined;
   }
 
   protected isAdvanceEnabled(): boolean {
@@ -722,6 +761,19 @@ export class App {
 
   protected displayTokens(values: readonly string[]): string {
     return values.map((value) => this.displayToken(value)).join(' / ');
+  }
+
+  protected logTagLabel(tag: string): string {
+    const normalizedTag = tag.toLowerCase();
+    const campaign = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (definition) => definition.id === normalizedTag,
+    );
+
+    if (campaign) {
+      return campaign.name;
+    }
+
+    return this.displayToken(normalizedTag);
   }
 
   protected unavailableReason(reason: string | undefined): string {

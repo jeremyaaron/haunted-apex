@@ -36,7 +36,7 @@ describe('operative weekly Stress maintenance', () => {
     const recovered = applyIdleStressRecovery(state, []);
 
     expect(recovered.operatives.map((operative) => operative.stress)).toEqual([38, 40]);
-    expect(recovered.eventLog).toEqual([
+    expect(recovered.eventLog.filter((entry) => entry.type === 'operative_condition')).toEqual([
       jasmine.objectContaining({
         type: 'operative_condition',
         title: 'Mara Voss Stabilizes',

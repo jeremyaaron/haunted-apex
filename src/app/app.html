@@ -3,7 +3,8 @@
     <div>
       <p class="eyebrow">The Roster</p>
       <h1>The Black Ledger</h1>
-      <p class="header-deck">Haunted Apex command channel // District Zero uplink</p>
+      <p class="header-deck">{{ game.campaignHeader().label }}</p>
+      <p class="campaign-subtitle">{{ game.campaignHeader().tensionSubtitle }}</p>
     </div>
 
     <div class="header-controls">
@@ -11,8 +12,17 @@
         <span>Seed</span>
         <input [(ngModel)]="seedInput" autocomplete="off" />
       </label>
+      <label class="seed-control campaign-control">
+        <span>Campaign</span>
+        <select [(ngModel)]="selectedCampaignTensionId" aria-label="Campaign Tension">
+          @for (option of campaignSelectionOptions; track option.id) {
+            <option [value]="option.id">{{ option.label }}</option>
+          }
+        </select>
+      </label>
       <button type="button" class="secondary" (click)="startNewRun()">New Run</button>
       <button type="button" class="secondary" (click)="resetRun()">Reset</button>
+      <button type="button" class="secondary" (click)="openCampaignBriefing()">Campaign</button>
       <button
         type="button"
         class="advance-button"
@@ -37,10 +47,75 @@
     </section>
   }
 
+  @if (game.campaignBriefingOpen()) {
+    @let briefing = game.campaignBriefing();
+    <section class="campaign-briefing" aria-label="Campaign briefing">
+      <div class="campaign-briefing-copy">
+        <p class="panel-label">Campaign Briefing</p>
+        <h2>{{ briefing.tensionName }} · {{ briefing.cityName }}</h2>
+        <p>{{ briefing.openingBriefing }}</p>
+        <p>{{ briefing.description }}</p>
+      </div>
+
+      <div class="campaign-briefing-grid">
+        <div>
+          <h3>Starting Shifts</h3>
+          <div class="briefing-chip-list">
+            @for (row of briefing.startingEffectRows; track row.id) {
+              <span [class.negative]="row.amount < 0">{{ row.label }} {{ row.value }}</span>
+            } @empty {
+              <span>No starting shifts</span>
+            }
+          </div>
+        </div>
+
+        <div>
+          <h3>Pressure Pattern</h3>
+          <ul>
+            @for (item of briefing.pressurePattern; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+
+        <div>
+          <h3>Active This Run</h3>
+          <ul>
+            @for (item of briefing.activeThisRun; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+
+        <div>
+          <h3>Favored By Tension</h3>
+          <ul>
+            @for (item of briefing.favoredByTension; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      <div class="campaign-briefing-actions">
+        @if (!game.state().campaign.openingBriefingShown) {
+          <button type="button" class="advance-button ready" (click)="dismissCampaignBriefing()">
+            Dismiss Briefing
+          </button>
+        } @else {
+          <button type="button" class="secondary" (click)="closeCampaignBriefing()">
+            Close Briefing
+          </button>
+        }
+      </div>
+    </section>
+  }
+
   <section class="status-strip" aria-label="Run status">
     <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
     <span>{{ game.commandPointsRemaining() }} Command</span>
     <span>{{ game.state().phase }}</span>
+    <span>{{ game.campaignHeader().tensionName }}</span>
     <span>Dominion target {{ debugView().dominionTarget }}</span>
     <span>Seed {{ game.state().seed }}</span>
     @if (game.state().gameOver; as gameOver) {
@@ -257,6 +332,9 @@
                     <small
                       >{{ discovery.candidateDefinitionIds.length }} possible Ledger leads</small
                     >
+                    @for (bonus of discovery.bonusRows; track bonus.label) {
+                      <small>{{ bonus.label }} +{{ bonus.amount }}%</small>
+                    }
                   </div>
                 }
               }
@@ -623,6 +701,26 @@
             </div>
 
             <div class="run-report-grid">
+              <section class="run-report-campaign">
+                <h4>Campaign</h4>
+                <dl>
+                  <div>
+                    <dt>City</dt>
+                    <dd>{{ report.campaign.cityName }}</dd>
+                  </div>
+                  <div>
+                    <dt>Tension</dt>
+                    <dd>{{ report.campaign.tensionName }}</dd>
+                  </div>
+                </dl>
+                <p>{{ report.campaign.subtitle }}</p>
+                <ul>
+                  @for (note of report.campaign.notes; track note) {
+                    <li>{{ note }}</li>
+                  }
+                </ul>
+              </section>
+
               <section>
                 <h4>Outcome</h4>
                 <dl>
@@ -1710,7 +1808,7 @@
             @if (entry.tags?.length) {
               <div class="log-tags">
                 @for (tag of entry.tags; track $index) {
-                  <span>{{ tag }}</span>
+                  <span>{{ logTagLabel(tag) }}</span>
                 }
               </div>
             }
