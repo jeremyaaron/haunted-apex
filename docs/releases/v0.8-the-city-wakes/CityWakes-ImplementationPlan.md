@@ -693,6 +693,25 @@ git diff --check
 
 Confirm event weighting is explainable before adding the Ghostline special hook.
 
+### Completion Notes
+
+- Extended weekly event weighting context with active Campaign Tension metadata and Campaign event
+  weight modifiers.
+- Applied authored event ID modifiers and weighted event-tag bias data as additive Campaign event
+  modifiers.
+- Added `campaign_event_id` and `campaign_event_tag` diagnostics so weighted-event output explains
+  Campaign contributions.
+- Preserved the existing zero-weight gate: Campaign modifiers only apply after an event has a
+  normal positive pre-Campaign weight path, so Ledger-style inactive events do not enter the pool
+  just because their tags match a Campaign.
+- Preserved recent-repeat penalties and Contact repeat multipliers after Campaign modifiers.
+- Added focused weekly-event tests for event ID modifiers, event tag modifiers, diagnostics, repeat
+  penalty ordering, and active-tension context.
+- Verification completed:
+  - `npx tsc -p tsconfig.app.json --noEmit`
+  - `npx tsc -p tsconfig.spec.json --noEmit`
+  - `npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/simulation/select-weekly-event.spec.ts'`
+
 ## Phase 7: Ghostline Signal Targeted Intel Bonus
 
 ### Objective

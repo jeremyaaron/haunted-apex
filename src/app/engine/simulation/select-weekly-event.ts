@@ -1,5 +1,11 @@
-import { DISTRICT_ZERO_EVENTS, getLedgerEntryDefinition } from '../content';
+import {
+  DISTRICT_ZERO_EVENTS,
+  getCampaignTensionDefinition,
+  getLedgerEntryDefinition,
+} from '../content';
 import type {
+  CampaignEventWeightModifier,
+  CampaignTensionId,
   ContactId,
   DistrictId,
   EventDefinition,
@@ -68,6 +74,8 @@ export type EventWeightContext = {
   oldestSecretAge: number;
   oldestFavorAge: number;
   ledgerTags: Set<string>;
+  campaignTensionId?: CampaignTensionId;
+  campaignEventWeightModifiers: readonly CampaignEventWeightModifier[];
 };
 
 export type EventWeightModifierId =
@@ -102,7 +110,9 @@ export type EventWeightModifierId =
   | 'faction_active_accord'
   | 'faction_high_standing'
   | 'faction_rival_pressure'
-  | 'faction_blind_spot';
+  | 'faction_blind_spot'
+  | 'campaign_event_id'
+  | 'campaign_event_tag';
 
 export type EventWeightModifier = {
   id: EventWeightModifierId;
@@ -231,6 +241,8 @@ export function buildEventWeightContext(state: GameState): EventWeightContext {
     oldestSecretAge: getOldestLedgerAge(state, activeSecrets),
     oldestFavorAge: getOldestLedgerAge(state, activeFavors),
     ledgerTags,
+    campaignTensionId: state.campaign?.tensionId,
+    campaignEventWeightModifiers: getCampaignEventWeightModifiers(state.campaign?.tensionId),
   };
 }
 
@@ -242,9 +254,16 @@ function calculateWeightedEvent(
 ): WeightedEvent {
   const baseAndRuleWeight = calculateEventWeight(state, event);
   const contextModifiers = getContextModifiers(state, event, context);
-  const weightBeforePenalty = Math.max(
+  const weightBeforeCampaign = Math.max(
     0,
     baseAndRuleWeight + contextModifiers.reduce((sum, modifier) => sum + modifier.amount, 0),
+  );
+  const campaignModifiers =
+    weightBeforeCampaign > 0 ? getCampaignEventModifiers(event, context) : [];
+  const allModifiers = [...contextModifiers, ...campaignModifiers];
+  const weightBeforePenalty = Math.max(
+    0,
+    baseAndRuleWeight + allModifiers.reduce((sum, modifier) => sum + modifier.amount, 0),
   );
   const recentPenaltyApplied = event.tags.some((tag) => recentPenaltyTags.has(tag));
   const finalWeight = Math.max(
@@ -260,7 +279,7 @@ function calculateWeightedEvent(
     weight: finalWeight,
     diagnostics: {
       baseAndRuleWeight,
-      contextModifiers,
+      contextModifiers: allModifiers,
       weightBeforePenalty,
       recentPenaltyApplied,
       finalWeight,
@@ -461,6 +480,39 @@ function getContextModifiers(
   }
 
   return modifiers;
+}
+
+function getCampaignEventWeightModifiers(
+  campaignTensionId: CampaignTensionId | undefined,
+): readonly CampaignEventWeightModifier[] {
+  const campaign = campaignTensionId
+    ? getCampaignTensionDefinition(campaignTensionId)
+    : undefined;
+  const eventTagModifiers = Object.entries(campaign?.generationBias.weightedEventTags ?? {}).map(
+    ([eventTag, weightDelta]) => ({
+      eventTag: eventTag as EventTag,
+      weightDelta,
+    }),
+  );
+
+  return [...(campaign?.eventWeightModifiers ?? []), ...eventTagModifiers];
+}
+
+function getCampaignEventModifiers(
+  event: EventDefinition,
+  context: EventWeightContext,
+): EventWeightModifier[] {
+  return context.campaignEventWeightModifiers.flatMap((modifier): EventWeightModifier[] => {
+    if (modifier.eventId && modifier.eventId === event.id) {
+      return [{ id: 'campaign_event_id', amount: modifier.weightDelta }];
+    }
+
+    if (modifier.eventTag && event.tags.includes(modifier.eventTag)) {
+      return [{ id: 'campaign_event_tag', amount: modifier.weightDelta }];
+    }
+
+    return [];
+  });
 }
 
 function isEligibleEvent(state: GameState, event: EventDefinition): boolean {

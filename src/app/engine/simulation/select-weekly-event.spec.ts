@@ -1,7 +1,12 @@
-import { DISTRICT_ZERO_EVENTS, getFactionDefinition } from '../content';
+import {
+  CAMPAIGN_TENSION_DEFINITIONS,
+  DISTRICT_ZERO_EVENTS,
+  getFactionDefinition,
+} from '../content';
 import { materializeFactionState } from '../factions';
 import { addLedgerEntry } from '../ledger';
 import type {
+  CampaignTensionId,
   ContactId,
   FactionId,
   FactionState,
@@ -81,7 +86,7 @@ describe('weekly event selection', () => {
         presentedLog('job_goes_loud', ['HEAT']),
       ],
     };
-    const corpWeight = getWeightedEvents(state).find(
+    const corpWeight = getWeightedEvents(withoutCampaignEventModifiers(state)).find(
       (candidate) => candidate.event.id === 'corp_patrol_sweep',
     )?.weight;
 
@@ -173,12 +178,89 @@ describe('weekly event selection', () => {
         presentedLog('job_goes_loud', ['HEAT']),
       ],
     };
-    const weighted = requireWeightedEvent(state, 'corp_patrol_sweep');
+    const weighted = requireWeightedEvent(
+      withoutCampaignEventModifiers(state),
+      'corp_patrol_sweep',
+    );
 
     expect(weighted.diagnostics.baseAndRuleWeight).toBe(6);
     expect(weighted.diagnostics.weightBeforePenalty).toBe(10);
     expect(weighted.diagnostics.recentPenaltyApplied).toBeTrue();
     expect(weighted.weight).toBe(5);
+  });
+
+  it('applies Campaign event-id weight modifiers with diagnostics', () => {
+    const state = newGame({
+      seed: 'CAMPAIGN-EVENT-ID',
+      campaignTensionId: 'campaign_corp_crackdown',
+    });
+    const weighted = requireWeightedEvent(state, 'corp_patrol_sweep');
+
+    expect(weighted.diagnostics.contextModifiers).toContain(
+      jasmine.objectContaining({
+        id: 'campaign_event_id',
+        amount: 15,
+      }),
+    );
+    expect(weighted.diagnostics.weightBeforePenalty).toBe(
+      weighted.diagnostics.baseAndRuleWeight + 15 + 8 + 15,
+    );
+  });
+
+  it('applies Campaign event-tag weight modifiers with diagnostics', () => {
+    const state = newGame({
+      seed: 'CAMPAIGN-EVENT-TAG',
+      campaignTensionId: 'campaign_corp_crackdown',
+    });
+    const weighted = requireWeightedEvent(state, 'job_goes_loud');
+
+    expect(weighted.diagnostics.contextModifiers).toContain(
+      jasmine.objectContaining({
+        id: 'campaign_event_tag',
+        amount: 8,
+      }),
+    );
+    expect(weighted.diagnostics.weightBeforePenalty).toBe(
+      weighted.diagnostics.baseAndRuleWeight + 8,
+    );
+  });
+
+  it('applies recent penalties after Campaign modifiers', () => {
+    const state: GameState = {
+      ...newGame({
+        seed: 'CAMPAIGN-PENALTY',
+        campaignTensionId: 'campaign_corp_crackdown',
+      }),
+      eventLog: [
+        presentedLog('corp_patrol_sweep', ['HEAT']),
+        presentedLog('job_goes_loud', ['HEAT']),
+      ],
+    };
+    const weighted = requireWeightedEvent(state, 'corp_patrol_sweep');
+
+    expect(weighted.diagnostics.baseAndRuleWeight).toBe(6);
+    expect(weighted.diagnostics.weightBeforePenalty).toBe(44);
+    expect(weighted.diagnostics.recentPenaltyApplied).toBeTrue();
+    expect(weighted.weight).toBe(22);
+  });
+
+  it('keeps Campaign modifier context data-driven from the active tension', () => {
+    const state = newGame({
+      seed: 'CAMPAIGN-CONTEXT',
+      campaignTensionId: 'campaign_ghostline_signal',
+    });
+    const context = buildEventWeightContext(state);
+    const ghostline = CAMPAIGN_TENSION_DEFINITIONS.find(
+      (campaign) => campaign.id === 'campaign_ghostline_signal',
+    )!;
+
+    expect(context.campaignTensionId).toBe('campaign_ghostline_signal');
+    expect(context.campaignEventWeightModifiers).toEqual([
+      ...(ghostline.eventWeightModifiers ?? []),
+      jasmine.objectContaining({ eventTag: 'LEDGER', weightDelta: 15 }),
+      jasmine.objectContaining({ eventTag: 'RUIN', weightDelta: 15 }),
+      jasmine.objectContaining({ eventTag: 'INTEL', weightDelta: 8 }),
+    ]);
   });
 
   it('builds complete context and returns diagnostics for the selected event', () => {
@@ -243,7 +325,7 @@ describe('weekly event selection', () => {
   });
 
   it('keeps Ledger events ineligible without matching active entries', () => {
-    const state = newGame({ seed: 'LEDGER-NO-EVENTS' });
+    const state = withoutCampaignEventModifiers(newGame({ seed: 'LEDGER-NO-EVENTS' }));
     const weighted = getWeightedEvents(state);
 
     expect(weighted.some((candidate) => candidate.event.id === 'ledger_debt_comes_due')).toBeFalse();
@@ -854,11 +936,14 @@ function withInactiveFactionMetrics(
 }
 
 function weightFor(state: GameState, eventId: string): number {
-  return requireWeightedEvent(state, eventId).weight;
+  return requireWeightedEvent(withoutCampaignEventModifiers(state), eventId).weight;
 }
 
 function modifierIdsFor(state: GameState, eventId: string): string[] {
-  return requireWeightedEvent(state, eventId).diagnostics.contextModifiers.map(
+  return requireWeightedEvent(
+    withoutCampaignEventModifiers(state),
+    eventId,
+  ).diagnostics.contextModifiers.map(
     (modifier) => modifier.id,
   );
 }
@@ -871,6 +956,16 @@ function requireWeightedEvent(state: GameState, eventId: string) {
   }
 
   return weighted;
+}
+
+function withoutCampaignEventModifiers(state: GameState): GameState {
+  return {
+    ...state,
+    campaign: {
+      ...state.campaign,
+      tensionId: 'campaign_test_no_event_modifiers' as CampaignTensionId,
+    },
+  };
 }
 
 function findSelection(state: GameState, eventId: string) {
