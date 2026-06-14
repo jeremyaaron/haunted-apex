@@ -1260,6 +1260,78 @@ Harness:
 campaign grouped report review
 ```
 
+### Completion Record
+
+Completed June 14, 2026:
+
+- Fixed the campaign agent CSV header so `campaignName` is represented explicitly.
+- Tuned only campaign-aware OperatorBot scoring:
+  - reduced unconditional front-cooling bias to heat-gated exposure management,
+  - added a stable-board Dominion tempo bias,
+  - added a low-resource recovery bias,
+  - discouraged low-resource Nightlife contact spam,
+  - capped Ghostline intel chasing once Intel is already healthy and added late Dominion tempo.
+- Baseline snapshot before this pass, using 100 random-campaign runs per agent:
+
+```text
+Random:           0% wins, avg Dominion 49.13
+Aggressive:      28% wins, avg Dominion 87.45
+Cautious:         0% wins, avg Dominion 17.87
+Greedy:          17% wins, avg Dominion 78.31
+Operator / Sane: 29% wins, avg Dominion 71.71
+```
+
+- Baseline Operator campaign snapshot, using 50 runs per agent per Campaign Tension:
+
+```text
+Corp Crackdown:   2% wins
+Nightlife War:    8% wins
+Ghostline Signal: 8% wins
+Industrial Cut:  70% wins
+Dirty Capital:   70% wins
+```
+
+- Final random-campaign snapshot, using 100 runs per agent:
+
+```text
+Random:           0% wins, avg Dominion 49.13, avg Heat 32.87
+Aggressive:      28% wins, avg Dominion 87.45, avg Heat 95.72
+Cautious:         0% wins, avg Dominion 17.87, avg Heat 2.26
+Greedy:          17% wins, avg Dominion 78.31, avg Heat 80.86
+Operator / Sane: 59% wins, avg Dominion 87.74, avg Heat 78.46
+```
+
+- Final Operator campaign snapshot, using 50 runs per Campaign Tension:
+
+```text
+Corp Crackdown:  66% wins, primary losses bankrupt/out of time
+Nightlife War:   50% wins, primary losses out of time/bankrupt
+Ghostline Signal:54% wins, primary losses Heat lockdown/out of time
+Industrial Cut:  66% wins, primary losses out of time/Heat lockdown
+Dirty Capital:   68% wins, primary losses out of time/Heat lockdown
+```
+
+- Final campaign texture remained distinct:
+
+```text
+Corp Crackdown keeps aggressive Heat pressure visible.
+Nightlife War punishes overuse of contact tempo when resources are weak.
+Ghostline Signal carries higher Ruin, Ledger, and Heat tension.
+Industrial Cut keeps Resources high but Heat dangerous.
+Dirty Capital keeps Front and capital pressure central without exceeding Operator targets.
+```
+
+- Balance targets met:
+
+```text
+OperatorBot overall within 55-75%.
+Every Campaign Tension OperatorBot result at least 40%.
+No Campaign Tension OperatorBot result above 85%.
+RandomBot within 0-10%.
+CautiousBot remains a Dominion-shortfall loser.
+AggressiveBot and GreedyBot remain viable but volatile rather than reliable.
+```
+
 ### Review Gate
 
 Manual and harness review: confirm campaigns feel distinct and broadly playable.

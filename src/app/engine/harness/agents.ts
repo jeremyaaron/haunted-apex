@@ -1434,11 +1434,18 @@ function scoreGreedyCampaignOrder(state: GameState, option: LegalOrderOption): n
 }
 
 function scoreOperatorCampaignOrder(state: GameState, option: LegalOrderOption): number {
-  const frontCoolingBias = option.preview.frontExposure ? 140 : 0;
+  const frontCoolingBias =
+    option.preview.frontExposure && state.pressures.heat >= 65 ? 55 : 0;
+  const stableTempoBias =
+    state.pressures.heat <= 58 && state.pressures.loyalty >= 38 && state.pressures.resources >= 900
+      ? scoreDominionTempo(option, 8)
+      : 0;
+  const resourceRecoveryBias =
+    option.actionId === 'run_small_job' && state.pressures.resources <= 1400 ? 95 : 0;
 
   switch (state.campaign.tensionId) {
     case 'campaign_corp_crackdown':
-      return frontCoolingBias + (
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
         scoreHeatReliefOrder(option, state.pressures.heat >= 60 ? 16 : 7) +
         scoreAccordIds(option, {
           accord_ashline_clean_corridor: 74,
@@ -1448,15 +1455,18 @@ function scoreOperatorCampaignOrder(state: GameState, option: LegalOrderOption):
         Math.max(0, option.preview.riskChance - 8) * 1.6
       );
     case 'campaign_nightlife_war':
-      return frontCoolingBias + (
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
         scoreContactIds(option, { contact_veyra_lux: 40, contact_mina_glass: 34 }) +
         scoreLoyaltyReliefOrder(state, option, 11) +
         scoreTargetRival(option, 'rival_nyx_ardent', -34) +
-        scoreAccordIds(option, { accord_velvet_guest_list: 42, accord_velvet_silence: 30 })
+        scoreAccordIds(option, { accord_velvet_guest_list: 42, accord_velvet_silence: 30 }) +
+        (state.pressures.resources <= 1800 && option.actionId === 'manage_contact' ? -36 : 0)
       );
     case 'campaign_ghostline_signal':
-      return frontCoolingBias + (
-        (option.actionId === 'gather_intel' && option.target ? 62 : 0) +
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
+        (option.actionId === 'gather_intel' && option.target && state.pressures.intel < 45 ? 50 : 0) +
+        (option.actionId === 'gather_intel' && state.pressures.intel >= 55 ? -72 : 0) +
+        (state.week >= 5 ? scoreDominionTempo(option, 12) : 0) +
         scoreRuinReliefOrder(state, option, 12) +
         scoreContactIds(option, { contact_father_static: 38, contact_ciro_moth: 36 }) +
         scoreAccordIds(option, {
@@ -1465,7 +1475,7 @@ function scoreOperatorCampaignOrder(state: GameState, option: LegalOrderOption):
         })
       );
     case 'campaign_industrial_cut':
-      return frontCoolingBias + (
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
         scoreFrontIds(option, {
           front_zero_mercy_cut: state.pressures.heat >= 70 ? -38 : 30,
           front_courier_line: 48,
@@ -1475,7 +1485,7 @@ function scoreOperatorCampaignOrder(state: GameState, option: LegalOrderOption):
         scoreOperativeRoles(option, { violence: 12, money: 12, stability: 8 })
       );
     case 'campaign_dirty_capital':
-      return frontCoolingBias + (
+      return frontCoolingBias + stableTempoBias + resourceRecoveryBias + (
         scoreFrontRolesFromOption(option, { resources: 42, heat_control: 24, dominion: 18 }) +
         scoreFrontMode(option, 'establish', state.week <= 4 ? 72 : 20) +
         scoreAccordIds(option, { accord_helix_quiet_capital: 52, accord_helix_permit_shell: 44 }) +

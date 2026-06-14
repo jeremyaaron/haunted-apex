@@ -1730,7 +1730,7 @@ export function formatBatchReport(report: HarnessBatchReport): string {
   lines.push(
     '',
     'campaign_agent_summary',
-    'agent,campaignId,runs,wins,losses,incomplete,winRate,avgWeeks,avgDominion,avgHeat,avgLoyalty,avgResources,avgIntel,avgRuin',
+    'agent,campaignId,campaignName,runs,wins,losses,incomplete,winRate,avgWeeks,avgDominion,avgHeat,avgLoyalty,avgResources,avgIntel,avgRuin',
   );
 
   for (const summary of report.campaignAgentSummaries) {
