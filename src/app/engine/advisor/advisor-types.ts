@@ -127,6 +127,11 @@ export type HandlerQueuedPlanAssessment = {
   summary: string;
   warnings: AdvisorMessage[];
   suggestedRemovals: string[];
+  suggestedReplacements: {
+    removeOrderId: string;
+    replacementOrders: HandlerRecommendedOrder[];
+    summary: string;
+  }[];
 };
 
 export type HandlerRecommendation = {

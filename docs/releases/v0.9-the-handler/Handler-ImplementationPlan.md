@@ -954,7 +954,62 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 19, 2026:
+
+- Extended `HandlerQueuedPlanAssessment` with replacement suggestion metadata:
+
+```ts
+suggestedReplacements: {
+  removeOrderId: string;
+  replacementOrders: HandlerRecommendedOrder[];
+  summary: string;
+}[];
+```
+
+- Preserved existing `suggestedRemovals` behavior with stable queued order ids.
+- Updated command-plan scoring so partial-queue recommendations project:
+  - existing queued orders,
+  - plus newly recommended remaining orders.
+- Added per-queued-order risk attribution for:
+  - Heat risk,
+  - Loyalty fragility,
+  - Resource danger,
+  - notable Ruin,
+  - elevated action risk,
+  - operative stress risk,
+  - missing/unpreviewable queued-order state.
+- Added replacement suggestion generation by:
+  - removing the risky queued order through the normal pure queue-removal path,
+  - recomputing legal remaining orders,
+  - scoring replacement plans with Handler command policy,
+  - returning replacement orders and a compact summary.
+- Confirmed no-queue, partial-queue, full-queue, risky-queue, and dangerous-queue flows remain
+  non-mutating.
+- Added unit coverage for:
+  - partial queue projections including existing queued orders,
+  - risky queued order removal suggestions,
+  - risky queued order replacement recommendations,
+  - non-mutating queued-plan assessment.
+- Targeted advisor verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/advisor/handler-policy.spec.ts --include=src/app/engine/advisor/handler-event-policy.spec.ts
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Touched advisor spec count is `16` specs.
+- Production build size after Phase 7:
+
+```text
+main:      643.99 kB raw, 143.19 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   678.73 kB raw, 154.69 kB estimated transfer
+```
 
 ## Phase 8: HandlerBot Harness Adapter and Reports
 

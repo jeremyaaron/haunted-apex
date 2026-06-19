@@ -9,7 +9,7 @@ import type {
 } from '../model';
 import { PRESSURE_IDS } from '../model';
 import { getActionPreview, getCommandPointsRemaining, type ActionPreview } from '../selectors';
-import { getRunRules, queueOrder } from '../simulation';
+import { getRunRules, queueOrder, removeQueuedOrder } from '../simulation';
 import type {
   AdvisorConfidence,
   AdvisorMessage,
@@ -140,13 +140,25 @@ export function assessQueuedPlan(state: GameState): HandlerQueuedPlanAssessment 
       summary: 'No orders are queued yet.',
       warnings: [],
       suggestedRemovals: [],
+      suggestedReplacements: [],
     };
   }
 
   const projected = projectQueuedPressures(state);
-  const warnings = selectPlanWarnings(state, projected);
+  const planWarnings = selectPlanWarnings(state, projected);
+  const riskyOrderIds = selectRiskyQueuedOrderIds(state, projected);
+  const orderWarnings = riskyOrderIds.flatMap((orderId) =>
+    selectQueuedOrderWarnings(state, orderId, projected),
+  );
+  const warnings = dedupeMessages([...planWarnings, ...orderWarnings]);
   const dangerous = warnings.some((warning) => warning.tone === 'danger');
   const risky = dangerous || warnings.some((warning) => warning.tone === 'warning');
+  const suggestedRemovals = dangerous
+    ? state.queuedOrders.map((order) => order.id)
+    : riskyOrderIds;
+  const suggestedReplacements = suggestedRemovals.flatMap((orderId) =>
+    selectReplacementSuggestion(state, orderId),
+  );
 
   return {
     status: dangerous ? 'dangerous' : risky ? 'risky' : 'stable',
@@ -156,12 +168,13 @@ export function assessQueuedPlan(state: GameState): HandlerQueuedPlanAssessment 
         ? 'Queued orders are playable, but the projected state needs care.'
         : 'Queued orders look stable.',
     warnings,
-    suggestedRemovals: dangerous ? state.queuedOrders.map((order) => order.id) : [],
+    suggestedRemovals,
+    suggestedReplacements,
   };
 }
 
 function scorePlan(state: GameState, orders: readonly LegalOrderOption[]): HandlerCommandPlan {
-  const projectedPressures = applyOrderPlan(state.pressures, orders);
+  const projectedPressures = applyOrderPlan(projectQueuedPressures(state), orders);
   const reasonCodes = selectReasonCodes(state, orders, projectedPressures);
 
   return {
@@ -374,6 +387,174 @@ function projectQueuedPressures(state: GameState): Pressures {
     const preview = getQueuedOrderPreview(state, order);
     return preview ? applyPressureDelta(next, getPreviewNetDelta(preview)) : next;
   }, { ...state.pressures });
+}
+
+function selectRiskyQueuedOrderIds(state: GameState, projected: Pressures): string[] {
+  return state.queuedOrders.flatMap((order) => {
+    const preview = getQueuedOrderPreview(state, order);
+
+    if (!preview) {
+      return [order.id];
+    }
+
+    const delta = getPreviewNetDelta(preview);
+    const stressRisk = preview.selectedOperative?.projectedStress ?? 0;
+    const risky =
+      projected.heat >= 88 && (delta.heat ?? 0) > 0 ||
+      projected.loyalty <= 18 && (delta.loyalty ?? 0) < 0 ||
+      projected.resources <= 650 && (delta.resources ?? 0) < 0 ||
+      (delta.ruin ?? 0) >= 5 ||
+      preview.riskChance >= 28 ||
+      stressRisk >= 70;
+
+    return risky ? [order.id] : [];
+  });
+}
+
+function selectQueuedOrderWarnings(
+  state: GameState,
+  orderId: string,
+  projected: Pressures,
+): AdvisorMessage[] {
+  const order = state.queuedOrders.find((candidate) => candidate.id === orderId);
+  const preview = order ? getQueuedOrderPreview(state, order) : undefined;
+
+  if (!order || !preview) {
+    return [
+      {
+        id: `${orderId}:queued-preview-missing`,
+        tone: 'danger',
+        text: 'A queued order cannot be previewed cleanly. Remove it and choose a legal order again.',
+        reasonCode: 'plan_warning',
+      },
+    ];
+  }
+
+  const delta = getPreviewNetDelta(preview);
+
+  return [
+    ...(projected.heat >= 88 && (delta.heat ?? 0) > 0
+      ? [
+          {
+            id: `${order.id}:queued-heat`,
+            tone: projected.heat >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.heatLoss
+              ? 'danger'
+              : 'warning',
+            text: `${preview.label} is adding Heat while the queued plan is already hot.`,
+            reasonCode: 'heat_crisis',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+    ...(projected.loyalty <= 18 && (delta.loyalty ?? 0) < 0
+      ? [
+          {
+            id: `${order.id}:queued-loyalty`,
+            tone: projected.loyalty <= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.loyaltyLoss
+              ? 'danger'
+              : 'warning',
+            text: `${preview.label} is cutting Loyalty while the queued plan is fragile.`,
+            reasonCode: 'loyalty_danger',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+    ...(projected.resources <= 650 && (delta.resources ?? 0) < 0
+      ? [
+          {
+            id: `${order.id}:queued-resources`,
+            tone: projected.resources < DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.resourceLoss
+              ? 'danger'
+              : 'warning',
+            text: `${preview.label} is spending Resources while the queued plan is cash-thin.`,
+            reasonCode: 'resource_danger',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+    ...((delta.ruin ?? 0) >= 5
+      ? [
+          {
+            id: `${order.id}:queued-ruin`,
+            tone: 'warning',
+            text: `${preview.label} adds a notable amount of Ruin.`,
+            reasonCode: 'plan_warning',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+    ...(preview.riskChance >= 28
+      ? [
+          {
+            id: `${order.id}:queued-risk`,
+            tone: 'warning',
+            text: `${preview.label} has elevated risk in the current board state.`,
+            reasonCode: 'plan_warning',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+    ...((preview.selectedOperative?.projectedStress ?? 0) >= 70
+      ? [
+          {
+            id: `${order.id}:queued-stress`,
+            tone: 'warning',
+            text: `${preview.selectedOperative?.name ?? 'The assigned operative'} would be pushed into a strained stress state.`,
+            reasonCode: 'operative_stress',
+          } satisfies AdvisorMessage,
+        ]
+      : []),
+  ];
+}
+
+function selectReplacementSuggestion(
+  state: GameState,
+  orderId: string,
+): HandlerQueuedPlanAssessment['suggestedReplacements'] {
+  const removed = removeQueuedOrder(state, orderId);
+
+  if (!removed.ok || getCommandPointsRemaining(removed.state) <= 0) {
+    return [];
+  }
+
+  const replacementPlan = [...buildCommandPlans(removed.state)].sort(
+    (left, right) => right.score - left.score,
+  )[0];
+
+  if (!replacementPlan) {
+    return [];
+  }
+
+  return [
+    {
+      removeOrderId: orderId,
+      replacementOrders: replacementPlan.orders.map((order, index) =>
+        toRecommendedOrder(order, index, replacementPlan),
+      ),
+      summary: summarizeReplacementPlan(replacementPlan, removed.state),
+    },
+  ];
+}
+
+function summarizeReplacementPlan(plan: HandlerCommandPlan, state: GameState): string {
+  const dominionGain = plan.projectedPressures.dominion - state.pressures.dominion;
+  const heatDelta = plan.projectedPressures.heat - state.pressures.heat;
+  const resourcesDelta = plan.projectedPressures.resources - state.pressures.resources;
+
+  return `If this queued order is removed, Handler prefers ${plan.orders.length} replacement order${
+    plan.orders.length === 1 ? '' : 's'
+  }: ${formatDelta(dominionGain)} Dominion, ${formatDelta(heatDelta)} Heat, ${formatDelta(resourcesDelta)} Resources projected.`;
+}
+
+function dedupeMessages(messages: readonly AdvisorMessage[]): AdvisorMessage[] {
+  const seen = new Set<string>();
+  const deduped: AdvisorMessage[] = [];
+
+  for (const message of messages) {
+    if (seen.has(message.id)) {
+      continue;
+    }
+
+    seen.add(message.id);
+    deduped.push(message);
+  }
+
+  return deduped;
 }
 
 function getQueuedOrderPreview(state: GameState, order: QueuedOrder): ActionPreview | undefined {

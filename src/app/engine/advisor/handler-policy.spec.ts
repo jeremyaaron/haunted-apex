@@ -65,6 +65,61 @@ describe('Handler command policy', () => {
     expect(queueRecommendedOrders(queued.state, recommendation.recommendedOrders).ok).toBeTrue();
   });
 
+  it('includes existing queued orders when scoring partial-queue plans', () => {
+    const initial = newGame({ seed: 'HANDLER-COMMAND-PARTIAL-PROJECTION' });
+    const queued = queueOrder(initial, { actionId: 'gather_intel' });
+
+    if (!queued.ok) {
+      fail(`Expected queued order, got ${queued.error}`);
+      return;
+    }
+
+    const plans = buildCommandPlans(queued.state);
+    const layLowPlan = plans.find((plan) =>
+      plan.orders.some(
+        (order) =>
+          order.actionId === 'lay_low' &&
+          order.target === undefined &&
+          order.assignedOperativeId === undefined,
+      ),
+    );
+
+    expect(plans.length).toBeGreaterThan(0);
+    expect(layLowPlan).toBeDefined();
+    expect(layLowPlan?.projectedPressures.heat).toBe(queued.state.pressures.heat - 10);
+  });
+
+  it('suggests removals and replacements for risky queued orders', () => {
+    const base = newGame({ seed: 'HANDLER-COMMAND-RISKY-QUEUE' });
+    const state = {
+      ...base,
+      pressures: {
+        ...base.pressures,
+        heat: 82,
+      },
+    };
+    const queued = queueOrder(state, {
+      actionId: 'run_small_job',
+      target: { type: 'district', id: 'district_violet_ward' },
+    });
+
+    if (!queued.ok) {
+      fail(`Expected queued order, got ${queued.error}`);
+      return;
+    }
+
+    const before = structuredClone(queued.state);
+    const assessment = assessQueuedPlan(queued.state);
+
+    expect(queued.state).toEqual(before);
+    expect(assessment.status).toBe('risky');
+    expect(assessment.suggestedRemovals).toContain(queued.order.id);
+    expect(assessment.suggestedReplacements.length).toBeGreaterThan(0);
+    expect(assessment.suggestedReplacements[0].removeOrderId).toBe(queued.order.id);
+    expect(assessment.suggestedReplacements[0].replacementOrders.length).toBeGreaterThan(0);
+    expect(assessment.suggestedReplacements[0].summary).toContain('Handler prefers');
+  });
+
   it('assesses a full queue instead of recommending more orders', () => {
     const initial = newGame({ seed: 'HANDLER-COMMAND-FULL' });
     const first = queueOrder(initial, { actionId: 'gather_intel' });
