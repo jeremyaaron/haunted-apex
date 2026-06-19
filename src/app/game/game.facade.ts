@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   advanceWeek,
   buildRunSummary,
+  getDefaultAdvisorMode,
   getActionPreview,
   getContactDefinition,
   getCommandPointsRemaining,
@@ -18,9 +19,12 @@ import {
   queueOrder,
   removeQueuedOrder,
   resolveEventChoice,
+  saveUserPreferences,
+  loadUserPreferences,
   selectActionCards,
   selectActiveContacts,
   selectAssignmentOptions,
+  selectAdvisorViewModel,
   selectActionTargetOptions,
   selectCampaignBriefingView,
   selectCampaignHeaderView,
@@ -38,6 +42,8 @@ import {
   type ActionPreview,
   type ActionTarget,
   type ActionTargetOption,
+  type AdvisorMode,
+  type AdvisorViewModel,
   type CampaignBriefingView,
   type CampaignHeaderView,
   type CampaignTensionId,
@@ -55,6 +61,7 @@ import {
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
   type RunSummaryReport,
+  type UserPreferences,
 } from '../engine';
 import { GameStorageService, type LoadCurrentRunResult } from './game-storage.service';
 
@@ -70,12 +77,21 @@ export class GameFacade {
   private readonly stateSignal = signal<GameState>(
     this.initialLoadResult.status === 'loaded' ? this.initialLoadResult.state : newGame(),
   );
+  private readonly userPreferencesSignal = signal<UserPreferences>(loadUserPreferences());
+  private readonly advisorModeSignal = signal<AdvisorMode>(
+    getDefaultAdvisorMode(this.stateSignal().run.mode, this.userPreferencesSignal().advisorMode),
+  );
   private readonly selectedOperativeId = signal<OperativeId | undefined>(undefined);
   private readonly campaignBriefingOpenSignal = signal(
     !this.stateSignal().campaign.openingBriefingShown,
   );
 
   readonly state = this.stateSignal.asReadonly();
+  readonly userPreferences = this.userPreferencesSignal.asReadonly();
+  readonly advisorMode = this.advisorModeSignal.asReadonly();
+  readonly advisorView = computed<AdvisorViewModel>(() =>
+    selectAdvisorViewModel(this.stateSignal(), this.advisorModeSignal()),
+  );
   readonly compatibilityNotice = signal<string | undefined>(
     requiresCompatibilityNotice(this.initialLoadResult) ? SAVE_COMPATIBILITY_NOTICE : undefined,
   );
@@ -152,6 +168,7 @@ export class GameFacade {
     const state = newGame(config);
     this.selectedOperativeId.set(undefined);
     this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
+    this.resetAdvisorModeForRun(state);
     this.setAndSave(state);
     return state;
   }
@@ -179,6 +196,7 @@ export class GameFacade {
       this.stateSignal.set(result.state);
       this.selectedOperativeId.set(undefined);
       this.campaignBriefingOpenSignal.set(!result.state.campaign.openingBriefingShown);
+      this.resetAdvisorModeForRun(result.state);
       return true;
     }
 
@@ -187,6 +205,7 @@ export class GameFacade {
       this.stateSignal.set(state);
       this.selectedOperativeId.set(undefined);
       this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
+      this.resetAdvisorModeForRun(state);
       this.compatibilityNotice.set(SAVE_COMPATIBILITY_NOTICE);
       this.storage.saveCurrentRun(state);
     }
@@ -209,6 +228,17 @@ export class GameFacade {
 
   dismissCompatibilityNotice(): void {
     this.compatibilityNotice.set(undefined);
+  }
+
+  setAdvisorMode(mode: AdvisorMode): void {
+    const preferences = {
+      ...this.userPreferencesSignal(),
+      advisorMode: mode,
+    };
+
+    this.advisorModeSignal.set(mode);
+    this.userPreferencesSignal.set(preferences);
+    saveUserPreferences(preferences);
   }
 
   dismissCampaignBriefing(): void {
@@ -336,6 +366,12 @@ export class GameFacade {
   private setAndSave(state: GameState): void {
     this.stateSignal.set(state);
     this.storage.saveCurrentRun(state);
+  }
+
+  private resetAdvisorModeForRun(state: GameState): void {
+    this.advisorModeSignal.set(
+      getDefaultAdvisorMode(state.run.mode, this.userPreferencesSignal().advisorMode),
+    );
   }
 }
 

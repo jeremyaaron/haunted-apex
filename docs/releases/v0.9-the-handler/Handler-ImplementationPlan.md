@@ -506,7 +506,54 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added the Advisor engine shell under `src/app/engine/advisor/` with:
+  - `AdvisorMode`, confidence, message, recommendation, and view-model contracts.
+  - versioned user preference helpers at `haunted-apex:user-preferences:v1`.
+  - deterministic Dominion pace selector and status bands.
+  - initial Advisor view model for Off, Hints, Coach, and Handler modes.
+- Exported Advisor APIs through `src/app/engine/index.ts`.
+- Wired `GameFacade` to expose:
+  - `userPreferences`
+  - `advisorMode`
+  - `advisorView`
+  - `setAdvisorMode(mode)`
+- Implemented Phase 3 defaults:
+  - Training starts in Handler mode.
+  - Standard uses saved Advisor preference.
+  - Standard falls back to Coach with no saved preference.
+  - Training mode can be overridden during a run, but starting Training again resets to Handler.
+- Added tests for:
+  - Advisor mode defaults.
+  - malformed preference fallback.
+  - preference save/load.
+  - Dominion pace target, required pace, and bands.
+  - Advisor view-model filtering for Off, Hints, and Coach.
+  - facade-level mode persistence and Training reset behavior.
+- Test count increased from `587` to `602` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Production build size after Phase 3:
+
+```text
+main:      642.86 kB raw, 143.03 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   677.60 kB raw, 154.52 kB estimated transfer
+```
+
+- No dev server, Karma watcher, or browser-debug process was intentionally left running by this
+  phase.
 
 ## Phase 4: Legal Option Enumeration and Recommendation Inputs
 

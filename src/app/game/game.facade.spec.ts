@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { getEventDefinition, newGame } from '../engine';
+import { getEventDefinition, newGame, USER_PREFERENCES_STORAGE_KEY } from '../engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
@@ -66,7 +66,46 @@ describe('GameFacade', () => {
       customSeed: false,
     });
     expect(facade.campaignBriefingOpen()).toBeTrue();
+    expect(facade.advisorMode()).toBe('handler');
+    expect(facade.advisorView().mode).toBe('handler');
     expect(readStoredState()).toEqual(state);
+  });
+
+  it('defaults Standard runs to Coach when no Advisor preference exists', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    expect(facade.state().run.mode).toBe('standard');
+    expect(facade.advisorMode()).toBe('coach');
+    expect(facade.advisorView().title).toBe('Strategic Coach');
+  });
+
+  it('persists Advisor mode preferences for Standard runs', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    facade.setAdvisorMode('hints');
+
+    expect(facade.userPreferences().advisorMode).toBe('hints');
+    expect(facade.advisorMode()).toBe('hints');
+    expect(JSON.parse(localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? '{}')).toEqual({
+      advisorMode: 'hints',
+    });
+
+    facade.startStandardRun('ADVISOR-SAVED-PREFERENCE', 'campaign_dirty_capital');
+
+    expect(facade.advisorMode()).toBe('hints');
+  });
+
+  it('allows Training Advisor overrides but resets new Training runs to Handler', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    facade.startTrainingRun();
+    facade.setAdvisorMode('off');
+
+    expect(facade.advisorMode()).toBe('off');
+
+    facade.startTrainingRun();
+
+    expect(facade.advisorMode()).toBe('handler');
   });
 
   it('loads a valid current run on construction', () => {
