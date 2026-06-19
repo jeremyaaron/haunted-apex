@@ -20,8 +20,10 @@
           }
         </select>
       </label>
-      <button type="button" class="secondary" (click)="startNewRun()">New Run</button>
+      <button type="button" class="secondary" (click)="startNewRun()">Standard Run</button>
+      <button type="button" class="secondary" (click)="startTrainingRun()">Training Run</button>
       <button type="button" class="secondary" (click)="resetRun()">Reset</button>
+      <button type="button" class="secondary" (click)="openHowToPlay()">How To Play</button>
       <button type="button" class="secondary" (click)="openCampaignBriefing()">Campaign</button>
       <button
         type="button"
@@ -111,10 +113,122 @@
     </section>
   }
 
+  @if (howToPlayOpen()) {
+    <div
+      class="how-to-play-backdrop"
+      role="presentation"
+      (click)="closeHowToPlayFromBackdrop($event)"
+    >
+      <section
+        class="how-to-play-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="how-to-play-title"
+      >
+        <div class="how-to-play-header">
+          <div>
+            <p class="panel-label">Quick Start</p>
+            <h2 id="how-to-play-title">How To Play</h2>
+          </div>
+          <button type="button" class="secondary" (click)="closeHowToPlay()">Close</button>
+        </div>
+
+        <div class="how-to-play-scroll">
+          <section class="how-to-play-section priority">
+            <h3>Goal</h3>
+            <p>
+              Reach {{ game.state().run.dominionTarget }} Dominion by the end of Week
+              {{ game.state().maxWeeks }}. You lose immediately if Heat reaches 100, Loyalty
+              reaches 0, or Resources fall below 0.
+            </p>
+          </section>
+
+          <section class="how-to-play-section">
+            <h3>Turn Structure</h3>
+            <p>
+              Each week starts on the Command Board. Spend Command points by queueing orders.
+              Choose an action, select required targets, assign an operative when useful, then
+              queue the order.
+            </p>
+            <p>
+              Queue at least one order, press Advance Week, resolve weekly fallout, choose an event
+              response, and begin the next week. Unspent Command does not carry forward.
+            </p>
+          </section>
+
+          <section class="how-to-play-section">
+            <h3>Actions, Targets, Operatives</h3>
+            <p>
+              Action cards recalculate their effects, costs, and risk as you change targets or
+              operatives. Targets can be districts, venues, rivals, recruits, Ledger entries,
+              Contacts, Fronts, or Factions depending on the action.
+            </p>
+            <p>
+              Operatives modify risk through skills, Loyalty, Stress, traits, affinities, and
+              liabilities. Tags are role hints: they signal likely usefulness, not strict rules.
+            </p>
+          </section>
+
+          <section class="how-to-play-section">
+            <h3>Events and Advisor Modes</h3>
+            <p>
+              Hints gives broad reads. Coach gives strategic advice without exact picks. Handler
+              gives exact recommended actions, targets, operatives, and event choices. Off hides
+              the panel. Advice never queues or chooses for you.
+            </p>
+          </section>
+
+          <section class="how-to-play-section">
+            <h3>Training and Standard Runs</h3>
+            <p>
+              Training uses a fixed validated setup, starts with Handler guidance, and wins at 80
+              Dominion. Standard uses the selected campaign and optional seed, wins at 90 Dominion,
+              and custom seeds are marked Unvalidated.
+            </p>
+          </section>
+
+          <section class="how-to-play-section">
+            <h3>Pressure Glossary</h3>
+            <dl class="how-to-play-glossary">
+              <div>
+                <dt>Dominion</dt>
+                <dd>Your win meter.</dd>
+              </div>
+              <div>
+                <dt>Heat</dt>
+                <dd>Too much visibility. Lose at 100.</dd>
+              </div>
+              <div>
+                <dt>Loyalty</dt>
+                <dd>Crew stability. Lose at 0.</dd>
+              </div>
+              <div>
+                <dt>Resources</dt>
+                <dd>Money and operational slack. Lose below 0.</dd>
+              </div>
+              <div>
+                <dt>Intel</dt>
+                <dd>Enables options, bargains, and leverage.</dd>
+              </div>
+              <div>
+                <dt>Ruin</dt>
+                <dd>Long-term damage and narrative warning pressure.</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+      </section>
+    </div>
+  }
+
   <section class="status-strip" aria-label="Run status">
     <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
     <span>{{ game.commandPointsRemaining() }} Command</span>
     <span>{{ game.state().phase }}</span>
+    <span>{{ runModeLabel() }}</span>
+    <span [class.danger]="game.state().run.validationStatus === 'unvalidated'">
+      {{ validationStatusLabel() }}
+    </span>
     <span>{{ game.campaignHeader().tensionName }}</span>
     <span>Dominion target {{ debugView().dominionTarget }}</span>
     <span>Seed {{ game.state().seed }}</span>

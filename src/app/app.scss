@@ -291,6 +291,95 @@ p {
   justify-content: flex-end;
 }
 
+.how-to-play-backdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.how-to-play-drawer {
+  width: min(880px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  border: 1px solid rgba(129, 216, 208, 0.34);
+  background:
+    linear-gradient(135deg, rgba(129, 216, 208, 0.09), rgba(229, 196, 107, 0.045)),
+    rgba(7, 11, 16, 0.98);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.how-to-play-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(232, 237, 242, 0.12);
+}
+
+.how-to-play-header h2 {
+  font-size: 1.18rem;
+}
+
+.how-to-play-scroll {
+  display: grid;
+  gap: 10px;
+  max-height: calc(min(760px, 100vh - 48px) - 78px);
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  scrollbar-color: rgba(129, 216, 208, 0.42) rgba(4, 7, 11, 0.5);
+  scrollbar-width: thin;
+}
+
+.how-to-play-section {
+  padding: 11px;
+  border: 1px solid rgba(232, 237, 242, 0.1);
+  background: rgba(4, 7, 11, 0.5);
+}
+
+.how-to-play-section.priority {
+  border-color: rgba(229, 196, 107, 0.36);
+  background: rgba(229, 196, 107, 0.06);
+}
+
+.how-to-play-section h3 {
+  margin-bottom: 6px;
+  color: #e8edf2;
+  font-size: 0.84rem;
+  text-transform: uppercase;
+}
+
+.how-to-play-section p {
+  margin-bottom: 7px;
+  font-size: 0.82rem;
+}
+
+.how-to-play-section p:last-child {
+  margin-bottom: 0;
+}
+
+.how-to-play-glossary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.how-to-play-glossary div {
+  padding: 8px;
+  border: 1px solid rgba(129, 216, 208, 0.14);
+  background: rgba(8, 18, 22, 0.55);
+}
+
+.how-to-play-glossary dd {
+  margin: 2px 0 0;
+  color: #a9b4c0;
+  font-size: 0.78rem;
+}
+
 .status-strip span,
 .trait-list span,
 .delta-list span,
@@ -2547,6 +2636,29 @@ pre {
 
   .campaign-briefing-actions button {
     width: 100%;
+  }
+
+  .how-to-play-backdrop {
+    place-items: stretch;
+    padding: 0;
+  }
+
+  .how-to-play-drawer {
+    width: 100%;
+    max-height: 100vh;
+  }
+
+  .how-to-play-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .how-to-play-scroll {
+    max-height: calc(100vh - 116px);
+  }
+
+  .how-to-play-glossary {
+    grid-template-columns: 1fr;
   }
 
   .seed-control {

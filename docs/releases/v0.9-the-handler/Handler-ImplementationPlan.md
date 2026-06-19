@@ -1479,7 +1479,28 @@ Custom seed is labeled Unvalidated.
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Added visible header controls for `Standard Run`, `Training Run`, and `How To Play`.
+- Added a How To Play drawer covering the objective, loss conditions, turn cadence,
+  Command points, actions, targets, operatives, events, Advisor modes, run modes,
+  validation status, pressure terms, and role tags.
+- Added header/status labels for run mode, validation status, campaign tension, seed,
+  and Dominion target.
+- Added focused Angular coverage in `src/app/app-how-to-play.spec.ts` for drawer
+  open/close behavior and Training/Standard run labels.
+
+Verification completed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/app-how-to-play.spec.ts
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/app-advisor.spec.ts
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run check:docs
+git diff --check
+```
 
 ## Phase 13: Handler Balance and Reliability Pass
 

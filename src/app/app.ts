@@ -74,6 +74,7 @@ export class App {
   protected readonly selectedTargets = signal<Partial<Record<ActionId, ActionTarget>>>({});
   protected readonly harnessOutput = signal('');
   protected readonly debugVisible = signal(false);
+  protected readonly howToPlayOpen = signal(false);
   protected readonly copyReportStatus = signal<'idle' | 'success' | 'failure'>('idle');
   protected seedInput = 'VIOLET-ASH-1047';
   protected selectedCampaignTensionId: '' | CampaignTensionId = '';
@@ -201,6 +202,12 @@ export class App {
     this.game.startNewRun(this.normalizedSeed(), this.selectedCampaignTensionId || undefined);
   }
 
+  protected startTrainingRun(): void {
+    this.clearTransientSelections();
+    this.copyReportStatus.set('idle');
+    this.game.startTrainingRun();
+  }
+
   protected resetRun(): void {
     this.clearTransientSelections();
     this.copyReportStatus.set('idle');
@@ -214,6 +221,20 @@ export class App {
 
   protected dismissCampaignBriefing(): void {
     this.game.dismissCampaignBriefing();
+  }
+
+  protected openHowToPlay(): void {
+    this.howToPlayOpen.set(true);
+  }
+
+  protected closeHowToPlay(): void {
+    this.howToPlayOpen.set(false);
+  }
+
+  protected closeHowToPlayFromBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeHowToPlay();
+    }
   }
 
   protected openCampaignBriefing(): void {
@@ -401,6 +422,21 @@ export class App {
 
   protected advisorMessageClass(message: AdvisorMessage): string {
     return `tone-${message.tone}`;
+  }
+
+  protected runModeLabel(): string {
+    return this.game.state().run.mode === 'training' ? 'Training Run' : 'Standard Run';
+  }
+
+  protected validationStatusLabel(): string {
+    switch (this.game.state().run.validationStatus) {
+      case 'validated':
+        return 'Validated';
+      case 'harness_validated':
+        return 'Harness Validated';
+      case 'unvalidated':
+        return 'Unvalidated Custom Seed';
+    }
   }
 
   protected operativeOptionLabel(operative: OperativeOptionView): string {
