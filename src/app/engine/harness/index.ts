@@ -20,6 +20,15 @@ export {
   simulateBatch,
   simulateRun,
 } from './simulation-harness';
+export {
+  formatHandlerValidationGateReport,
+  isPassingHandlerValidationResult,
+  runHandlerStandardValidation,
+  runHandlerTrainingValidation,
+  runHandlerValidationGate,
+  summarizeHandlerValidationRuns,
+  validateStandardValidationSeedSet,
+} from './handler-validation-runner';
 export type {
   AgentDecisionContext,
   HandlerAgentEventDecision,
@@ -72,3 +81,14 @@ export type {
   TargetReport,
   TargetRunStats,
 } from './simulation-harness';
+export type {
+  HandlerSeedSetCampaignValidation,
+  HandlerSeedSetValidation,
+  HandlerStandardValidationOptions,
+  HandlerTrainingValidationOptions,
+  HandlerValidationFailure,
+  HandlerValidationGateReport,
+  HandlerValidationKind,
+  HandlerValidationLossCause,
+  HandlerValidationReport,
+} from './handler-validation-runner';

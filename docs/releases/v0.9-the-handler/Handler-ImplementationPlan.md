@@ -1161,7 +1161,52 @@ Any softlock or stall fails validation.
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Added deterministic Standard validation seed generation in
+  `src/app/engine/advisor/standard-validation-seeds.ts`.
+- Seed set contains `100` reproducible seeds per Campaign Tension and `500` total Standard
+  validation seeds.
+- Added `handler-validation-runner.ts` with:
+  - fixed Training validation,
+  - Standard validation over the deterministic seed set,
+  - combined gate reporting,
+  - pass/fail summarization,
+  - failure records with campaign, seed, cause, final pressures, and trace messages,
+  - copyable CSV-style gate output.
+- Widened `HandlerValidationResult.lossCause` to include `softlock`.
+- Exported validation seeds and runner APIs through the advisor/harness barrels.
+- Added focused tests for:
+  - exact seed counts,
+  - duplicate/undersized seed-set rejection,
+  - invalid/loss/stall/softlock failure classification,
+  - formatted failure output,
+  - fixed Training config victory under HandlerBot.
+
+Verification:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/harness/handler-validation-runner.spec.ts
+# 6 SUCCESS
+
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/harness/simulation-harness.spec.ts
+# 42 SUCCESS
+
+npx tsc -p tsconfig.app.json --noEmit
+# pass
+
+npm run check:docs
+# Documentation links verified for 9 release folders.
+
+npm run build
+# pass
+
+git diff --check
+# pass
+```
+
+No full 500-run Standard validation was executed in this phase; the runner and deterministic seed
+set are now in place for the Phase 14 release gate and Phase 13 tuning loop.
 
 ## Phase 10: Advisor Facade and View Model Integration
 

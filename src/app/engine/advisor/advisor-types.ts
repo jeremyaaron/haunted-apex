@@ -112,7 +112,7 @@ export type HandlerValidationResult = {
   runMode: RunMode;
   resultWeek?: number;
   finalPressures?: Pressures;
-  lossCause?: GameOverReason | 'agent_stalled' | 'invalid_recommendation';
+  lossCause?: GameOverReason | 'agent_stalled' | 'invalid_recommendation' | 'softlock';
   invalidRecommendationCount: number;
   decisionTrace: HandlerDecisionTraceEntry[];
 };

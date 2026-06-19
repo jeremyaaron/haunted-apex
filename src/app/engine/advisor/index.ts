@@ -7,3 +7,4 @@ export * from './handler-policy';
 export * from './handler-recommendations';
 export * from './legal-options';
 export * from './run-validation';
+export * from './standard-validation-seeds';
