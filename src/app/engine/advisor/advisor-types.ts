@@ -95,6 +95,13 @@ export type HandlerInvalidRecommendation = {
   reason: string;
 };
 
+export type HandlerQueuedPlanAssessment = {
+  status: 'stable' | 'risky' | 'dangerous';
+  summary: string;
+  warnings: AdvisorMessage[];
+  suggestedRemovals: string[];
+};
+
 export type HandlerRecommendation = {
   phase: HandlerRecommendationPhase;
   confidence: AdvisorConfidence;
@@ -104,5 +111,6 @@ export type HandlerRecommendation = {
   warnings: AdvisorMessage[];
   opportunities: AdvisorMessage[];
   planAssessment?: string;
+  queuedPlanAssessment?: HandlerQueuedPlanAssessment;
   invalidRecommendations: HandlerInvalidRecommendation[];
 };

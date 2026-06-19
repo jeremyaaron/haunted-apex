@@ -713,7 +713,71 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added the Handler command policy module and the public recommendation wrapper:
+
+```text
+src/app/engine/advisor/handler-policy.ts
+src/app/engine/advisor/handler-recommendations.ts
+```
+
+- Exported Handler policy helpers through the advisor barrel.
+- Extended `HandlerRecommendation` with queued-plan assessment metadata so the UI can distinguish:
+
+```text
+no queued orders
+stable queued plan
+risky queued plan
+dangerous queued plan
+```
+
+- Implemented current-turn legal plan generation:
+  - one-order candidates when one command point remains,
+  - two-order combinations when multiple command points remain,
+  - second-order legality recomputed after simulating the first queued order,
+  - no mutation of the source game state during recommendation generation.
+- Implemented command-plan scoring for:
+  - immediate losing projections,
+  - Dominion pace and victory reach,
+  - Heat, Loyalty, and Resources safety,
+  - useful Ledger, Contact, Front, Accord, and Secret opportunities,
+  - operative stress,
+  - campaign tension priorities,
+  - risk chance,
+  - avoidable Ruin and dangerous pressure drift.
+- Added player-readable recommendation reasons, reason codes, plan summaries, warnings, and
+  opportunities.
+- Added post-selection validation using the normal `queueOrder` rules so invalid recommendations
+  are counted and exposed.
+- Added stable highlight helpers for matching recommended actions and targets.
+- Added unit coverage for:
+  - legal and explainable command recommendations,
+  - non-mutating recommendation generation,
+  - two-order plan generation,
+  - partial-queue behavior,
+  - operative reuse avoidance after an assignment is queued,
+  - full-queue assessment behavior,
+  - recommended action and target matching,
+  - dangerous queued-plan warnings.
+- Current test count is `614` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+```
+
+- Production build size after Phase 5:
+
+```text
+main:      643.99 kB raw, 143.14 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   678.73 kB raw, 154.64 kB estimated transfer
+```
 
 ## Phase 6: Handler Event Policy and Decision Trace
 
