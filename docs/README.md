@@ -71,3 +71,4 @@
 - [`v0.9A.md`](releases/v0.9-the-handler/v0.9A.md): locked mechanical decisions.
 - [`Handler-TDD.md`](releases/v0.9-the-handler/Handler-TDD.md): technical design.
 - [`Handler-ImplementationPlan.md`](releases/v0.9-the-handler/Handler-ImplementationPlan.md): phased implementation plan.
+- [`Handler-ReleaseNotes.md`](releases/v0.9-the-handler/Handler-ReleaseNotes.md): release notes draft.

@@ -1,7 +1,7 @@
 <main class="black-ledger-shell">
   <header class="ledger-header">
     <div>
-      <p class="eyebrow">The Roster</p>
+      <p class="eyebrow">The Handler</p>
       <h1>The Black Ledger</h1>
       <p class="header-deck">{{ game.campaignHeader().label }}</p>
       <p class="campaign-subtitle">{{ game.campaignHeader().tensionSubtitle }}</p>
@@ -224,7 +224,7 @@
   <section class="status-strip" aria-label="Run status">
     <span>Week {{ game.state().week }} / {{ game.state().maxWeeks }}</span>
     <span>{{ game.commandPointsRemaining() }} Command</span>
-    <span>{{ game.state().phase }}</span>
+    <span>{{ displayToken(game.state().phase) }}</span>
     <span>{{ runModeLabel() }}</span>
     <span [class.danger]="game.state().run.validationStatus === 'unvalidated'">
       {{ validationStatusLabel() }}
@@ -245,7 +245,9 @@
       </select>
     </label>
     @if (game.state().gameOver; as gameOver) {
-      <span class="danger">{{ gameOver.result }}: {{ gameOver.reason }}</span>
+      <span class="danger">
+        {{ displayToken(gameOver.result) }}: {{ displayToken(gameOver.reason) }}
+      </span>
     }
   </section>
 
@@ -1054,8 +1056,8 @@
             <pre class="run-report-text">{{ report.text }}</pre>
           } @else {
             <p class="panel-label">Run Closed</p>
-            <h3>{{ game.state().gameOver?.result }}</h3>
-            <p>{{ game.state().gameOver?.reason }}</p>
+            <h3>{{ displayToken(game.state().gameOver?.result ?? 'run_closed') }}</h3>
+            <p>{{ displayToken(game.state().gameOver?.reason ?? 'unknown') }}</p>
             <button type="button" (click)="startNewRun()">New Run</button>
           }
         </div>
@@ -2055,7 +2057,7 @@
         <p class="panel-label">Network Reference</p>
         <h2 id="field-guide-title">Field Guide</h2>
       </div>
-      <span class="panel-count">The Roster</span>
+      <span class="panel-count">The Handler</span>
     </div>
 
     <div class="guide-scroll">

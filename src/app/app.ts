@@ -837,6 +837,7 @@ export class App {
 
   protected displayToken(value: string): string {
     return value
+      .toLowerCase()
       .replace(/^op_/, '')
       .split('_')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

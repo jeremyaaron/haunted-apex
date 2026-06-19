@@ -1658,7 +1658,28 @@ No visible enum labels leak into player-facing text.
 
 ### Completion Record
 
-Pending.
+Completed in this pass.
+
+- Added v0.9 release notes and linked them from the root and docs indexes.
+- Updated release labels from `The Roster` to `The Handler`.
+- Formatted phase and game-over status labels so uppercase enum values do not leak into
+  player-facing text.
+- Added a How To Play/status regression test covering the v0.9 label and formatted status copy.
+- Updated stale app shell assertions to expect the v0.9 Standard Run and formatted status labels.
+- Kept the app-level harness UI test focused on debug panel rendering by stubbing the harness
+  output; engine-level harness tests still cover simulation behavior.
+- Reviewed the Advisor responsive rules. The existing grid and mobile breakpoints still collapse
+  the panel cleanly, so no CSS change was required.
+
+Verification completed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run check:docs
+```
 
 ## Phase 15: Release Readiness and Pages Build
 

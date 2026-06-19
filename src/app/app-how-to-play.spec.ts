@@ -76,6 +76,22 @@ describe('App How To Play and run controls', () => {
     );
     expect(compiled.querySelector('.status-strip')?.textContent).toContain('Dominion target 90');
   });
+
+  it('uses v0.9 release labels and formatted status text', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    const statusText = compiled.querySelector('.status-strip')?.textContent ?? '';
+
+    expect(compiled.querySelector('.eyebrow')?.textContent).toContain('The Handler');
+    expect(compiled.querySelector('.guide-panel .panel-count')?.textContent).toContain(
+      'The Handler',
+    );
+    expect(statusText).toContain('Command');
+    expect(statusText).not.toContain('COMMAND');
+    expect(statusText).not.toContain('EVENT_CHOICE');
+    expect(statusText).not.toContain('GAME_OVER');
+  });
 });
 
 function clickButton(root: HTMLElement, text: string): void {
