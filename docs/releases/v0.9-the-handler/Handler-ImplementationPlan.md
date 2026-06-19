@@ -608,7 +608,54 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added shared legal option selectors in `src/app/engine/advisor/legal-options.ts`:
+  - `selectOrderCandidateOptions`
+  - `selectLegalOrderOptions`
+  - `selectEventChoiceCandidateOptions`
+  - `selectLegalEventChoiceOptions`
+- Added stable key helpers for recommendations:
+  - `getOrderOptionKey`
+  - `getActionTargetKey`
+  - `getAssignmentKey`
+  - `getEventChoiceKey`
+- Legal order options now include action label, target key/label, assignment key/label, preview,
+  command cost, resource cost, risk, and availability.
+- Candidate order options retain unavailable entries for diagnostics, while legal order options use
+  an optimized availability-first path for harness and Handler policy consumers.
+- Legal event choice options now include choice definition, preview, stable key, and availability.
+- Migrated harness `getLegalOrderOptions` and `getLegalEventChoiceOptions` to delegate to the shared
+  Advisor legal selectors while keeping existing harness exports stable.
+- Added tests covering:
+  - target requirements and target keys,
+  - affordability filtering,
+  - operative availability after queueing,
+  - command point exhaustion,
+  - event choice validity.
+- Test count increased from `602` to `607` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Production build size after Phase 4:
+
+```text
+main:      643.99 kB raw, 143.21 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   678.73 kB raw, 154.70 kB estimated transfer
+```
+
+- No dev server, Karma watcher, or browser-debug process was intentionally left running by this
+  phase.
 
 ## Phase 5: Handler Command Policy
 

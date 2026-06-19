@@ -21,17 +21,11 @@ import type {
   QueuedOrder,
   StressTier,
 } from '../model';
-import type { ActionPreview, QueueOrderRequest } from '../selectors';
+import type { ActionPreview } from '../selectors';
+import type { LegalEventChoiceOption, LegalOrderOption } from '../advisor';
 import { getRunRules } from '../simulation/run-rules';
 
-export type LegalOrderOption = QueueOrderRequest & {
-  preview: ActionPreview;
-};
-
-export type LegalEventChoiceOption = {
-  eventId: string;
-  choice: EventChoiceDefinition;
-};
+export type { LegalEventChoiceOption, LegalOrderOption } from '../advisor';
 
 export type AgentDecisionContext = {
   nextInt: (minInclusive: number, maxInclusive: number) => number;

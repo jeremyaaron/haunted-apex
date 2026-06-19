@@ -18,6 +18,10 @@ import {
   getRivalDefinition,
   getVenueDefinition,
 } from '../content';
+import {
+  selectLegalEventChoiceOptions,
+  selectLegalOrderOptions,
+} from '../advisor';
 import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
 import type {
@@ -47,16 +51,9 @@ import type {
 import { PRESSURE_IDS } from '../model';
 import { createRng, nextInt } from '../rng';
 import { getStressTier } from '../roster';
-import {
-  getActionPreview,
-  getCommandPointsRemaining,
-  getOrderAvailability,
-  selectActionTargetOptions,
-  type QueueOrderRequest,
-} from '../selectors';
+import { getCommandPointsRemaining } from '../selectors';
 import {
   advanceWeek,
-  getEventChoiceAvailability,
   newGame,
   queueOrder,
   resolveEventChoice,
@@ -1848,64 +1845,11 @@ function formatCampaignSummaryCells(summary: CampaignBatchSummary): string[] {
 }
 
 export function getLegalOrderOptions(state: GameState): LegalOrderOption[] {
-  if (state.phase !== 'COMMAND' || getCommandPointsRemaining(state) <= 0) {
-    return [];
-  }
-
-  const queuedActionIds = new Set(state.queuedOrders.map((order) => order.actionId));
-  const options: LegalOrderOption[] = [];
-
-  for (const action of DISTRICT_ZERO_ACTIONS) {
-    if (queuedActionIds.has(action.id)) {
-      continue;
-    }
-
-    const requests = getOrderRequestsForAction(state, action.id);
-
-    for (const request of requests) {
-      const availability = getOrderAvailability(state, request);
-      const preview = getActionPreview(
-        state,
-        request.actionId,
-        request.assignedOperativeId,
-        request.target,
-      );
-
-      if (availability.available && preview) {
-        options.push({
-          ...request,
-          preview,
-        });
-      }
-    }
-  }
-
-  return options;
+  return selectLegalOrderOptions(state);
 }
 
 export function getLegalEventChoiceOptions(state: GameState): LegalEventChoiceOption[] {
-  const pendingEvent = state.pendingEvent;
-
-  if (state.phase !== 'EVENT_CHOICE' || !pendingEvent) {
-    return [];
-  }
-
-  const definition = getEventDefinition(pendingEvent.definitionId);
-
-  if (!definition) {
-    return [];
-  }
-
-  return definition.choices.flatMap((choice) =>
-    getEventChoiceAvailability(state, pendingEvent.id, choice.id).available
-      ? [
-          {
-            eventId: pendingEvent.id,
-            choice,
-          },
-        ]
-      : [],
-  );
+  return selectLegalEventChoiceOptions(state);
 }
 
 function queueAgentOrders(
@@ -1954,49 +1898,6 @@ function queueAgentOrders(
   }
 
   return next;
-}
-
-function getOrderRequestsForAction(state: GameState, actionId: ActionId): QueueOrderRequest[] {
-  const action = DISTRICT_ZERO_ACTIONS.find((candidate) => candidate.id === actionId);
-
-  if (!action) {
-    return [];
-  }
-
-  if (action.assignment === 'none') {
-    return withLegalTargets(state, actionId, [{ actionId }]);
-  }
-
-  const operativeRequests = state.operatives.map((operative) => ({
-    actionId,
-    assignedOperativeId: operative.id,
-  }));
-
-  const assignmentRequests =
-    action.assignment === 'required' ? operativeRequests : [{ actionId }, ...operativeRequests];
-
-  return withLegalTargets(state, actionId, assignmentRequests);
-}
-
-function withLegalTargets(
-  state: GameState,
-  actionId: ActionId,
-  requests: QueueOrderRequest[],
-): QueueOrderRequest[] {
-  const action = DISTRICT_ZERO_ACTIONS.find((candidate) => candidate.id === actionId);
-
-  if (!action) {
-    return [];
-  }
-
-  const targetedRequests = selectActionTargetOptions(state, actionId).flatMap((option) =>
-    requests.map((request) => ({
-      ...request,
-      target: option.target,
-    })),
-  );
-
-  return action.requiresTarget ? targetedRequests : [...requests, ...targetedRequests];
 }
 
 function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResult[]): AgentBatchSummary {
