@@ -5,7 +5,6 @@ import {
   PRESSURE_IDS,
   STRATEGY_AGENTS,
   CAMPAIGN_TENSION_DEFINITIONS,
-  DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   formatBatchReport,
   generateRoster,
   getWeightedEvents,
@@ -122,7 +121,7 @@ export class App {
       seed: state.seed,
       rngCursor: state.rngCursor,
       phase: state.phase,
-      dominionTarget: DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory,
+      dominionTarget: state.run.dominionTarget,
       pendingEventId: state.pendingEvent?.definitionId ?? 'None',
       pressuresJson: JSON.stringify(state.pressures, null, 2),
       flagsJson: JSON.stringify(state.flags, null, 2),
@@ -855,11 +854,13 @@ export class App {
 
   private getPressureMeterValue(id: PressureId, value: number): number {
     if (id === 'dominion') {
+      const dominionTarget = this.game.state().run.dominionTarget;
+
       return Math.max(
         0,
         Math.min(
           100,
-          Math.round((value / DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) * 100),
+          Math.round((value / dominionTarget) * 100),
         ),
       );
     }
@@ -877,7 +878,7 @@ export class App {
 
   private getPressureStatus(id: PressureId, value: number): 'stable' | 'warning' | 'critical' {
     if (id === 'dominion') {
-      return value >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
+      return value >= this.game.state().run.dominionTarget
         ? 'critical'
         : value >= 60
           ? 'warning'
@@ -906,7 +907,7 @@ export class App {
   private getPressureTargetLabel(id: PressureId): string {
     switch (id) {
       case 'dominion':
-        return `Win at ${DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory}`;
+        return `Win at ${this.game.state().run.dominionTarget}`;
       case 'heat':
         return 'Lose at 100';
       case 'loyalty':

@@ -272,7 +272,84 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added `RunMode`, `RunValidationStatus`, and `RunSettings`.
+- Extended `NewGameConfig` with `runMode` and `customSeed`.
+- Updated `GameState` to schema version `9`.
+- Added `state.run` metadata:
+
+```text
+mode
+dominionTarget
+validationStatus
+customSeed
+```
+
+- Standard runs now default to:
+
+```text
+mode: standard
+dominionTarget: 90
+validationStatus: harness_validated for generated seeds, unvalidated for custom seeds
+```
+
+- Training-mode runs now use:
+
+```text
+mode: training
+dominionTarget: 80
+validationStatus: validated
+```
+
+- Added `getRunRules(state)` and routed Dominion victory checks through
+  `state.run.dominionTarget`.
+- Updated Dominion pressure meter percentage, target label, status strip, and Field Guide target
+  copy to read the run-specific target.
+- Updated OperatorBot's Dominion pace and finish heuristics to use the run-specific target.
+- Updated persistence:
+
+```text
+CURRENT_SAVE_SCHEMA_VERSION = 9
+CURRENT_GAME_VERSION = 0.9.0
+CURRENT_RUN_STORAGE_KEY = haunted-apex:v0.9:current-run
+LEGACY_V08_STORAGE_KEY = haunted-apex:v0.8:current-run
+```
+
+- v0.8 saves are invalidated cleanly. No migration is performed.
+- Updated compatibility copy for v0.9.
+- Added storage validation for run metadata.
+- Preserved `startNewRun(seed, campaignTensionId)` compatibility as Standard behavior.
+- Added focused tests for:
+  - Standard custom seed run metadata,
+  - generated Standard validation status,
+  - Training Dominion target,
+  - run-specific Dominion victory,
+  - v0.8 save invalidation,
+  - malformed run metadata rejection.
+- Test count increased from `580` to `585` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Production build size after Phase 1:
+
+```text
+main:      636.04 kB raw, 141.05 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   670.78 kB raw, 152.54 kB estimated transfer
+```
+
+- No dev server, Karma watcher, or browser-debug process was intentionally left running by this
+  phase.
 
 ## Phase 2: Training Run Assembly
 

@@ -11,6 +11,7 @@ import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
   CURRENT_SAVE_SCHEMA_VERSION,
+  LEGACY_V08_STORAGE_KEY,
   LEGACY_V07_STORAGE_KEY,
   LEGACY_V06_STORAGE_KEY,
   LEGACY_V05_STORAGE_KEY,
@@ -34,7 +35,7 @@ describe('GameStorageService', () => {
     localStorage.clear();
   });
 
-  it('round-trips a complete v0.8 envelope through localStorage', () => {
+  it('round-trips a complete v0.9 envelope through localStorage', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     service.saveCurrentRun(state);
@@ -52,6 +53,7 @@ describe('GameStorageService', () => {
 
   it('clears current and legacy run keys', () => {
     service.saveCurrentRun(newGame({ seed: 'VIOLET-ASH-1047' }));
+    localStorage.setItem(LEGACY_V08_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V07_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V06_STORAGE_KEY, '{}');
     localStorage.setItem(LEGACY_V05_STORAGE_KEY, '{}');
@@ -62,6 +64,7 @@ describe('GameStorageService', () => {
     service.clearCurrentRun();
 
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(LEGACY_V08_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V07_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V06_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(LEGACY_V05_STORAGE_KEY)).toBeNull();
@@ -86,6 +89,27 @@ describe('GameStorageService', () => {
       foundVersion: 2,
     });
     expect(localStorage.getItem(CURRENT_RUN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('removes the v0.8 key and reports it incompatible', () => {
+    localStorage.setItem(
+      LEGACY_V08_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 8,
+        gameVersion: '0.8.0',
+        savedAt: '2026-06-18T00:00:00.000Z',
+        state: {
+          ...newGame({ seed: 'LEGACY' }),
+          schemaVersion: 8,
+        },
+      }),
+    );
+
+    expect(service.loadCurrentRun()).toEqual({
+      status: 'incompatible',
+      foundVersion: 8,
+    });
+    expect(localStorage.getItem(LEGACY_V08_STORAGE_KEY)).toBeNull();
   });
 
   it('removes the v0.7 key and reports it incompatible', () => {
@@ -193,6 +217,25 @@ describe('GameStorageService', () => {
     (state as { schemaVersion: number }).schemaVersion = 2;
 
     expectLoadInvalid(state);
+  });
+
+  it('rejects missing or malformed run settings', () => {
+    const missingRun = structuredClone(newGame()) as Record<string, unknown>;
+    delete missingRun['run'];
+    const badDominionTarget = structuredClone(newGame()) as GameState;
+    badDominionTarget.run = {
+      ...badDominionTarget.run,
+      dominionTarget: 0,
+    };
+    const badValidationStatus = structuredClone(newGame()) as GameState;
+    badValidationStatus.run = {
+      ...badValidationStatus.run,
+      validationStatus: 'certified' as typeof badValidationStatus.run.validationStatus,
+    };
+
+    expectLoadInvalid(missingRun as GameState);
+    expectLoadInvalid(badDominionTarget);
+    expectLoadInvalid(badValidationStatus);
   });
 
   it('round-trips Campaign state', () => {

@@ -55,6 +55,9 @@ export type {
   GameOverState,
   GameState,
   NewGameConfig,
+  RunMode,
+  RunSettings,
+  RunValidationStatus,
   TurnPhase,
 } from './game-state';
 export type {

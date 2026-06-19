@@ -485,6 +485,25 @@ describe('clamps and win/loss', () => {
     });
   });
 
+  it('uses the run-specific Dominion target for victory', () => {
+    expect(
+      getGameOverState({
+        ...withPressures({ dominion: 80 }),
+        run: {
+          mode: 'training',
+          dominionTarget: 80,
+          validationStatus: 'validated',
+          customSeed: true,
+        },
+      }),
+    ).toEqual({
+      result: 'victory',
+      reason: 'dominion_victory',
+    });
+
+    expect(getGameOverState(withPressures({ dominion: 80 }))).toBeUndefined();
+  });
+
   it('detects loss before victory when fail and win thresholds are both crossed', () => {
     expect(getGameOverState(withPressures({ dominion: 90, heat: 100 }))).toEqual({
       result: 'loss',

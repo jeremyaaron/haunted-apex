@@ -58,7 +58,7 @@ import {
 import { GameStorageService, type LoadCurrentRunResult } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected an older save. v0.8.0 - The City Wakes changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.9.0 - The Handler changes the game state schema and requires a fresh run.';
 
 @Injectable({
   providedIn: 'root',

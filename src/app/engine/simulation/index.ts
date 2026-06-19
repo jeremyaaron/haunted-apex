@@ -21,6 +21,7 @@ export {
 export { applyRivalPassiveEffects } from './rival-effects';
 export { pruneRecentActivity, recordRecentActivity } from './recent-activity';
 export { applyWinLoss, getGameOverState } from './win-loss';
+export { getRunRules, type RunRules } from './run-rules';
 export { clampPressures, clampStress } from './clamps';
 export { applyPressureDelta, mergePressureDeltas } from './pressure-delta';
 export {

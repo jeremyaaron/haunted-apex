@@ -14,10 +14,23 @@ import type { RivalId, RivalState } from './rivals';
 
 export type Difficulty = 'standard';
 
+export type RunMode = 'training' | 'standard';
+
+export type RunValidationStatus = 'validated' | 'harness_validated' | 'unvalidated';
+
+export type RunSettings = {
+  mode: RunMode;
+  dominionTarget: number;
+  validationStatus: RunValidationStatus;
+  customSeed: boolean;
+};
+
 export type NewGameConfig = {
   seed?: string;
   difficulty?: Difficulty;
   campaignTensionId?: CampaignTensionId;
+  runMode?: RunMode;
+  customSeed?: boolean;
 };
 
 export type TurnPhase =
@@ -65,7 +78,7 @@ export type GameLogEntry = {
 };
 
 export type GameState = {
-  schemaVersion: 8;
+  schemaVersion: 9;
   id: string;
   seed: string;
   rngCursor: number;
@@ -73,6 +86,7 @@ export type GameState = {
   maxWeeks: number;
   phase: TurnPhase;
   commandPointsPerWeek: number;
+  run: RunSettings;
   campaign: CampaignState;
   pressures: Pressures;
   operatives: OperativeState[];
