@@ -38,6 +38,37 @@ describe('GameFacade', () => {
     expect(readStoredState()).toEqual(state);
   });
 
+  it('starts a Standard run and marks custom seeds as unvalidated', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startStandardRun('STANDARD-CUSTOM', 'campaign_dirty_capital');
+
+    expect(state.seed).toBe('STANDARD-CUSTOM');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
+    expect(state.run).toEqual({
+      mode: 'standard',
+      dominionTarget: 90,
+      validationStatus: 'unvalidated',
+      customSeed: true,
+    });
+    expect(readStoredState()).toEqual(state);
+  });
+
+  it('starts the fixed Training run and persists it', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startTrainingRun();
+
+    expect(state.seed).toBe('TRAINING-GLASS-CROWN-001');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
+    expect(state.run).toEqual({
+      mode: 'training',
+      dominionTarget: 80,
+      validationStatus: 'validated',
+      customSeed: false,
+    });
+    expect(facade.campaignBriefingOpen()).toBeTrue();
+    expect(readStoredState()).toEqual(state);
+  });
+
   it('loads a valid current run on construction', () => {
     const saved = newGame({ seed: 'SAVED-SEED' });
     storeEnvelope(saved);

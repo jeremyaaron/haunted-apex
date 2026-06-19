@@ -394,7 +394,62 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added `TRAINING_RUN_CONFIG` under the simulation engine.
+- Fixed Training config is:
+
+```text
+runMode: training
+seed: TRAINING-GLASS-CROWN-001
+campaignTensionId: campaign_dirty_capital
+customSeed: false
+```
+
+- Training run assembly now produces:
+
+```text
+mode: training
+dominionTarget: 80
+validationStatus: validated
+customSeed: false
+```
+
+- Added `GameFacade.startTrainingRun()`.
+- Added `GameFacade.startStandardRun(seed?, campaignTensionId?)`.
+- Preserved `GameFacade.startNewRun(seed?, campaignTensionId?)` as a Standard-run compatibility
+  wrapper.
+- Existing visible New Run UI still uses Standard behavior. Dedicated Training/Standard controls
+  remain scheduled for Phase 12.
+- Advisor-mode defaults are intentionally deferred to Phase 3, where Advisor preferences are
+  introduced.
+- Added focused tests for:
+  - fixed Training config values,
+  - Training run persistence through the facade,
+  - Standard custom seed `unvalidated` metadata through the facade.
+- Test count increased from `585` to `587` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
+git diff --check
+```
+
+- Production build size after Phase 2:
+
+```text
+main:      636.27 kB raw, 141.12 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   671.02 kB raw, 152.61 kB estimated transfer
+```
+
+- No dev server, Karma watcher, or browser-debug process was intentionally left running by this
+  phase.
 
 ## Phase 3: Advisor Types, Preferences, and Dominion Pace
 

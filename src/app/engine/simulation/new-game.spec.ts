@@ -25,6 +25,7 @@ import {
   STARTING_FRONT_ID,
 } from '../fronts';
 import { newGame } from './new-game';
+import { TRAINING_RUN_CONFIG } from './training-run';
 
 describe('newGame', () => {
   it('creates the expected starting campaign state', () => {
@@ -77,17 +78,15 @@ describe('newGame', () => {
   });
 
   it('creates Training runs with the Training Dominion target', () => {
-    const state = newGame({
-      seed: 'TRAINING-GLASS-CROWN-001',
-      runMode: 'training',
-      campaignTensionId: 'campaign_dirty_capital',
-    });
+    const state = newGame(TRAINING_RUN_CONFIG);
 
+    expect(state.seed).toBe('TRAINING-GLASS-CROWN-001');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
     expect(state.run).toEqual({
       mode: 'training',
       dominionTarget: 80,
       validationStatus: 'validated',
-      customSeed: true,
+      customSeed: false,
     });
   });
 

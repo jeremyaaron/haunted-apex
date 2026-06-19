@@ -33,6 +33,7 @@ import {
   selectQueuedOrderViews,
   selectRivalTerritoryViews,
   selectRosterViews,
+  TRAINING_RUN_CONFIG,
   type ActionId,
   type ActionPreview,
   type ActionTarget,
@@ -156,10 +157,19 @@ export class GameFacade {
   }
 
   startNewRun(seed?: string, campaignTensionId?: CampaignTensionId): GameState {
+    return this.startStandardRun(seed, campaignTensionId);
+  }
+
+  startStandardRun(seed?: string, campaignTensionId?: CampaignTensionId): GameState {
     return this.startNewGame({
+      runMode: 'standard',
       ...(seed ? { seed } : {}),
       ...(campaignTensionId ? { campaignTensionId } : {}),
     });
+  }
+
+  startTrainingRun(): GameState {
+    return this.startNewGame(TRAINING_RUN_CONFIG);
   }
 
   loadCurrentRun(): boolean {
