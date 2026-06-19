@@ -22,7 +22,13 @@ import type {
   StressTier,
 } from '../model';
 import type { ActionPreview } from '../selectors';
-import type { LegalEventChoiceOption, LegalOrderOption } from '../advisor';
+import {
+  getActionTargetKey,
+  selectHandlerRecommendation,
+  type HandlerRecommendation,
+  type LegalEventChoiceOption,
+  type LegalOrderOption,
+} from '../advisor';
 import { getRunRules } from '../simulation/run-rules';
 
 export type { LegalEventChoiceOption, LegalOrderOption } from '../advisor';
@@ -45,6 +51,18 @@ export type StrategyAgent = {
     options: readonly LegalEventChoiceOption[],
     context: AgentDecisionContext,
   ) => LegalEventChoiceOption | undefined;
+};
+
+export type HandlerAgentOrderDecision = {
+  recommendation: HandlerRecommendation;
+  order?: LegalOrderOption;
+  invalidRecommendationCount: number;
+};
+
+export type HandlerAgentEventDecision = {
+  recommendation: HandlerRecommendation;
+  eventChoice?: LegalEventChoiceOption;
+  invalidRecommendationCount: number;
 };
 
 type PressureWeights = Partial<Record<keyof PressureDelta, number>>;
@@ -184,6 +202,14 @@ export const OPERATOR_BOT: StrategyAgent = {
     ),
 };
 
+export const HANDLER_BOT: StrategyAgent = {
+  id: 'handler',
+  label: 'HandlerBot',
+  chooseOrder: (state, options) => chooseHandlerOrder(state, options).order,
+  chooseEventChoice: (state, options) =>
+    chooseHandlerEventChoice(state, options).eventChoice,
+};
+
 export const STRATEGY_AGENTS = [
   RANDOM_BOT,
   AGGRESSIVE_BOT,
@@ -191,6 +217,50 @@ export const STRATEGY_AGENTS = [
   GREEDY_BOT,
   OPERATOR_BOT,
 ] as const;
+
+export const EXTENDED_STRATEGY_AGENTS = [...STRATEGY_AGENTS, HANDLER_BOT] as const;
+
+export function chooseHandlerOrder(
+  state: GameState,
+  options: readonly LegalOrderOption[],
+): HandlerAgentOrderDecision {
+  const recommendation = selectHandlerRecommendation(state, {
+    legalOrderOptions: options,
+  });
+  const recommendedOrder = recommendation.recommendedOrders[0];
+  const order = recommendedOrder
+    ? options.find((option) => isMatchingHandlerOrder(option, recommendedOrder))
+    : undefined;
+  const missingOrder = recommendedOrder && !order ? 1 : 0;
+
+  return {
+    recommendation,
+    order,
+    invalidRecommendationCount:
+      recommendation.invalidRecommendations.length + missingOrder,
+  };
+}
+
+export function chooseHandlerEventChoice(
+  state: GameState,
+  options: readonly LegalEventChoiceOption[],
+): HandlerAgentEventDecision {
+  const recommendation = selectHandlerRecommendation(state, {
+    legalEventChoiceOptions: options,
+  });
+  const eventRecommendation = recommendation.eventRecommendation;
+  const eventChoice = eventRecommendation
+    ? options.find((option) => option.choice.id === eventRecommendation.choiceId)
+    : undefined;
+  const missingChoice = eventRecommendation && !eventChoice ? 1 : 0;
+
+  return {
+    recommendation,
+    eventChoice,
+    invalidRecommendationCount:
+      recommendation.invalidRecommendations.length + missingChoice,
+  };
+}
 
 export function getQueuedActionUsage(
   queuedOrders: readonly QueuedOrder[],
@@ -202,6 +272,21 @@ export function getQueuedActionUsage(
     }),
     createEmptyActionUsage(),
   );
+}
+
+function isMatchingHandlerOrder(
+  option: LegalOrderOption,
+  recommendation: HandlerRecommendation['recommendedOrders'][number],
+): boolean {
+  return (
+    option.actionId === recommendation.actionId &&
+    option.assignedOperativeId === recommendation.assignedOperativeId &&
+    getOrderTargetKey(option.target) === getOrderTargetKey(recommendation.target)
+  );
+}
+
+function getOrderTargetKey(target: ActionTarget | undefined): string {
+  return target ? getActionTargetKey(target) : 'target:none';
 }
 
 export function createEmptyActionUsage(): Record<ActionId, number> {

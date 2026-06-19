@@ -1057,7 +1057,46 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Added `HANDLER_BOT` as a harness strategy backed by the existing Handler advisor policy.
+- Preserved `STRATEGY_AGENTS` as the legacy bot set and added `EXTENDED_STRATEGY_AGENTS` for
+  Handler-inclusive harness runs.
+- Updated the in-app harness runner to use the extended agent set so Handler report sections are
+  populated from the UI.
+- Added invalid recommendation, stall, and softlock reporting to harness results.
+- Added Handler CSV sections:
+  - `handler_validation_summary`
+  - `handler_campaign_summary`
+  - `handler_loss_causes`
+  - `handler_invalid_recommendations`
+  - `handler_confidence_distribution`
+  - `handler_training_validation`
+  - `handler_operator_delta`
+- Adjusted the Handler event adapter to match legal event choices by event choice id because event
+  recommendations currently carry the event definition id while legal options carry the pending
+  event instance id.
+- Raised the production initial bundle warning budget to keep Phase 8 builds warning-free.
+
+Verification:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/harness/simulation-harness.spec.ts
+# 42 SUCCESS
+
+npx tsc -p tsconfig.app.json --noEmit
+# pass
+
+npm run check:docs
+# Documentation links verified for 9 release folders.
+
+npm run build
+# pass
+```
+
+Karma reported success but left `npm test` / `ng test` processes alive in the PTY session after the
+focused run; those processes were terminated and a final process-table check showed no harness test
+or dev-server process remaining.
 
 ## Phase 9: Validation Seeds and Release Gate Runner
 

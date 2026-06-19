@@ -21,6 +21,7 @@ import {
 import {
   selectLegalEventChoiceOptions,
   selectLegalOrderOptions,
+  type AdvisorConfidence,
 } from '../advisor';
 import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
@@ -45,6 +46,7 @@ import type {
   PressureId,
   Pressures,
   RivalId,
+  RunMode,
   StressTier,
   VenueId,
 } from '../model';
@@ -63,6 +65,8 @@ import {
 } from '../simulation';
 import {
   createEmptyActionUsage,
+  chooseHandlerEventChoice,
+  chooseHandlerOrder,
   type AgentDecisionContext,
   type LegalEventChoiceOption,
   type LegalOrderOption,
@@ -73,6 +77,7 @@ export type HarnessRunOptions = {
   seed: string;
   agent: StrategyAgent;
   campaignTensionId?: CampaignTensionId;
+  runMode?: RunMode;
   collectTrace?: boolean;
 };
 
@@ -88,7 +93,7 @@ export type HarnessRunResult = {
   seed: string;
   finalState: GameState;
   outcome: 'victory' | 'loss' | 'incomplete';
-  reason?: GameOverReason | 'agent_stalled';
+  reason?: HarnessFailureReason;
   weeksPlayed: number;
   actionUsage: Record<ActionId, number>;
   targetUsage: Record<string, TargetRunStats>;
@@ -102,8 +107,15 @@ export type HarnessRunResult = {
   contactStats: ContactRunStats;
   frontStats: FrontRunStats;
   factionStats: FactionRunStats;
+  handlerStats?: HandlerRunStats;
   trace: HarnessTraceEntry[];
 };
+
+export type HarnessFailureReason =
+  | GameOverReason
+  | 'agent_stalled'
+  | 'invalid_recommendation'
+  | 'softlock';
 
 export type HarnessBatchOptions = {
   agents: readonly StrategyAgent[];
@@ -111,6 +123,7 @@ export type HarnessBatchOptions = {
   seedPrefix?: string;
   campaignTensionId?: CampaignTensionId;
   campaignTensionIds?: readonly CampaignTensionId[];
+  runMode?: RunMode;
 };
 
 export type AgentBatchSummary = {
@@ -123,7 +136,7 @@ export type AgentBatchSummary = {
   winRate: number;
   averageWeeksPlayed: number;
   averageFinalPressures: Pressures;
-  lossReasons: Partial<Record<GameOverReason | 'agent_stalled', number>>;
+  lossReasons: Partial<Record<HarnessFailureReason, number>>;
   actionUsage: Record<ActionId, number>;
   targetReports: TargetReport[];
   mostSelectedTarget?: TargetReport;
@@ -173,6 +186,13 @@ export type HarnessBatchReport = {
   campaignActionUsage: CampaignActionUsageReport[];
   campaignEvents: CampaignEventReport[];
   campaignSystemUsage: CampaignSystemUsageReport[];
+  handlerValidationSummary: HandlerValidationSummaryReport[];
+  handlerCampaignSummary: HandlerCampaignSummaryReport[];
+  handlerLossCauses: HandlerLossCauseReport[];
+  handlerInvalidRecommendations: HandlerInvalidRecommendationReport[];
+  handlerConfidenceDistribution: HandlerConfidenceDistributionReport[];
+  handlerTrainingValidation: HandlerTrainingValidationReport[];
+  handlerOperatorDelta: HandlerOperatorDeltaReport[];
 };
 
 export type CampaignBatchSummary = {
@@ -196,7 +216,7 @@ export type CampaignLossCauseReport = {
   campaignId: CampaignTensionId;
   campaignName: string;
   agentId: string;
-  cause: GameOverReason | 'agent_stalled' | 'none';
+  cause: HarnessFailureReason | 'none';
   count: number;
 };
 
@@ -234,6 +254,83 @@ export type CampaignSystemUsageReport = {
   averageFrontEvents: number;
   averageContactEvents: number;
   averageOperativeEvents: number;
+};
+
+export type HandlerRunStats = {
+  invalidRecommendationCount: number;
+  decisionCount: number;
+  softlockCount: number;
+  confidenceCounts: Record<AdvisorConfidence, number>;
+};
+
+export type HandlerValidationSummaryReport = {
+  agentId: string;
+  agentLabel: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  incomplete: number;
+  winRate: number;
+  invalidRecommendations: number;
+  softlocks: number;
+  stalls: number;
+};
+
+export type HandlerCampaignSummaryReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  incomplete: number;
+  winRate: number;
+  invalidRecommendations: number;
+  softlocks: number;
+  stalls: number;
+};
+
+export type HandlerLossCauseReport = {
+  agentId: string;
+  cause: HarnessFailureReason | 'none';
+  count: number;
+};
+
+export type HandlerInvalidRecommendationReport = {
+  agentId: string;
+  seed: string;
+  campaignId: CampaignTensionId;
+  runMode: RunMode;
+  outcome: HarnessRunResult['outcome'];
+  reason: HarnessFailureReason | 'none';
+  invalidRecommendations: number;
+};
+
+export type HandlerConfidenceDistributionReport = {
+  agentId: string;
+  confidence: AdvisorConfidence;
+  count: number;
+  share: number;
+};
+
+export type HandlerTrainingValidationReport = {
+  agentId: string;
+  runs: number;
+  wins: number;
+  losses: number;
+  incomplete: number;
+  invalidRecommendations: number;
+  softlocks: number;
+  stalls: number;
+  passed: boolean;
+};
+
+export type HandlerOperatorDeltaReport = {
+  campaignId: CampaignTensionId;
+  campaignName: string;
+  metric: 'winRate' | 'averageWeeksPlayed' | 'averageDominion' | 'averageHeat';
+  handlerValue: number;
+  operatorValue: number;
+  delta: number;
 };
 
 export type TargetRunStats = {
@@ -692,7 +789,11 @@ const TARGET_TAG_MODIFIERS = new Set([
 const RIVAL_PRESSURE_MODIFIERS = new Set(['nyx_pressure', 'knox_pressure']);
 
 export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
-  let state = newGame({ seed: options.seed, campaignTensionId: options.campaignTensionId });
+  let state = newGame({
+    seed: options.seed,
+    campaignTensionId: options.campaignTensionId,
+    runMode: options.runMode,
+  });
   const startingRosterIds = state.operatives.map((operative) => operative.id);
   const initialHirePoolIds = [...state.hirePool];
   const operativeStats = createInitialOperativeStats(startingRosterIds, initialHirePoolIds);
@@ -708,11 +809,13 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const factionStats = createEmptyFactionRunStats(state);
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
+  const handlerStats = createHandlerRunStats();
   let stalled = false;
+  let failureReason: HarnessFailureReason | undefined;
 
   for (let step = 0; step < MAX_HARNESS_STEPS && !state.gameOver && !stalled; step += 1) {
     if (state.phase === 'COMMAND') {
-      state = queueAgentOrders(
+      const queuedResult = queueAgentOrders(
         state,
         options.agent,
         context,
@@ -724,10 +827,19 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         factionStats,
         trace,
         options.collectTrace,
+        handlerStats,
       );
+      state = queuedResult.state;
+
+      if (queuedResult.failureReason) {
+        stalled = true;
+        failureReason = queuedResult.failureReason;
+        break;
+      }
 
       if (state.queuedOrders.length === 0) {
         stalled = true;
+        failureReason = 'agent_stalled';
         appendTrace(trace, options.collectTrace, state, 'Agent stalled with no queued orders.');
         break;
       }
@@ -736,6 +848,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
 
       if (!advanced.ok) {
         stalled = true;
+        failureReason = 'agent_stalled';
         appendTrace(trace, options.collectTrace, state, `Advance failed: ${advanced.error}.`);
         break;
       }
@@ -781,11 +894,28 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
 
     if (state.phase === 'EVENT_CHOICE') {
       const optionsForEvent = getLegalEventChoiceOptions(state);
-      const choice = options.agent.chooseEventChoice(state, optionsForEvent, context);
+      const choice = getAgentEventChoice(
+        state,
+        options.agent,
+        optionsForEvent,
+        context,
+        handlerStats,
+        trace,
+        options.collectTrace,
+      );
 
       if (!choice) {
         stalled = true;
-        appendTrace(trace, options.collectTrace, state, 'Agent stalled with no event choice.');
+        failureReason =
+          options.agent.id === 'handler' ? 'invalid_recommendation' : 'agent_stalled';
+        appendTrace(
+          trace,
+          options.collectTrace,
+          state,
+          options.agent.id === 'handler'
+            ? 'Handler recommendation could not be applied to event choice.'
+            : 'Agent stalled with no event choice.',
+        );
         break;
       }
 
@@ -793,6 +923,8 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
 
       if (!resolved.ok) {
         stalled = true;
+        failureReason =
+          options.agent.id === 'handler' ? 'invalid_recommendation' : 'agent_stalled';
         appendTrace(trace, options.collectTrace, state, `Event choice failed: ${resolved.error}.`);
         break;
       }
@@ -803,6 +935,14 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
       recordFactionSnapshot(factionStats, state);
       appendTrace(trace, options.collectTrace, state, `Chose event option: ${choice.choice.label}.`);
     }
+  }
+
+  if (!state.gameOver && !failureReason && !stalled) {
+    failureReason = 'softlock';
+    if (options.agent.id === 'handler') {
+      handlerStats.softlockCount += 1;
+    }
+    appendTrace(trace, options.collectTrace, state, 'Harness reached max steps without terminal state.');
   }
 
   finalizeOperativeStats(operativeStats, state);
@@ -817,7 +957,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     seed: state.seed,
     finalState: state,
     outcome: state.gameOver?.result ?? (stalled ? 'incomplete' : 'incomplete'),
-    reason: state.gameOver?.reason ?? (stalled ? 'agent_stalled' : undefined),
+    reason: state.gameOver?.reason ?? failureReason,
     weeksPlayed: state.week,
     actionUsage,
     targetUsage,
@@ -831,6 +971,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     contactStats,
     frontStats,
     factionStats,
+    handlerStats: options.agent.id === 'handler' ? handlerStats : undefined,
     trace,
   };
 }
@@ -849,6 +990,7 @@ export function simulateBatch(options: HarnessBatchOptions): HarnessBatchReport 
           simulateRun({
             agent,
             campaignTensionId,
+            runMode: options.runMode,
             seed: `${seedPrefix}-${agent.id}${campaignSeedSegment}-${index + 1}`,
           }),
         );
@@ -859,17 +1001,25 @@ export function simulateBatch(options: HarnessBatchOptions): HarnessBatchReport 
 
     return summarizeAgentRuns(agent, runs);
   });
+  const campaignAgentSummaries = summarizeCampaignAgentRuns(allRuns);
 
   return {
     runsPerAgent: options.runsPerAgent,
     totalRuns: allRuns.length,
     summaries,
     campaignSummaries: summarizeCampaignRuns(allRuns),
-    campaignAgentSummaries: summarizeCampaignAgentRuns(allRuns),
+    campaignAgentSummaries,
     campaignLossCauses: summarizeCampaignLossCauses(allRuns),
     campaignActionUsage: summarizeCampaignActionUsage(allRuns),
     campaignEvents: summarizeCampaignEvents(allRuns),
     campaignSystemUsage: summarizeCampaignSystemUsage(allRuns),
+    handlerValidationSummary: summarizeHandlerValidation(allRuns),
+    handlerCampaignSummary: summarizeHandlerCampaigns(allRuns),
+    handlerLossCauses: summarizeHandlerLossCauses(allRuns),
+    handlerInvalidRecommendations: summarizeHandlerInvalidRecommendations(allRuns),
+    handlerConfidenceDistribution: summarizeHandlerConfidenceDistribution(allRuns),
+    handlerTrainingValidation: summarizeHandlerTrainingValidation(allRuns),
+    handlerOperatorDelta: summarizeHandlerOperatorDelta(campaignAgentSummaries),
   };
 }
 
@@ -1818,6 +1968,132 @@ export function formatBatchReport(report: HarnessBatchReport): string {
     );
   }
 
+  lines.push(
+    '',
+    'handler_validation_summary',
+    'agent,agentLabel,runs,wins,losses,incomplete,winRate,invalidRecommendations,softlocks,stalls',
+  );
+
+  for (const summary of report.handlerValidationSummary) {
+    lines.push(
+      [
+        summary.agentId,
+        csvCell(summary.agentLabel),
+        summary.runs,
+        summary.wins,
+        summary.losses,
+        summary.incomplete,
+        summary.winRate.toFixed(3),
+        summary.invalidRecommendations,
+        summary.softlocks,
+        summary.stalls,
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'handler_campaign_summary',
+    'campaignId,campaignName,runs,wins,losses,incomplete,winRate,invalidRecommendations,softlocks,stalls',
+  );
+
+  for (const summary of report.handlerCampaignSummary) {
+    lines.push(
+      [
+        summary.campaignId,
+        csvCell(summary.campaignName),
+        summary.runs,
+        summary.wins,
+        summary.losses,
+        summary.incomplete,
+        summary.winRate.toFixed(3),
+        summary.invalidRecommendations,
+        summary.softlocks,
+        summary.stalls,
+      ].join(','),
+    );
+  }
+
+  lines.push('', 'handler_loss_causes', 'agent,cause,count');
+
+  for (const loss of report.handlerLossCauses) {
+    lines.push([loss.agentId, loss.cause, loss.count].join(','));
+  }
+
+  lines.push(
+    '',
+    'handler_invalid_recommendations',
+    'agent,seed,campaignId,runMode,outcome,reason,invalidRecommendations',
+  );
+
+  for (const invalid of report.handlerInvalidRecommendations) {
+    lines.push(
+      [
+        invalid.agentId,
+        invalid.seed,
+        invalid.campaignId,
+        invalid.runMode,
+        invalid.outcome,
+        invalid.reason,
+        invalid.invalidRecommendations,
+      ].join(','),
+    );
+  }
+
+  lines.push('', 'handler_confidence_distribution', 'agent,confidence,count,share');
+
+  for (const confidence of report.handlerConfidenceDistribution) {
+    lines.push(
+      [
+        confidence.agentId,
+        confidence.confidence,
+        confidence.count,
+        confidence.share.toFixed(3),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'handler_training_validation',
+    'agent,runs,wins,losses,incomplete,invalidRecommendations,softlocks,stalls,passed',
+  );
+
+  for (const validation of report.handlerTrainingValidation) {
+    lines.push(
+      [
+        validation.agentId,
+        validation.runs,
+        validation.wins,
+        validation.losses,
+        validation.incomplete,
+        validation.invalidRecommendations,
+        validation.softlocks,
+        validation.stalls,
+        validation.passed,
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'handler_operator_delta',
+    'campaignId,campaignName,metric,handlerValue,operatorValue,delta',
+  );
+
+  for (const delta of report.handlerOperatorDelta) {
+    lines.push(
+      [
+        delta.campaignId,
+        csvCell(delta.campaignName),
+        delta.metric,
+        delta.handlerValue.toFixed(3),
+        delta.operatorValue.toFixed(3),
+        delta.delta.toFixed(3),
+      ].join(','),
+    );
+  }
+
   return lines.join('\n');
 }
 
@@ -1852,6 +2128,11 @@ export function getLegalEventChoiceOptions(state: GameState): LegalEventChoiceOp
   return selectLegalEventChoiceOptions(state);
 }
 
+type QueueAgentOrdersResult = {
+  state: GameState;
+  failureReason?: HarnessFailureReason;
+};
+
 function queueAgentOrders(
   state: GameState,
   agent: StrategyAgent,
@@ -1864,15 +2145,27 @@ function queueAgentOrders(
   factionStats: FactionRunStats,
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
-): GameState {
+  handlerStats: HandlerRunStats,
+): QueueAgentOrdersResult {
   let next = state;
 
   while (getCommandPointsRemaining(next) > 0) {
     const legalOptions = getLegalOrderOptions(next);
-    const decision = agent.chooseOrder(next, legalOptions, context);
+    const decision = getAgentOrderChoice(
+      next,
+      agent,
+      legalOptions,
+      context,
+      handlerStats,
+      trace,
+      collectTrace,
+    );
 
     if (!decision) {
-      return next;
+      return {
+        state: next,
+        failureReason: agent.id === 'handler' ? 'invalid_recommendation' : undefined,
+      };
     }
 
     const queued = queueOrder(next, {
@@ -1883,7 +2176,10 @@ function queueAgentOrders(
 
     if (!queued.ok) {
       appendTrace(trace, collectTrace, next, `Queue failed: ${queued.error}.`);
-      return next;
+      return {
+        state: next,
+        failureReason: agent.id === 'handler' ? 'invalid_recommendation' : undefined,
+      };
     }
 
     next = queued.state;
@@ -1897,7 +2193,98 @@ function queueAgentOrders(
     appendTrace(trace, collectTrace, next, `Queued order: ${decision.preview.label}.`);
   }
 
-  return next;
+  return { state: next };
+}
+
+function getAgentOrderChoice(
+  state: GameState,
+  agent: StrategyAgent,
+  legalOptions: readonly LegalOrderOption[],
+  context: AgentDecisionContext,
+  handlerStats: HandlerRunStats,
+  trace: HarnessTraceEntry[],
+  collectTrace: boolean | undefined,
+): LegalOrderOption | undefined {
+  if (agent.id !== 'handler') {
+    return agent.chooseOrder(state, legalOptions, context);
+  }
+
+  const decision = chooseHandlerOrder(state, legalOptions);
+  recordHandlerRecommendation(handlerStats, decision.recommendation.confidence);
+  handlerStats.invalidRecommendationCount += decision.invalidRecommendationCount;
+
+  if (decision.invalidRecommendationCount > 0 || !decision.order) {
+    const invalidReasons = decision.recommendation.invalidRecommendations
+      .map((invalid) => invalid.reason)
+      .join('; ');
+    appendTrace(
+      trace,
+      collectTrace,
+      state,
+      `Handler command recommendation could not be applied${
+        invalidReasons ? `: ${invalidReasons}` : '.'
+      }`,
+    );
+    return undefined;
+  }
+
+  return decision.order;
+}
+
+function getAgentEventChoice(
+  state: GameState,
+  agent: StrategyAgent,
+  legalOptions: readonly LegalEventChoiceOption[],
+  context: AgentDecisionContext,
+  handlerStats: HandlerRunStats,
+  trace: HarnessTraceEntry[],
+  collectTrace: boolean | undefined,
+): LegalEventChoiceOption | undefined {
+  if (agent.id !== 'handler') {
+    return agent.chooseEventChoice(state, legalOptions, context);
+  }
+
+  const decision = chooseHandlerEventChoice(state, legalOptions);
+  recordHandlerRecommendation(handlerStats, decision.recommendation.confidence);
+  handlerStats.invalidRecommendationCount += decision.invalidRecommendationCount;
+
+  if (decision.invalidRecommendationCount > 0 || !decision.eventChoice) {
+    const invalidReasons = decision.recommendation.invalidRecommendations
+      .map((invalid) => invalid.reason)
+      .join('; ');
+    appendTrace(
+      trace,
+      collectTrace,
+      state,
+      `Handler event recommendation could not be applied${
+        invalidReasons ? `: ${invalidReasons}` : '.'
+      }`,
+    );
+    return undefined;
+  }
+
+  return decision.eventChoice;
+}
+
+function createHandlerRunStats(): HandlerRunStats {
+  return {
+    invalidRecommendationCount: 0,
+    decisionCount: 0,
+    softlockCount: 0,
+    confidenceCounts: {
+      high: 0,
+      medium: 0,
+      low: 0,
+    },
+  };
+}
+
+function recordHandlerRecommendation(
+  handlerStats: HandlerRunStats,
+  confidence: AdvisorConfidence,
+): void {
+  handlerStats.decisionCount += 1;
+  handlerStats.confidenceCounts[confidence] += 1;
 }
 
 function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResult[]): AgentBatchSummary {
@@ -1911,7 +2298,7 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
   const actionUsage = createEmptyActionUsage();
   const targetReportsByKey = new Map<string, TargetReport>();
   const eventChoiceUsage: Record<string, number> = {};
-  const lossReasons: Partial<Record<GameOverReason | 'agent_stalled', number>> = {};
+  const lossReasons: Partial<Record<HarnessFailureReason, number>> = {};
   const rivalPressureTotals = createEmptyRivalPressureTotals();
   const districtTotals = createEmptyDistrictTotals();
   const contextualEvents = createEmptyContextualEventCounts();
@@ -2382,6 +2769,262 @@ function summarizeCampaignSystemUsage(
         compareCampaignIds(left.campaignId, right.campaignId) ||
         left.agentId.localeCompare(right.agentId),
     );
+}
+
+function summarizeHandlerValidation(
+  runs: readonly HarnessRunResult[],
+): HandlerValidationSummaryReport[] {
+  const handlerRuns = getHandlerRuns(runs);
+
+  if (handlerRuns.length === 0) {
+    return [];
+  }
+
+  const wins = handlerRuns.filter((run) => run.outcome === 'victory').length;
+  const losses = handlerRuns.filter((run) => run.outcome === 'loss').length;
+  const incomplete = handlerRuns.filter((run) => run.outcome === 'incomplete').length;
+
+  return [
+    {
+      agentId: 'handler',
+      agentLabel: handlerRuns[0]?.agentLabel ?? 'HandlerBot',
+      runs: handlerRuns.length,
+      wins,
+      losses,
+      incomplete,
+      winRate: handlerRuns.length > 0 ? wins / handlerRuns.length : 0,
+      invalidRecommendations: sumHandlerInvalidRecommendations(handlerRuns),
+      softlocks: countHandlerReason(handlerRuns, 'softlock'),
+      stalls: countHandlerReason(handlerRuns, 'agent_stalled'),
+    },
+  ];
+}
+
+function summarizeHandlerCampaigns(
+  runs: readonly HarnessRunResult[],
+): HandlerCampaignSummaryReport[] {
+  const reports = new Map<CampaignTensionId, HandlerCampaignSummaryReport>();
+
+  for (const run of getHandlerRuns(runs)) {
+    const campaignId = run.finalState.campaign.tensionId;
+    const current = reports.get(campaignId) ?? {
+      campaignId,
+      campaignName: getCampaignName(campaignId),
+      runs: 0,
+      wins: 0,
+      losses: 0,
+      incomplete: 0,
+      winRate: 0,
+      invalidRecommendations: 0,
+      softlocks: 0,
+      stalls: 0,
+    };
+    current.runs += 1;
+    current.wins += run.outcome === 'victory' ? 1 : 0;
+    current.losses += run.outcome === 'loss' ? 1 : 0;
+    current.incomplete += run.outcome === 'incomplete' ? 1 : 0;
+    current.invalidRecommendations += run.handlerStats?.invalidRecommendationCount ?? 0;
+    current.softlocks += run.reason === 'softlock' ? 1 : 0;
+    current.stalls += run.reason === 'agent_stalled' ? 1 : 0;
+    current.winRate = current.runs > 0 ? current.wins / current.runs : 0;
+    reports.set(campaignId, current);
+  }
+
+  return sortCampaignReports([...reports.values()]);
+}
+
+function summarizeHandlerLossCauses(
+  runs: readonly HarnessRunResult[],
+): HandlerLossCauseReport[] {
+  const grouped = new Map<HarnessFailureReason | 'none', HandlerLossCauseReport>();
+
+  for (const run of getHandlerRuns(runs)) {
+    if (!run.reason || run.outcome === 'victory') {
+      continue;
+    }
+
+    const current = grouped.get(run.reason) ?? {
+      agentId: run.agentId,
+      cause: run.reason,
+      count: 0,
+    };
+    current.count += 1;
+    grouped.set(run.reason, current);
+  }
+
+  if (getHandlerRuns(runs).length > 0 && grouped.size === 0) {
+    grouped.set('none', {
+      agentId: 'handler',
+      cause: 'none',
+      count: 0,
+    });
+  }
+
+  return [...grouped.values()].sort((left, right) => left.cause.localeCompare(right.cause));
+}
+
+function summarizeHandlerInvalidRecommendations(
+  runs: readonly HarnessRunResult[],
+): HandlerInvalidRecommendationReport[] {
+  return getHandlerRuns(runs)
+    .filter((run) => (run.handlerStats?.invalidRecommendationCount ?? 0) > 0)
+    .map((run) => {
+      const reason: HandlerInvalidRecommendationReport['reason'] = run.reason ?? 'none';
+
+      return {
+        agentId: run.agentId,
+        seed: run.seed,
+        campaignId: run.finalState.campaign.tensionId,
+        runMode: run.finalState.run.mode,
+        outcome: run.outcome,
+        reason,
+        invalidRecommendations: run.handlerStats?.invalidRecommendationCount ?? 0,
+      };
+    })
+    .sort(
+      (left, right) =>
+        compareCampaignIds(left.campaignId, right.campaignId) ||
+        left.seed.localeCompare(right.seed),
+    );
+}
+
+function summarizeHandlerConfidenceDistribution(
+  runs: readonly HarnessRunResult[],
+): HandlerConfidenceDistributionReport[] {
+  const totals: Record<AdvisorConfidence, number> = {
+    high: 0,
+    medium: 0,
+    low: 0,
+  };
+
+  for (const run of getHandlerRuns(runs)) {
+    for (const confidence of Object.keys(totals) as AdvisorConfidence[]) {
+      totals[confidence] += run.handlerStats?.confidenceCounts[confidence] ?? 0;
+    }
+  }
+
+  const totalDecisions = Object.values(totals).reduce((total, count) => total + count, 0);
+
+  return (Object.keys(totals) as AdvisorConfidence[]).map((confidence) => ({
+    agentId: 'handler',
+    confidence,
+    count: totals[confidence],
+    share: totalDecisions > 0 ? totals[confidence] / totalDecisions : 0,
+  }));
+}
+
+function summarizeHandlerTrainingValidation(
+  runs: readonly HarnessRunResult[],
+): HandlerTrainingValidationReport[] {
+  const trainingRuns = getHandlerRuns(runs).filter(
+    (run) => run.finalState.run.mode === 'training',
+  );
+
+  if (trainingRuns.length === 0) {
+    return [];
+  }
+
+  const wins = trainingRuns.filter((run) => run.outcome === 'victory').length;
+  const losses = trainingRuns.filter((run) => run.outcome === 'loss').length;
+  const incomplete = trainingRuns.filter((run) => run.outcome === 'incomplete').length;
+  const invalidRecommendations = sumHandlerInvalidRecommendations(trainingRuns);
+  const softlocks = countHandlerReason(trainingRuns, 'softlock');
+  const stalls = countHandlerReason(trainingRuns, 'agent_stalled');
+
+  return [
+    {
+      agentId: 'handler',
+      runs: trainingRuns.length,
+      wins,
+      losses,
+      incomplete,
+      invalidRecommendations,
+      softlocks,
+      stalls,
+      passed:
+        wins === trainingRuns.length &&
+        invalidRecommendations === 0 &&
+        softlocks === 0 &&
+        stalls === 0,
+    },
+  ];
+}
+
+function summarizeHandlerOperatorDelta(
+  campaignAgentSummaries: readonly CampaignAgentBatchSummary[],
+): HandlerOperatorDeltaReport[] {
+  const reports: HandlerOperatorDeltaReport[] = [];
+
+  for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
+    const handler = campaignAgentSummaries.find(
+      (summary) => summary.campaignId === campaign.id && summary.agentId === 'handler',
+    );
+    const operator = campaignAgentSummaries.find(
+      (summary) => summary.campaignId === campaign.id && summary.agentId === 'operator',
+    );
+
+    if (!handler || !operator) {
+      continue;
+    }
+
+    reports.push(
+      createHandlerOperatorDelta(campaign.id, 'winRate', handler.winRate, operator.winRate),
+      createHandlerOperatorDelta(
+        campaign.id,
+        'averageWeeksPlayed',
+        handler.averageWeeksPlayed,
+        operator.averageWeeksPlayed,
+      ),
+      createHandlerOperatorDelta(
+        campaign.id,
+        'averageDominion',
+        handler.averageFinalPressures.dominion,
+        operator.averageFinalPressures.dominion,
+      ),
+      createHandlerOperatorDelta(
+        campaign.id,
+        'averageHeat',
+        handler.averageFinalPressures.heat,
+        operator.averageFinalPressures.heat,
+      ),
+    );
+  }
+
+  return reports;
+}
+
+function createHandlerOperatorDelta(
+  campaignId: CampaignTensionId,
+  metric: HandlerOperatorDeltaReport['metric'],
+  handlerValue: number,
+  operatorValue: number,
+): HandlerOperatorDeltaReport {
+  return {
+    campaignId,
+    campaignName: getCampaignName(campaignId),
+    metric,
+    handlerValue,
+    operatorValue,
+    delta: handlerValue - operatorValue,
+  };
+}
+
+function getHandlerRuns(runs: readonly HarnessRunResult[]): HarnessRunResult[] {
+  return runs.filter((run) => run.agentId === 'handler');
+}
+
+function sumHandlerInvalidRecommendations(runs: readonly HarnessRunResult[]): number {
+  return runs.reduce(
+    (total, run) => total + (run.handlerStats?.invalidRecommendationCount ?? 0),
+    0,
+  );
+}
+
+function countHandlerReason(
+  runs: readonly HarnessRunResult[],
+  reason: HarnessFailureReason,
+): number {
+  return runs.filter((run) => run.reason === reason).length;
 }
 
 function addCampaignSummaryRun(

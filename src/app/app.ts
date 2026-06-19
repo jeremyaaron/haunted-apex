@@ -3,7 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   PRESSURE_IDS,
-  STRATEGY_AGENTS,
+  EXTENDED_STRATEGY_AGENTS,
   CAMPAIGN_TENSION_DEFINITIONS,
   formatBatchReport,
   generateRoster,
@@ -319,7 +319,7 @@ export class App {
 
   protected runHarnessBatch(): void {
     const report = simulateBatch({
-      agents: STRATEGY_AGENTS,
+      agents: EXTENDED_STRATEGY_AGENTS,
       runsPerAgent: 100,
       seedPrefix: `UI-${this.game.state().seed}`,
     });
