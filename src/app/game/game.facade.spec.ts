@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { getEventDefinition, newGame, USER_PREFERENCES_STORAGE_KEY } from '../engine';
+import {
+  getActionTargetKey,
+  getEventDefinition,
+  newGame,
+  USER_PREFERENCES_STORAGE_KEY,
+} from '../engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
@@ -106,6 +111,75 @@ describe('GameFacade', () => {
     facade.startTrainingRun();
 
     expect(facade.advisorMode()).toBe('handler');
+  });
+
+  it('exposes Handler recommendation highlights without auto-queueing orders', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startTrainingRun();
+    const before = facade.state();
+
+    const recommendations = facade.advisorView().recommendations;
+    const firstRecommendation = recommendations[0];
+
+    expect(recommendations.length).toBeGreaterThan(0);
+    expect(firstRecommendation.recommendedActionId).toBeDefined();
+    expect(
+      facade.isAdvisorRecommendedAction(firstRecommendation.recommendedActionId ?? 'gather_intel'),
+    ).toBeTrue();
+    expect(facade.state()).toBe(before);
+    expect(facade.state().queuedOrders).toEqual([]);
+    expect(facade.state().phase).toBe('COMMAND');
+
+    if (firstRecommendation.recommendedOperativeId) {
+      expect(facade.isAdvisorRecommendedOperative(firstRecommendation.recommendedOperativeId)).toBeTrue();
+    }
+
+    if (firstRecommendation.recommendedActionId && firstRecommendation.recommendedTargetKey) {
+      const matchingTarget = facade
+        .getTargetOptions(firstRecommendation.recommendedActionId)
+        .find((option) => getActionTargetKey(option.target) === firstRecommendation.recommendedTargetKey);
+
+      expect(matchingTarget).toBeDefined();
+      expect(facade.isAdvisorRecommendedTarget(matchingTarget?.target)).toBeTrue();
+    }
+  });
+
+  it('does not expose exact recommendation highlights outside Handler mode', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startStandardRun('ADVISOR-HIGHLIGHTS-COACH', 'campaign_dirty_capital');
+    const recommendation = facade.advisorView().recommendations[0];
+
+    expect(facade.advisorMode()).toBe('coach');
+    expect(recommendation.recommendedActionId).toBeUndefined();
+    expect(facade.advisorHighlights().actionIds.size).toBe(0);
+    expect(facade.isAdvisorRecommendedAction('gather_intel')).toBeFalse();
+  });
+
+  it('exposes Handler event-choice highlights without auto-resolving fallout', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startTrainingRun();
+    const queued = facade.queueOrder('gather_intel');
+
+    if (!queued.ok) {
+      fail(`Expected queued order, got ${queued.error}`);
+      return;
+    }
+
+    const advanced = facade.advanceWeek();
+
+    if (!advanced.ok) {
+      fail(`Expected advanced week, got ${advanced.error}`);
+      return;
+    }
+
+    const pendingEvent = facade.state().pendingEvent;
+    const recommendedChoiceId = facade.advisorView().recommendations[0]?.recommendedEventChoiceId;
+
+    expect(pendingEvent).toBeDefined();
+    expect(recommendedChoiceId).toBeDefined();
+    expect(facade.isAdvisorRecommendedEventChoice(recommendedChoiceId)).toBeTrue();
+    expect(facade.state().phase).toBe('EVENT_CHOICE');
+    expect(facade.state().pendingEvent).toEqual(pendingEvent);
   });
 
   it('loads a valid current run on construction', () => {

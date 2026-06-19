@@ -1259,7 +1259,50 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Updated `selectAdvisorViewModel` to consume Handler policy output in Handler mode.
+- Preserved mode filtering:
+  - Off returns empty guidance surfaces.
+  - Hints shows read/warnings/opportunities without exact picks.
+  - Coach shows strategic non-exact recommendations.
+  - Handler exposes exact recommended action, target, operative, and event-choice ids.
+- Converted Handler command and event recommendations into presentation-ready
+  `AdvisorRecommendationView` rows using existing Handler explanations and reason codes.
+- Added facade-level `advisorHighlights` computed state.
+- Added facade helpers:
+  - `isAdvisorRecommendedAction(actionId)`
+  - `isAdvisorRecommendedTarget(target)`
+  - `isAdvisorRecommendedOperative(operativeId)`
+  - `isAdvisorRecommendedEventChoice(choiceId)`
+- Confirmed recommendation reads do not auto-queue orders or auto-resolve fallout.
+- Added focused selector and facade specs for mode filtering, highlight ids, and no-auto-action
+  guarantees.
+
+Verification:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/advisor/advisor-view-model.spec.ts
+# 6 SUCCESS
+
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/game/game.facade.spec.ts
+# 24 SUCCESS
+
+npx tsc -p tsconfig.app.json --noEmit
+# pass
+
+npx tsc -p tsconfig.spec.json --noEmit
+# pass
+
+npm run check:docs
+# Documentation links verified for 9 release folders.
+
+npm run build
+# pass
+
+git diff --check
+# pass
+```
 
 ## Phase 11: Advisor Panel UI and Recommendation Highlights
 

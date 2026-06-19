@@ -11,6 +11,7 @@ import {
   getEventChoicePreview,
   getFrontDefinition,
   getFactionDefinition,
+  getActionTargetKey,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
@@ -68,6 +69,13 @@ import { GameStorageService, type LoadCurrentRunResult } from './game-storage.se
 export const SAVE_COMPATIBILITY_NOTICE =
   'Detected an older save. v0.9.0 - The Handler changes the game state schema and requires a fresh run.';
 
+export type AdvisorHighlightSelectors = {
+  actionIds: ReadonlySet<ActionId>;
+  targetKeys: ReadonlySet<string>;
+  operativeIds: ReadonlySet<OperativeId>;
+  eventChoiceIds: ReadonlySet<string>;
+};
+
 @Injectable({
   providedIn: 'root',
 })
@@ -91,6 +99,9 @@ export class GameFacade {
   readonly advisorMode = this.advisorModeSignal.asReadonly();
   readonly advisorView = computed<AdvisorViewModel>(() =>
     selectAdvisorViewModel(this.stateSignal(), this.advisorModeSignal()),
+  );
+  readonly advisorHighlights = computed<AdvisorHighlightSelectors>(() =>
+    selectAdvisorHighlights(this.advisorView()),
   );
   readonly compatibilityNotice = signal<string | undefined>(
     requiresCompatibilityNotice(this.initialLoadResult) ? SAVE_COMPATIBILITY_NOTICE : undefined,
@@ -239,6 +250,22 @@ export class GameFacade {
     this.advisorModeSignal.set(mode);
     this.userPreferencesSignal.set(preferences);
     saveUserPreferences(preferences);
+  }
+
+  isAdvisorRecommendedAction(actionId: ActionId): boolean {
+    return this.advisorHighlights().actionIds.has(actionId);
+  }
+
+  isAdvisorRecommendedTarget(target: ActionTarget | undefined): boolean {
+    return target ? this.advisorHighlights().targetKeys.has(getActionTargetKey(target)) : false;
+  }
+
+  isAdvisorRecommendedOperative(operativeId: OperativeId | undefined): boolean {
+    return operativeId ? this.advisorHighlights().operativeIds.has(operativeId) : false;
+  }
+
+  isAdvisorRecommendedEventChoice(choiceId: string | undefined): boolean {
+    return choiceId ? this.advisorHighlights().eventChoiceIds.has(choiceId) : false;
   }
 
   dismissCampaignBriefing(): void {
@@ -405,4 +432,34 @@ function renderPendingEventText(state: GameState, text: string): string {
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {
   return result.status === 'incompatible' || result.status === 'invalid';
+}
+
+function selectAdvisorHighlights(view: AdvisorViewModel): AdvisorHighlightSelectors {
+  return view.recommendations.reduce(
+    (highlights, recommendation) => {
+      if (recommendation.recommendedActionId) {
+        highlights.actionIds.add(recommendation.recommendedActionId);
+      }
+
+      if (recommendation.recommendedTargetKey) {
+        highlights.targetKeys.add(recommendation.recommendedTargetKey);
+      }
+
+      if (recommendation.recommendedOperativeId) {
+        highlights.operativeIds.add(recommendation.recommendedOperativeId);
+      }
+
+      if (recommendation.recommendedEventChoiceId) {
+        highlights.eventChoiceIds.add(recommendation.recommendedEventChoiceId);
+      }
+
+      return highlights;
+    },
+    {
+      actionIds: new Set<ActionId>(),
+      targetKeys: new Set<string>(),
+      operativeIds: new Set<OperativeId>(),
+      eventChoiceIds: new Set<string>(),
+    },
+  );
 }

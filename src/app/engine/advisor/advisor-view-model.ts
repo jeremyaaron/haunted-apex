@@ -1,11 +1,15 @@
 import { DISTRICT_ZERO_SOFT_WARNINGS } from '../content';
 import type { GameState, Pressures } from '../model';
 import { selectDominionPace } from './dominion-pace';
+import { getActionTargetKey } from './legal-options';
+import { selectHandlerRecommendation } from './handler-recommendations';
 import type {
   AdvisorConfidence,
   AdvisorMessage,
   AdvisorMode,
   AdvisorRecommendationView,
+  HandlerRecommendation,
+  HandlerRecommendedOrder,
   AdvisorViewModel,
   HandlerRecommendationPhase,
 } from './advisor-types';
@@ -26,12 +30,27 @@ export function selectAdvisorViewModel(state: GameState, mode: AdvisorMode): Adv
         ]
       : [];
   const opportunities = selectOpportunityMessages(state);
-  const currentRead = mode === 'off' ? [] : selectCurrentRead(state, dominionPace.summary);
-  const warnings = mode === 'off' ? [] : [...pressureWarnings, ...paceWarnings];
-  const recommendations =
-    mode === 'coach' || mode === 'handler'
-      ? selectStrategicRecommendations(state, warnings, dominionPace.status)
-      : [];
+  const handlerRecommendation =
+    mode === 'handler' ? selectHandlerRecommendation(state) : undefined;
+  const currentRead =
+    mode === 'off'
+      ? []
+      : mode === 'handler' && handlerRecommendation
+        ? handlerRecommendation.currentRead
+        : selectCurrentRead(state, dominionPace.summary);
+  const warnings =
+    mode === 'off'
+      ? []
+      : mode === 'handler' && handlerRecommendation
+        ? handlerRecommendation.warnings
+        : [...pressureWarnings, ...paceWarnings];
+  const recommendations = selectModeRecommendations(
+    state,
+    mode,
+    warnings,
+    dominionPace.status,
+    handlerRecommendation,
+  );
 
   return {
     mode,
@@ -44,8 +63,16 @@ export function selectAdvisorViewModel(state: GameState, mode: AdvisorMode): Adv
     currentRead,
     recommendations,
     warnings,
-    opportunities: mode === 'off' ? [] : opportunities,
-    confidence: getAdvisorConfidence(warnings),
+    opportunities:
+      mode === 'off'
+        ? []
+        : mode === 'handler' && handlerRecommendation
+          ? handlerRecommendation.opportunities
+          : opportunities,
+    confidence:
+      mode === 'handler' && handlerRecommendation
+        ? handlerRecommendation.confidence
+        : getAdvisorConfidence(warnings),
   };
 }
 
@@ -252,6 +279,70 @@ function selectStrategicRecommendations(
       confidence: 'medium',
     },
   ];
+}
+
+function selectModeRecommendations(
+  state: GameState,
+  mode: AdvisorMode,
+  warnings: readonly AdvisorMessage[],
+  paceStatus: string,
+  handlerRecommendation: HandlerRecommendation | undefined,
+): AdvisorRecommendationView[] {
+  if (mode === 'off' || mode === 'hints') {
+    return [];
+  }
+
+  if (mode === 'coach') {
+    return selectStrategicRecommendations(state, warnings, paceStatus);
+  }
+
+  return handlerRecommendation ? selectHandlerRecommendationViews(handlerRecommendation) : [];
+}
+
+function selectHandlerRecommendationViews(
+  recommendation: HandlerRecommendation,
+): AdvisorRecommendationView[] {
+  if (recommendation.eventRecommendation) {
+    return [
+      {
+        id: `handler-event-${recommendation.eventRecommendation.choiceId}`,
+        title: recommendation.eventRecommendation.choiceLabel,
+        subtitle: 'Recommended fallout response',
+        body: recommendation.eventRecommendation.reason,
+        chips: recommendation.eventRecommendation.reasonCodes.map(formatReasonCode),
+        confidence: recommendation.eventRecommendation.confidence,
+        recommendedEventChoiceId: recommendation.eventRecommendation.choiceId,
+      },
+    ];
+  }
+
+  return recommendation.recommendedOrders.map(toHandlerOrderView);
+}
+
+function toHandlerOrderView(
+  order: HandlerRecommendedOrder,
+  index: number,
+): AdvisorRecommendationView {
+  return {
+    id: `handler-order-${index + 1}-${order.actionId}`,
+    title: order.actionLabel,
+    ...(order.targetLabel || order.operativeName
+      ? { subtitle: [order.targetLabel, order.operativeName].filter(Boolean).join(' / ') }
+      : {}),
+    body: order.reason,
+    chips: order.reasonCodes.map(formatReasonCode),
+    confidence: order.confidence,
+    recommendedActionId: order.actionId,
+    ...(order.target ? { recommendedTargetKey: getActionTargetKey(order.target) } : {}),
+    ...(order.assignedOperativeId ? { recommendedOperativeId: order.assignedOperativeId } : {}),
+  };
+}
+
+function formatReasonCode(reasonCode: string): string {
+  return reasonCode
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 function getAdvisorConfidence(warnings: readonly AdvisorMessage[]): AdvisorConfidence {
