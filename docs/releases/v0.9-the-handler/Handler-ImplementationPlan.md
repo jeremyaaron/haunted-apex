@@ -1364,7 +1364,55 @@ Highlights render but do not take action.
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Added an always-visible Advisor mode selector to the status strip.
+- Added the Advisor panel above the Command Board content.
+- Rendered:
+  - Current Read,
+  - Dominion Pace,
+  - recommendations/advice,
+  - warnings,
+  - openings.
+- Preserved mode behavior:
+  - Off hides the Advisor panel while keeping the selector available.
+  - Hints/Coach do not show exact picks.
+  - Handler shows exact Handler recommendations and "Handler Pick" markers.
+- Added visual recommendation highlights for:
+  - action cards,
+  - target dropdown options,
+  - operative assignment dropdown options,
+  - event choice cards.
+- Added risky queued-order warning chips above queued orders.
+- Added focused `app-advisor.spec.ts` coverage for mode rendering, Handler Pick highlights, and
+  no-auto-action guarantees.
+
+Verification:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/app-advisor.spec.ts
+# 3 SUCCESS
+
+npx tsc -p tsconfig.app.json --noEmit
+# pass
+
+npx tsc -p tsconfig.spec.json --noEmit
+# pass
+
+npm run check:docs
+# Documentation links verified for 9 release folders.
+
+npm run build
+# pass
+
+git diff --check
+# pass
+```
+
+The full legacy `app.spec.ts` run was attempted twice and disconnected via ChromeHeadless ping
+timeout after dozens of successful specs, with no assertion failure reported before disconnect.
+The Phase 11 UI assertions were moved into the focused Advisor UI spec above for reliable
+verification.
 
 ## Phase 12: How To Play, Training Controls, and Run Labels
 

@@ -118,6 +118,18 @@
     <span>{{ game.campaignHeader().tensionName }}</span>
     <span>Dominion target {{ debugView().dominionTarget }}</span>
     <span>Seed {{ game.state().seed }}</span>
+    <label class="advisor-mode-control">
+      <span>Advisor</span>
+      <select
+        [ngModel]="game.advisorMode()"
+        (ngModelChange)="setAdvisorMode($event)"
+        aria-label="Advisor mode"
+      >
+        @for (option of advisorModeOptions; track option.id) {
+          <option [value]="option.id">{{ option.label }}</option>
+        }
+      </select>
+    </label>
     @if (game.state().gameOver; as gameOver) {
       <span class="danger">{{ gameOver.result }}: {{ gameOver.reason }}</span>
     }
@@ -161,6 +173,86 @@
         <h2>Available Actions</h2>
       </div>
 
+      @if (game.advisorMode() !== 'off') {
+        @let advisor = game.advisorView();
+        <section class="advisor-panel" [class]="'advisor-panel mode-' + advisor.mode">
+          <div class="advisor-panel-header">
+            <div>
+              <p class="panel-label">{{ advisor.title }}</p>
+              <h3>{{ advisor.summary }}</h3>
+            </div>
+            <div class="advisor-meta">
+              <span>{{ displayToken(advisor.runMode) }}</span>
+              <span>{{ displayToken(advisor.validationStatus) }}</span>
+              <span [class]="'confidence-' + advisor.confidence">
+                {{ displayToken(advisor.confidence) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="advisor-pace">
+            <span>Dominion Pace</span>
+            <strong>{{ advisor.dominionPace.summary }}</strong>
+          </div>
+
+          <div class="advisor-grid">
+            <div class="advisor-column">
+              <h4>Current Read</h4>
+              @for (message of advisor.currentRead; track message.id) {
+                <p class="advisor-message" [class]="advisorMessageClass(message)">
+                  {{ message.text }}
+                </p>
+              }
+            </div>
+
+            <div class="advisor-column advisor-recommendations">
+              <h4>{{ advisor.mode === 'handler' ? 'Recommendation' : 'Advice' }}</h4>
+              @for (recommendation of advisor.recommendations; track recommendation.id) {
+                <article class="advisor-recommendation">
+                  <div>
+                    <strong>{{ recommendation.title }}</strong>
+                    @if (recommendation.subtitle) {
+                      <span>{{ recommendation.subtitle }}</span>
+                    }
+                  </div>
+                  <p>{{ recommendation.body }}</p>
+                  <div class="advisor-chip-list">
+                    @if (advisor.mode === 'handler') {
+                      <span class="handler-pick-chip">Handler Pick</span>
+                    }
+                    @for (chip of recommendation.chips; track chip) {
+                      <span>{{ chip }}</span>
+                    }
+                  </div>
+                </article>
+              } @empty {
+                <p class="muted">No exact recommendation in this mode.</p>
+              }
+            </div>
+
+            <div class="advisor-column">
+              <h4>Warnings</h4>
+              @for (warning of advisor.warnings; track warning.id) {
+                <p class="advisor-message" [class]="advisorMessageClass(warning)">
+                  {{ warning.text }}
+                </p>
+              } @empty {
+                <p class="muted">No active warnings.</p>
+              }
+
+              @if (advisor.opportunities.length > 0) {
+                <h4>Openings</h4>
+                @for (opportunity of advisor.opportunities; track opportunity.id) {
+                  <p class="advisor-message" [class]="advisorMessageClass(opportunity)">
+                    {{ opportunity.text }}
+                  </p>
+                }
+              }
+            </div>
+          </div>
+        </section>
+      }
+
       @if (game.state().phase === 'COMMAND') {
         <div class="action-grid">
           @for (action of actionViews(); track action.actionId) {
@@ -168,9 +260,13 @@
               class="action-card"
               [class.queued]="action.state === 'queued'"
               [class.unavailable]="action.state === 'unavailable'"
+              [class.handler-pick]="isActionRecommended(action.actionId)"
             >
               <div class="card-topline">
                 <h3>{{ action.label }}</h3>
+                @if (isActionRecommended(action.actionId)) {
+                  <span class="handler-pick-chip">Handler Pick</span>
+                }
                 <span
                   class="risk"
                   [class.high-risk]="action.riskLabel === 'High' || action.riskLabel === 'Severe'"
@@ -226,6 +322,7 @@
                       <option
                         [value]="targetOptionValue(option)"
                         [disabled]="targetOptionDisabled(option)"
+                        [class.handler-option]="isTargetRecommended(option)"
                       >
                         {{ targetOptionLabel(option) }}
                       </option>
@@ -247,8 +344,12 @@
                   >
                     <option value="">No operative</option>
                     @for (operative of action.availableOperatives; track operative.id) {
-                      <option [value]="operative.id" [disabled]="operative.disabled">
-                        {{ operative.name }} · {{ displayToken(operative.stressTier) }}
+                      <option
+                        [value]="operative.id"
+                        [disabled]="operative.disabled"
+                        [class.handler-option]="isOperativeRecommended(operative.id)"
+                      >
+                        {{ operativeOptionLabel(operative) }}
                       </option>
                     }
                   </select>
@@ -635,10 +736,16 @@
                 <button
                   type="button"
                   class="choice-card"
+                  [class.handler-pick]="isEventChoiceRecommended(choice.id)"
                   [disabled]="!canChoose(choice.id)"
                   (click)="chooseEvent(choice.id)"
                 >
-                  <span>{{ choice.label }}</span>
+                  <span>
+                    {{ choice.label }}
+                    @if (isEventChoiceRecommended(choice.id)) {
+                      <b class="handler-pick-chip">Handler Pick</b>
+                    }
+                  </span>
                   <small class="choice-meta">Cost: {{ formatCost(choice.cost) }}</small>
                   <small class="choice-effects">
                     @for (delta of deltaRows(choice.effects); track delta.id) {
@@ -849,6 +956,14 @@
         <div class="panel-heading compact">
           <p class="panel-label">Queued Orders</p>
         </div>
+
+        @if (queuedOrderWarnings().length > 0) {
+          <div class="queued-warning-list">
+            @for (warning of queuedOrderWarnings(); track warning.id) {
+              <span [class]="advisorMessageClass(warning)">{{ warning.text }}</span>
+            }
+          </div>
+        }
 
         @if (game.queuedOrders().length > 0) {
           @for (order of game.queuedOrders(); track order.id) {
