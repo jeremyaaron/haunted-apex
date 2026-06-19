@@ -823,12 +823,90 @@ run-validation.ts
 ```bash
 npm test -- --watch=false --browsers=ChromeHeadless
 npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+npm run check:docs
 git diff --check
 ```
 
 ### Completion Record
 
-Pending.
+Completed June 18, 2026:
+
+- Added the Handler event-choice policy module:
+
+```text
+src/app/engine/advisor/handler-event-policy.ts
+```
+
+- Added the Handler validation and decision-trace helper module:
+
+```text
+src/app/engine/advisor/run-validation.ts
+```
+
+- Extended advisor types with:
+  - `HandlerDecisionTraceEntry`,
+  - `HandlerValidationStatus`,
+  - `HandlerValidationResult`.
+- Exported event policy and validation helpers through the advisor barrel.
+- Updated `selectHandlerRecommendation` so it routes to command policy during Command phase and
+  event policy during Event Choice phase.
+- Preserved the previous command-options call shape while adding explicit command/event option
+  inputs for later harness integration.
+- Implemented event-choice plan generation by resolving each legal current event choice through the
+  existing pure event simulation path.
+- Implemented event scoring for:
+  - immediate losing projections,
+  - Dominion pace when the board is stable,
+  - Heat, Loyalty, and Resources red-zone relief,
+  - event affordability through existing legal-option filtering,
+  - Ledger debt/favor/secret creation and resolution,
+  - Contact Trust, Volatility, Leverage, and Exposure movement,
+  - Front Exposure and compromised/active state movement,
+  - Faction Standing, Suspicion, and Obligation movement,
+  - preservation or creation of future Ledger recovery tools,
+  - campaign tension priorities.
+- Added event recommendation reasons, reason codes, confidence, warnings, opportunities, and
+  stable event-choice highlighting.
+- Added compact decision trace creation from Handler recommendations.
+- Added validation result summary creation for later harness gates.
+- Added unit coverage for:
+  - legal and explainable event recommendations,
+  - non-mutating event recommendation generation,
+  - one plan per legal event choice,
+  - immediate loss-prevention priority,
+  - public Handler selector event routing,
+  - event decision trace entries,
+  - validation result summaries.
+- Current test count is `621` specs.
+- Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm run build
+npm run build -- --configuration production --base-href /haunted-apex/
+```
+
+- After a final validation-result cleanup, the touched advisor specs also passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/advisor/handler-event-policy.spec.ts --include=src/app/engine/advisor/handler-policy.spec.ts
+```
+
+- Two later full-suite reruns hit ChromeHeadless ping-timeout disconnects at `352/621` and
+  `529/621` with no spec assertion failures before disconnect.
+
+- Production build size after Phase 6:
+
+```text
+main:      643.99 kB raw, 143.17 kB estimated transfer
+polyfills:  34.59 kB raw,  11.33 kB estimated transfer
+initial:   678.73 kB raw, 154.67 kB estimated transfer
+```
 
 ## Phase 7: Partial Queue Assessment
 

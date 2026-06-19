@@ -1,8 +1,11 @@
 import type {
   ActionId,
   ActionTarget,
+  CampaignTensionId,
   EventId,
+  GameOverReason,
   OperativeId,
+  Pressures,
   RunMode,
   RunValidationStatus,
 } from '../model';
@@ -88,6 +91,30 @@ export type HandlerEventRecommendation = {
   reason: string;
   reasonCodes: HandlerReasonCode[];
   warnings: AdvisorMessage[];
+};
+
+export type HandlerDecisionTraceEntry = {
+  week: number;
+  phase: HandlerRecommendationPhase;
+  recommendationSummary: string;
+  chosenOrders?: HandlerRecommendedOrder[];
+  chosenEventChoiceId?: string;
+  reason: string;
+  warnings: string[];
+};
+
+export type HandlerValidationStatus = 'handler_win' | 'handler_loss' | 'invalid_state';
+
+export type HandlerValidationResult = {
+  status: HandlerValidationStatus;
+  seed: string;
+  campaignTensionId: CampaignTensionId;
+  runMode: RunMode;
+  resultWeek?: number;
+  finalPressures?: Pressures;
+  lossCause?: GameOverReason | 'agent_stalled' | 'invalid_recommendation';
+  invalidRecommendationCount: number;
+  decisionTrace: HandlerDecisionTraceEntry[];
 };
 
 export type HandlerInvalidRecommendation = {
