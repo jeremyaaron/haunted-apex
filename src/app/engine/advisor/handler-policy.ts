@@ -194,6 +194,7 @@ function scoreProjectedPressures(state: GameState, projected: Pressures): number
   const loyaltyDelta = projected.loyalty - state.pressures.loyalty;
   const ruinDelta = projected.ruin - state.pressures.ruin;
   const immediateLossPenalty = isLosingProjection(projected) ? -100_000 : 0;
+  const nearTermLossPenalty = scoreNearTermLossRisk(state, projected);
   const victoryBonus = projected.dominion >= rules.dominionTarget ? 25_000 : 0;
   const paceMultiplier = dominionNeeded > 45 || state.week >= 5 ? 26 : 18;
   const heatSafety = safetyBandScore(projected.heat, 58, 76, 92, true) * 2.2;
@@ -202,6 +203,7 @@ function scoreProjectedPressures(state: GameState, projected: Pressures): number
 
   return (
     immediateLossPenalty +
+    nearTermLossPenalty +
     victoryBonus +
     dominionGain * paceMultiplier +
     Math.min(projected.intel, 70) * 0.7 +
@@ -214,6 +216,46 @@ function scoreProjectedPressures(state: GameState, projected: Pressures): number
     (heatDelta < 0 ? Math.abs(heatDelta) * 8 : heatDelta * -7) +
     ruinDelta * -4
   );
+}
+
+function scoreNearTermLossRisk(state: GameState, projected: Pressures): number {
+  const rules = getRunRules(state);
+  const finishingLine = projected.dominion >= rules.dominionTarget;
+  const lateLine = state.week >= Math.max(1, state.maxWeeks - 2);
+  const pressure = finishingLine || lateLine ? 1.15 : 1;
+  let penalty = 0;
+
+  if (finishingLine && projected.heat >= 88) {
+    penalty -= 36_000 * pressure;
+  } else if (finishingLine && projected.heat >= 84) {
+    penalty -= 14_000 * pressure;
+  } else if (projected.heat >= 96) {
+    penalty -= 36_000 * pressure;
+  } else if (projected.heat >= 92) {
+    penalty -= 14_000 * pressure;
+  } else if (projected.heat >= 88) {
+    penalty -= 4_000;
+  }
+
+  if (finishingLine && projected.resources < 1800) {
+    penalty -= 36_000 * pressure;
+  } else if (finishingLine && projected.resources < 2400) {
+    penalty -= 14_000 * pressure;
+  } else if (projected.resources < 700) {
+    penalty -= 36_000 * pressure;
+  } else if (projected.resources < 1200) {
+    penalty -= 14_000 * pressure;
+  } else if (projected.resources < 1800) {
+    penalty -= 4_000;
+  }
+
+  if (projected.loyalty <= 8) {
+    penalty -= 36_000 * pressure;
+  } else if (projected.loyalty <= 16) {
+    penalty -= 14_000 * pressure;
+  }
+
+  return penalty;
 }
 
 function scoreOrders(state: GameState, orders: readonly LegalOrderOption[]): number {

@@ -2,21 +2,33 @@ import { CAMPAIGN_TENSION_DEFINITIONS } from '../content';
 import type {
   CampaignTensionId,
   GameOverReason,
+  GameState,
   Pressures,
   RunMode,
 } from '../model';
 import {
+  chooseHandlerEventChoice,
+  chooseHandlerOrder,
+  type HandlerAgentEventDecision,
+  type HandlerAgentOrderDecision,
+} from './agents';
+import {
+  selectLegalEventChoiceOptions,
+  selectLegalOrderOptions,
   STANDARD_VALIDATION_SEEDS,
   STANDARD_VALIDATION_SEEDS_PER_CAMPAIGN,
   STANDARD_VALIDATION_TOTAL_RUNS,
 } from '../advisor';
 import type { HandlerValidationResult, HandlerValidationStatus } from '../advisor';
-import { TRAINING_RUN_CONFIG } from '../simulation';
-import { HANDLER_BOT } from './agents';
 import {
-  simulateRun,
-  type HarnessRunResult,
-} from './simulation-harness';
+  advanceWeek,
+  newGame,
+  queueOrder,
+  resolveEventChoice,
+  TRAINING_RUN_CONFIG,
+} from '../simulation';
+import { getCommandPointsRemaining } from '../selectors';
+import type { HarnessFailureReason, HarnessTraceEntry } from './simulation-harness';
 
 export type HandlerValidationKind = 'training' | 'standard';
 
@@ -26,7 +38,7 @@ export type HandlerValidationFailure = {
   campaignTensionId: CampaignTensionId;
   runMode: RunMode;
   status: HandlerValidationStatus;
-  outcome: HarnessRunResult['outcome'];
+  outcome: HandlerValidationRunResult['outcome'];
   lossCause: HandlerValidationLossCause;
   invalidRecommendationCount: number;
   finalPressures: Pressures;
@@ -73,6 +85,34 @@ export type HandlerTrainingValidationOptions = {
   collectFailureTrace?: boolean;
 };
 
+type HandlerValidationRunOptions = {
+  seed: string;
+  campaignTensionId?: CampaignTensionId;
+  runMode?: RunMode;
+  collectTrace?: boolean;
+};
+
+type HandlerValidationRunStats = {
+  invalidRecommendationCount: number;
+  decisionCount: number;
+  softlockCount: number;
+  confidenceCounts: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+};
+
+type HandlerValidationRunResult = {
+  seed: string;
+  finalState: GameState;
+  outcome: 'victory' | 'loss' | 'incomplete';
+  reason?: HarnessFailureReason;
+  weeksPlayed: number;
+  handlerStats?: HandlerValidationRunStats;
+  trace: HarnessTraceEntry[];
+};
+
 export function runHandlerValidationGate(
   options: HandlerStandardValidationOptions & HandlerTrainingValidationOptions = {},
 ): HandlerValidationGateReport {
@@ -90,8 +130,7 @@ export function runHandlerValidationGate(
 export function runHandlerTrainingValidation(
   options: HandlerTrainingValidationOptions = {},
 ): HandlerValidationReport {
-  const run = simulateRun({
-    agent: HANDLER_BOT,
+  const run = simulateHandlerValidationRun({
     seed: TRAINING_RUN_CONFIG.seed,
     campaignTensionId: TRAINING_RUN_CONFIG.campaignTensionId,
     runMode: TRAINING_RUN_CONFIG.runMode,
@@ -105,13 +144,12 @@ export function runHandlerStandardValidation(
   options: HandlerStandardValidationOptions = {},
 ): HandlerValidationReport {
   const seedSet = options.seedSet ?? STANDARD_VALIDATION_SEEDS;
-  const runs: HarnessRunResult[] = [];
+  const runs: HandlerValidationRunResult[] = [];
 
   for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
     for (const seed of seedSet[campaign.id] ?? []) {
       runs.push(
-        simulateRun({
-          agent: HANDLER_BOT,
+        simulateHandlerValidationRun({
           seed,
           campaignTensionId: campaign.id,
           runMode: 'standard',
@@ -131,7 +169,7 @@ export function runHandlerStandardValidation(
 export function summarizeHandlerValidationRuns(
   kind: HandlerValidationKind,
   expectedRuns: number,
-  runs: readonly HarnessRunResult[],
+  runs: readonly HandlerValidationRunResult[],
 ): HandlerValidationReport {
   const results = runs.map(createHandlerValidationResultFromRun);
   const failures = runs.flatMap((run, index) =>
@@ -297,7 +335,7 @@ export type HandlerSeedSetCampaignValidation = {
 };
 
 function createHandlerValidationResultFromRun(
-  run: HarnessRunResult,
+  run: HandlerValidationRunResult,
 ): HandlerValidationResult {
   const invalidRecommendationCount = run.handlerStats?.invalidRecommendationCount ?? 0;
   const lossCause = selectValidationLossCause(run, invalidRecommendationCount);
@@ -317,7 +355,7 @@ function createHandlerValidationResultFromRun(
 
 function createHandlerValidationFailure(
   kind: HandlerValidationKind,
-  run: HarnessRunResult,
+  run: HandlerValidationRunResult,
   result: HandlerValidationResult,
 ): HandlerValidationFailure {
   const lossCause = result.lossCause ?? 'handler_loss';
@@ -338,7 +376,7 @@ function createHandlerValidationFailure(
 }
 
 function selectValidationStatus(
-  run: HarnessRunResult,
+  run: HandlerValidationRunResult,
   invalidRecommendationCount: number,
 ): HandlerValidationStatus {
   if (invalidRecommendationCount > 0 || run.reason === 'invalid_recommendation') {
@@ -349,7 +387,7 @@ function selectValidationStatus(
 }
 
 function selectValidationLossCause(
-  run: HarnessRunResult,
+  run: HandlerValidationRunResult,
   invalidRecommendationCount: number,
 ): HandlerValidationResult['lossCause'] | 'none' {
   if (invalidRecommendationCount > 0 || run.reason === 'invalid_recommendation') {
@@ -365,6 +403,254 @@ function selectValidationLossCause(
   }
 
   return 'softlock';
+}
+
+const MAX_HANDLER_VALIDATION_STEPS = 64;
+
+function simulateHandlerValidationRun(
+  options: HandlerValidationRunOptions,
+): HandlerValidationRunResult {
+  let state = newGame({
+    seed: options.seed,
+    campaignTensionId: options.campaignTensionId,
+    runMode: options.runMode,
+  });
+  const handlerStats = createHandlerValidationRunStats();
+  const trace: HarnessTraceEntry[] = [];
+  let stalled = false;
+  let failureReason: HarnessFailureReason | undefined;
+
+  for (
+    let step = 0;
+    step < MAX_HANDLER_VALIDATION_STEPS && !state.gameOver && !stalled;
+    step += 1
+  ) {
+    if (state.phase === 'COMMAND') {
+      const queued = queueHandlerValidationOrders(
+        state,
+        handlerStats,
+        trace,
+        options.collectTrace,
+      );
+      state = queued.state;
+
+      if (queued.failureReason) {
+        stalled = true;
+        failureReason = queued.failureReason;
+        break;
+      }
+
+      if (state.queuedOrders.length === 0) {
+        stalled = true;
+        failureReason = 'agent_stalled';
+        appendValidationTrace(
+          trace,
+          options.collectTrace,
+          state,
+          'Handler stalled with no queued orders.',
+        );
+        break;
+      }
+
+      const advanced = advanceWeek(state);
+
+      if (!advanced.ok) {
+        stalled = true;
+        failureReason = 'agent_stalled';
+        appendValidationTrace(
+          trace,
+          options.collectTrace,
+          state,
+          `Advance failed: ${advanced.error}.`,
+        );
+        break;
+      }
+
+      state = advanced.state;
+      appendValidationTrace(trace, options.collectTrace, state, 'Advanced week.');
+    }
+
+    if (state.phase === 'EVENT_CHOICE') {
+      const legalOptions = selectLegalEventChoiceOptions(state);
+      const decision = chooseHandlerEventChoice(state, legalOptions);
+      recordHandlerValidationRecommendation(handlerStats, decision);
+
+      if (decision.invalidRecommendationCount > 0 || !decision.eventChoice) {
+        stalled = true;
+        failureReason = 'invalid_recommendation';
+        appendValidationTrace(
+          trace,
+          options.collectTrace,
+          state,
+          createInvalidEventTraceMessage(decision),
+        );
+        break;
+      }
+
+      const resolved = resolveEventChoice(
+        state,
+        decision.eventChoice.eventId,
+        decision.eventChoice.choice.id,
+      );
+
+      if (!resolved.ok) {
+        stalled = true;
+        failureReason = 'invalid_recommendation';
+        appendValidationTrace(
+          trace,
+          options.collectTrace,
+          state,
+          `Event choice failed: ${resolved.error}.`,
+        );
+        break;
+      }
+
+      state = resolved.state;
+      appendValidationTrace(
+        trace,
+        options.collectTrace,
+        state,
+        `Chose event option: ${decision.eventChoice.choice.label}.`,
+      );
+    }
+  }
+
+  if (!state.gameOver && !failureReason && !stalled) {
+    failureReason = 'softlock';
+    handlerStats.softlockCount += 1;
+    appendValidationTrace(
+      trace,
+      options.collectTrace,
+      state,
+      'Handler validation reached max steps without terminal state.',
+    );
+  }
+
+  return {
+    seed: state.seed,
+    finalState: state,
+    outcome: state.gameOver?.result ?? 'incomplete',
+    reason: state.gameOver?.reason ?? failureReason,
+    weeksPlayed: state.week,
+    handlerStats,
+    trace,
+  };
+}
+
+type QueueHandlerValidationOrdersResult = {
+  state: GameState;
+  failureReason?: HarnessFailureReason;
+};
+
+function queueHandlerValidationOrders(
+  state: GameState,
+  handlerStats: HandlerValidationRunStats,
+  trace: HarnessTraceEntry[],
+  collectTrace: boolean | undefined,
+): QueueHandlerValidationOrdersResult {
+  let next = state;
+
+  while (getCommandPointsRemaining(next) > 0) {
+    const legalOptions = selectLegalOrderOptions(next);
+    const decision = chooseHandlerOrder(next, legalOptions);
+    recordHandlerValidationRecommendation(handlerStats, decision);
+
+    if (decision.invalidRecommendationCount > 0 || !decision.order) {
+      appendValidationTrace(
+        trace,
+        collectTrace,
+        next,
+        createInvalidOrderTraceMessage(decision),
+      );
+      return {
+        state: next,
+        failureReason: 'invalid_recommendation',
+      };
+    }
+
+    const queued = queueOrder(next, {
+      actionId: decision.order.actionId,
+      assignedOperativeId: decision.order.assignedOperativeId,
+      target: decision.order.target,
+    });
+
+    if (!queued.ok) {
+      appendValidationTrace(trace, collectTrace, next, `Queue failed: ${queued.error}.`);
+      return {
+        state: next,
+        failureReason: 'invalid_recommendation',
+      };
+    }
+
+    next = queued.state;
+    appendValidationTrace(
+      trace,
+      collectTrace,
+      next,
+      `Queued order: ${decision.order.preview.label}.`,
+    );
+  }
+
+  return { state: next };
+}
+
+function createHandlerValidationRunStats(): HandlerValidationRunStats {
+  return {
+    invalidRecommendationCount: 0,
+    decisionCount: 0,
+    softlockCount: 0,
+    confidenceCounts: {
+      high: 0,
+      medium: 0,
+      low: 0,
+    },
+  };
+}
+
+function recordHandlerValidationRecommendation(
+  handlerStats: HandlerValidationRunStats,
+  decision: HandlerAgentOrderDecision | HandlerAgentEventDecision,
+): void {
+  handlerStats.decisionCount += 1;
+  handlerStats.confidenceCounts[decision.recommendation.confidence] += 1;
+  handlerStats.invalidRecommendationCount += decision.invalidRecommendationCount;
+}
+
+function createInvalidOrderTraceMessage(decision: HandlerAgentOrderDecision): string {
+  const invalidReasons = decision.recommendation.invalidRecommendations
+    .map((invalid) => invalid.reason)
+    .join('; ');
+
+  return `Handler command recommendation could not be applied${
+    invalidReasons ? `: ${invalidReasons}` : '.'
+  }`;
+}
+
+function createInvalidEventTraceMessage(decision: HandlerAgentEventDecision): string {
+  const invalidReasons = decision.recommendation.invalidRecommendations
+    .map((invalid) => invalid.reason)
+    .join('; ');
+
+  return `Handler event recommendation could not be applied${
+    invalidReasons ? `: ${invalidReasons}` : '.'
+  }`;
+}
+
+function appendValidationTrace(
+  trace: HarnessTraceEntry[],
+  collectTrace: boolean | undefined,
+  state: GameState,
+  message: string,
+): void {
+  if (!collectTrace) {
+    return;
+  }
+
+  trace.push({
+    week: state.week,
+    phase: state.phase,
+    message,
+  });
 }
 
 function expectedStandardRunCount(

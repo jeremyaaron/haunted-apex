@@ -1565,7 +1565,30 @@ Softlocks/stalls: 0.
 
 ### Completion Record
 
-Pending.
+Completed.
+
+- Added `npm run validate:handler`, a Node-based Handler release gate that runs outside
+  Karma so the 500-run validation set does not trip browser heartbeat timeouts.
+- Switched Handler release validation to a lightweight engine loop that uses the real
+  `newGame`, legal option selectors, `queueOrder`, `advanceWeek`, and `resolveEventChoice`
+  transitions without full harness report aggregation.
+- Tuned Handler command scoring to reserve more Heat, Resources, and Loyalty on finishing
+  lines, preventing apparent Dominion wins that collapse to same-week lockdown or bankruptcy.
+- Preserved the game-over rule ordering: loss states still beat Dominion victory if the
+  final resolved state is already losing.
+
+Validation report:
+
+```text
+handler_validation_gate
+passed,trainingPassed,standardPassed,totalRuns,standardRuns,trainingRuns,failures
+true,true,true,501,500,1,0
+
+handler_validation_summary
+kind,passed,expectedRuns,totalRuns,wins,losses,invalidStates,invalidRecommendations,softlocks,stalls,failures
+training,true,1,1,1,0,0,0,0,0,0
+standard,true,500,500,500,0,0,0,0,0,0
+```
 
 ## Phase 14: Polish, Regression Tests, and Documentation
 
