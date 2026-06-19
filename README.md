@@ -13,6 +13,7 @@ Development documentation is organized under [`docs/`](docs/README.md):
 - [`docs/releases/v0.6-fronts/`](docs/releases/v0.6-fronts/) contains the Fronts direction, clarifications, TDD, implementation plan, and release notes.
 - [`docs/releases/v0.7-the-accords/`](docs/releases/v0.7-the-accords/) contains The Accords direction, clarifications, TDD, implementation plan, and release notes.
 - [`docs/releases/v0.8-the-city-wakes/`](docs/releases/v0.8-the-city-wakes/) contains The City Wakes direction, clarifications, TDD, implementation plan, and release notes.
+- [`docs/releases/v0.9-the-handler/`](docs/releases/v0.9-the-handler/) contains The Handler direction, clarifications, TDD, and implementation plan.
 
 ## Runtime
 

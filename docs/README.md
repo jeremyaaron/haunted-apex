@@ -64,3 +64,10 @@
 - [`CityWakes-TDD.md`](releases/v0.8-the-city-wakes/CityWakes-TDD.md): technical design.
 - [`CityWakes-ImplementationPlan.md`](releases/v0.8-the-city-wakes/CityWakes-ImplementationPlan.md): phased implementation plan.
 - [`CityWakes-ReleaseNotes.md`](releases/v0.8-the-city-wakes/CityWakes-ReleaseNotes.md): release notes draft.
+
+## v0.9.0: The Handler
+
+- [`v0.9.md`](releases/v0.9-the-handler/v0.9.md): release direction and product scope.
+- [`v0.9A.md`](releases/v0.9-the-handler/v0.9A.md): locked mechanical decisions.
+- [`Handler-TDD.md`](releases/v0.9-the-handler/Handler-TDD.md): technical design.
+- [`Handler-ImplementationPlan.md`](releases/v0.9-the-handler/Handler-ImplementationPlan.md): phased implementation plan.
