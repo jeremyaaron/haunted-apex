@@ -25,11 +25,26 @@ import {
   type AdvisorConfidence,
 } from '../advisor';
 import type {
+  AnalyticsRunReportInput,
+  CommandPairReport,
+  CommandUsageReport,
+  LoopWarningReport,
   PressureAttributionEntry,
   RunTelemetry,
+  SourceBreakdownReport,
+  StrategicFingerprintReport,
   StrategicSystemId,
+  SystemEngagementReport,
   TelemetryEntry,
   PressureChangeSourceKind,
+} from '../analytics';
+import {
+  buildCommandPairReports,
+  buildCommandUsageReports,
+  buildLoopWarningReports,
+  buildSourceBreakdownReports,
+  buildStrategicFingerprintReports,
+  buildSystemEngagementReports,
 } from '../analytics';
 import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
@@ -128,6 +143,15 @@ export type HarnessFailureReason =
   | 'invalid_recommendation'
   | 'softlock';
 
+type AnalyticsReportSet = {
+  strategicFingerprintReports: StrategicFingerprintReport[];
+  commandUsageReports: CommandUsageReport[];
+  commandPairReports: CommandPairReport[];
+  sourceBreakdownReports: SourceBreakdownReport[];
+  systemEngagementReports: SystemEngagementReport[];
+  loopWarnings: LoopWarningReport[];
+};
+
 export type HarnessBatchOptions = {
   agents: readonly StrategyAgent[];
   runsPerAgent: number;
@@ -185,6 +209,12 @@ export type AgentBatchSummary = {
   factionOutcomeReports: FactionOutcomeReport[];
   factionEventReports: FactionEventReport[];
   factionSetReports: FactionSetReport[];
+  strategicFingerprintReports: StrategicFingerprintReport[];
+  commandUsageReports: CommandUsageReport[];
+  commandPairReports: CommandPairReport[];
+  sourceBreakdownReports: SourceBreakdownReport[];
+  systemEngagementReports: SystemEngagementReport[];
+  loopWarnings: LoopWarningReport[];
 };
 
 export type HarnessBatchReport = {
@@ -204,6 +234,12 @@ export type HarnessBatchReport = {
   handlerConfidenceDistribution: HandlerConfidenceDistributionReport[];
   handlerTrainingValidation: HandlerTrainingValidationReport[];
   handlerOperatorDelta: HandlerOperatorDeltaReport[];
+  strategicFingerprintReports: StrategicFingerprintReport[];
+  commandUsageReports: CommandUsageReport[];
+  commandPairReports: CommandPairReport[];
+  sourceBreakdownReports: SourceBreakdownReport[];
+  systemEngagementReports: SystemEngagementReport[];
+  loopWarnings: LoopWarningReport[];
 };
 
 export type CampaignBatchSummary = {
@@ -1034,6 +1070,7 @@ export function simulateBatch(options: HarnessBatchOptions): HarnessBatchReport 
     return summarizeAgentRuns(agent, runs);
   });
   const campaignAgentSummaries = summarizeCampaignAgentRuns(allRuns);
+  const analyticsReports = buildAnalyticsReportSet(allRuns);
 
   return {
     runsPerAgent: options.runsPerAgent,
@@ -1052,6 +1089,7 @@ export function simulateBatch(options: HarnessBatchOptions): HarnessBatchReport 
     handlerConfidenceDistribution: summarizeHandlerConfidenceDistribution(allRuns),
     handlerTrainingValidation: summarizeHandlerTrainingValidation(allRuns),
     handlerOperatorDelta: summarizeHandlerOperatorDelta(campaignAgentSummaries),
+    ...analyticsReports,
   };
 }
 
@@ -2126,6 +2164,152 @@ export function formatBatchReport(report: HarnessBatchReport): string {
     );
   }
 
+  lines.push(
+    '',
+    'strategic_fingerprint',
+    'agent,agentLabel,campaignId,campaignName,runs,wins,winRate,totalCommands,avgCommands,topCommand,topCommandPct,topPair,topPairPct,topDominionSource,topHeatReliefSource,warning',
+  );
+
+  for (const fingerprint of report.strategicFingerprintReports) {
+    lines.push(
+      [
+        fingerprint.agentId,
+        csvCell(fingerprint.agentLabel),
+        fingerprint.campaignId,
+        csvCell(fingerprint.campaignName),
+        fingerprint.runs,
+        fingerprint.wins,
+        fingerprint.winRate.toFixed(3),
+        fingerprint.totalCommands,
+        fingerprint.averageCommandsUsed.toFixed(2),
+        csvCell(fingerprint.topCommand?.actionLabel ?? ''),
+        fingerprint.topCommand?.percentage.toFixed(3) ?? '',
+        csvCell(fingerprint.topPair?.pairLabel ?? ''),
+        fingerprint.topPair?.percentageOfWeeks.toFixed(3) ?? '',
+        csvCell(formatSourceLabel(fingerprint.topDominionSource)),
+        csvCell(formatSourceLabel(fingerprint.topHeatReliefSource)),
+        csvCell(fingerprint.dominantLoopWarning?.message ?? ''),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'command_usage',
+    'agent,agentLabel,campaignId,campaignName,actionId,actionLabel,count,percentage',
+  );
+
+  for (const usage of report.commandUsageReports) {
+    lines.push(
+      [
+        usage.agentId,
+        csvCell(usage.agentLabel),
+        usage.campaignId,
+        csvCell(usage.campaignName),
+        usage.actionId,
+        csvCell(usage.actionLabel),
+        usage.count,
+        usage.percentage.toFixed(3),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'command_pairs',
+    'agent,agentLabel,campaignId,campaignName,actionA,actionB,pairLabel,count,percentageOfWeeks',
+  );
+
+  for (const pair of report.commandPairReports) {
+    lines.push(
+      [
+        pair.agentId,
+        csvCell(pair.agentLabel),
+        pair.campaignId,
+        csvCell(pair.campaignName),
+        pair.actionA,
+        pair.actionB,
+        csvCell(pair.pairLabel),
+        pair.count,
+        pair.percentageOfWeeks.toFixed(3),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'source_breakdown',
+    'agent,agentLabel,campaignId,campaignName,pressure,sourceKind,sourceId,sourceLabel,totalDelta,positiveDelta,negativeDelta',
+  );
+
+  for (const source of report.sourceBreakdownReports) {
+    lines.push(
+      [
+        source.agentId,
+        csvCell(source.agentLabel),
+        source.campaignId,
+        csvCell(source.campaignName),
+        source.pressure,
+        source.sourceKind,
+        csvCell(source.sourceId),
+        csvCell(source.sourceLabel),
+        source.totalDelta.toFixed(2),
+        source.positiveDelta.toFixed(2),
+        source.negativeDelta.toFixed(2),
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'system_engagement',
+    'agent,agentLabel,campaignId,campaignName,runs,wins,runsWithFrontInvestment,runsWithFrontUpgrade,runsWithAccordBrokered,runsWithLedgerUse,runsWithContactService,runsWithBribe,runsWithLayLow,winsWithNoFronts,winsWithNoAccords,winsWithNoLedger,winsWithNoContacts',
+  );
+
+  for (const engagement of report.systemEngagementReports) {
+    lines.push(
+      [
+        engagement.agentId,
+        csvCell(engagement.agentLabel),
+        engagement.campaignId,
+        csvCell(engagement.campaignName),
+        engagement.runs,
+        engagement.wins,
+        engagement.runsWithFrontInvestment,
+        engagement.runsWithFrontUpgrade,
+        engagement.runsWithAccordBrokered,
+        engagement.runsWithLedgerUse,
+        engagement.runsWithContactService,
+        engagement.runsWithBribe,
+        engagement.runsWithLayLow,
+        engagement.winsWithNoFronts,
+        engagement.winsWithNoAccords,
+        engagement.winsWithNoLedger,
+        engagement.winsWithNoContacts,
+      ].join(','),
+    );
+  }
+
+  lines.push(
+    '',
+    'loop_warnings',
+    'agent,agentLabel,campaignId,warningType,value,threshold,message',
+  );
+
+  for (const warning of report.loopWarnings) {
+    lines.push(
+      [
+        warning.agentId,
+        csvCell(warning.agentLabel),
+        warning.campaignId,
+        warning.warningType,
+        warning.value.toFixed(3),
+        warning.threshold.toFixed(3),
+        csvCell(warning.message),
+      ].join(','),
+    );
+  }
+
   return lines.join('\n');
 }
 
@@ -2480,6 +2664,7 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
         target.selections > 0 ? target.complications / target.selections : 0,
     }))
     .sort((left, right) => left.targetLabel.localeCompare(right.targetLabel));
+  const analyticsReports = buildAnalyticsReportSet(runs);
 
   return {
     agentId: agent.id,
@@ -2529,6 +2714,49 @@ function summarizeAgentRuns(agent: StrategyAgent, runs: readonly HarnessRunResul
     factionOutcomeReports: sortFactionOutcomeReports([...factionOutcomeReports.values()]),
     factionEventReports: sortFactionEventReports([...factionEventReports.values()]),
     factionSetReports: finalizeFactionSetReports(factionSetReports),
+    ...analyticsReports,
+  };
+}
+
+function buildAnalyticsReportSet(runs: readonly HarnessRunResult[]): AnalyticsReportSet {
+  const reportInput = runs.map(toAnalyticsRunReportInput);
+  const commandUsageReports = buildCommandUsageReports(reportInput);
+  const commandPairReports = buildCommandPairReports(reportInput);
+  const sourceBreakdownReports = buildSourceBreakdownReports(reportInput);
+  const systemEngagementReports = buildSystemEngagementReports(reportInput);
+  const loopWarnings = buildLoopWarningReports({
+    commandUsageReports,
+    commandPairReports,
+    systemEngagementReports,
+  });
+  const strategicFingerprintReports = buildStrategicFingerprintReports({
+    commandUsageReports,
+    commandPairReports,
+    sourceBreakdownReports,
+    systemEngagementReports,
+    loopWarnings,
+  });
+
+  return {
+    strategicFingerprintReports,
+    commandUsageReports,
+    commandPairReports,
+    sourceBreakdownReports,
+    systemEngagementReports,
+    loopWarnings,
+  };
+}
+
+function toAnalyticsRunReportInput(run: HarnessRunResult): AnalyticsRunReportInput {
+  const campaignId = run.finalState.campaign.tensionId;
+
+  return {
+    agentId: run.agentId,
+    agentLabel: run.agentLabel,
+    campaignId,
+    campaignName: getCampaignName(campaignId),
+    outcome: run.outcome,
+    telemetry: run.telemetry,
   };
 }
 
@@ -5696,6 +5924,14 @@ function createAgentDecisionContext(seed: string): AgentDecisionContext {
 
 function csvCell(value: string): string {
   return /[",\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+function formatSourceLabel(source: SourceBreakdownReport | undefined): string {
+  if (!source) {
+    return '';
+  }
+
+  return `${source.sourceLabel} (${source.sourceKind})`;
 }
 
 function appendTrace(

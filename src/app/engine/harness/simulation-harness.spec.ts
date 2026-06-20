@@ -887,6 +887,12 @@ describe('simulation harness', () => {
     expect(output).toContain('handler_confidence_distribution');
     expect(output).toContain('handler_training_validation');
     expect(output).toContain('handler_operator_delta');
+    expect(output).toContain('strategic_fingerprint');
+    expect(output).toContain('command_usage');
+    expect(output).toContain('command_pairs');
+    expect(output).toContain('source_breakdown');
+    expect(output).toContain('system_engagement');
+    expect(output).toContain('loop_warnings');
   });
 
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {
@@ -944,9 +950,20 @@ describe('simulation harness', () => {
     expect(output).toContain('campaign_action_usage');
     expect(output).toContain('campaign_events');
     expect(output).toContain('campaign_system_usage');
+    expect(output).toContain('strategic_fingerprint');
+    expect(output).toContain('command_usage');
+    expect(output).toContain('command_pairs');
+    expect(output).toContain('source_breakdown');
+    expect(output).toContain('system_engagement');
+    expect(output).toContain('loop_warnings');
     expect(report.campaignSummaries.length).toBeGreaterThan(0);
     expect(report.campaignAgentSummaries.length).toBeGreaterThan(0);
     expect(report.campaignSystemUsage.length).toBeGreaterThan(0);
+    expect(report.strategicFingerprintReports.length).toBeGreaterThan(0);
+    expect(report.commandUsageReports.length).toBeGreaterThan(0);
+    expect(report.commandPairReports.length).toBeGreaterThan(0);
+    expect(report.sourceBreakdownReports.length).toBeGreaterThan(0);
+    expect(report.systemEngagementReports.length).toBeGreaterThan(0);
     expect(
       report.campaignSummaries.reduce((total, summary) => total + summary.runs, 0),
     ).toBe(report.totalRuns);
@@ -998,6 +1015,11 @@ describe('simulation harness', () => {
       expect(summary.factionSummary.averageBrokerAccordUses).toBeGreaterThanOrEqual(0);
       expect(summary.factionOutcomeReports.length).toBeGreaterThan(0);
       expect(summary.factionSetReports.length).toBeGreaterThan(0);
+      expect(summary.strategicFingerprintReports.length).toBeGreaterThan(0);
+      expect(summary.commandUsageReports.length).toBeGreaterThan(0);
+      expect(summary.commandPairReports.length).toBeGreaterThan(0);
+      expect(summary.sourceBreakdownReports.length).toBeGreaterThan(0);
+      expect(summary.systemEngagementReports.length).toBeGreaterThan(0);
     }
 
     expect(
@@ -1033,6 +1055,8 @@ describe('simulation harness', () => {
     expect(report.campaignAgentSummaries.length).toBe(campaignTensionIds.length);
     expect(report.campaignLossCauses.length).toBe(campaignTensionIds.length);
     expect(report.campaignSystemUsage.length).toBe(campaignTensionIds.length);
+    expect(report.strategicFingerprintReports.length).toBe(campaignTensionIds.length + 1);
+    expect(report.systemEngagementReports.length).toBe(campaignTensionIds.length + 1);
 
     for (const campaign of CAMPAIGN_TENSION_DEFINITIONS) {
       expect(output).toContain(campaign.id);

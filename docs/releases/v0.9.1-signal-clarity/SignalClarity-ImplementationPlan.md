@@ -674,7 +674,39 @@ Confirm old report sections still appear.
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Extended `AgentBatchSummary` and `HarnessBatchReport` with:
+  - `strategicFingerprintReports`,
+  - `commandUsageReports`,
+  - `commandPairReports`,
+  - `sourceBreakdownReports`,
+  - `systemEngagementReports`,
+  - `loopWarnings`.
+- Added a shared harness analytics report-set builder that converts `HarnessRunResult.telemetry`
+  into analytics report inputs.
+- Batch-level and per-agent summary analytics are generated from the same pure analytics builders.
+- Extended `formatBatchReport()` with append-only CSV-style sections:
+  - `strategic_fingerprint`,
+  - `command_usage`,
+  - `command_pairs`,
+  - `source_breakdown`,
+  - `system_engagement`,
+  - `loop_warnings`.
+- Preserved existing report section ordering and appended the new analytics sections after existing
+  Handler diagnostics.
+- Updated harness specs to assert the new report arrays and output sections are present.
+- Verification passed:
+
+```bash
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/harness/simulation-harness.spec.ts' --include='src/app/app.spec.ts'
+npm run check:docs
+git diff --check
+```
+
+- The focused browser run reported `TOTAL: 90 SUCCESS`; the Karma process remained attached after
+  success and was manually stopped so no test server or browser process was left running.
 
 ## Phase 8: Media Model, Registry, and Selectors
 
