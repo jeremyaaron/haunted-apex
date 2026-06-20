@@ -135,6 +135,27 @@ campaign modifier reports
 
 ### Completion Record
 
+Completed in this pass.
+
+- Updated package metadata from `0.0.0` to `0.9.0`.
+- Ran the full Handler validation gate:
+  - Training fixed config: 1/1 Handler wins.
+  - Standard validation set: 500/500 Handler wins.
+  - Invalid states: 0.
+  - Invalid recommendations: 0.
+  - Softlocks: 0.
+  - Stalls: 0.
+  - Failures: 0.
+- Ran the full automated regression suite: 645/645 specs passed.
+- Confirmed TypeScript app and spec configs compile.
+- Confirmed docs links, whitespace diff checks, standard production build, and Pages base-href
+  production build pass.
+- Smoke-checked the Pages artifact by verifying the `/haunted-apex/` base href and referenced
+  JS/CSS assets in `dist/haunted-apex/browser/index.html`.
+- Confirmed no test runner, browser test process, or validation process from this pass remains
+  running. A pre-existing local `ng serve` process was detected at `pid 16914`; it was not started
+  by this phase and was left alone.
+
 Completed June 18, 2026:
 
 - Runtime validation used Node `24.16.0` from `.nvmrc`.
