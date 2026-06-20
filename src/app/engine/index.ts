@@ -1,4 +1,5 @@
 export * from './accords';
+export * from './analytics';
 export * from './advisor';
 export * from './campaign';
 export * from './content';

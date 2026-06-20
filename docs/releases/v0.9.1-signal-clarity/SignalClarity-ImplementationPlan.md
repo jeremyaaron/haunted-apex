@@ -227,7 +227,40 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added `src/app/engine/analytics/`.
+- Added telemetry model types:
+  - `TelemetryActorType`,
+  - `PressureChangeSourceKind`,
+  - `TelemetryEntryKind`,
+  - `StrategicSystemId`,
+  - `PressureAttributionEntry`,
+  - `CommandUsedTelemetryEntry`,
+  - `EventChoiceUsedTelemetryEntry`,
+  - `SystemEngagedTelemetryEntry`,
+  - `OperativeAssignedTelemetryEntry`,
+  - `TelemetryEntry`,
+  - `RunTelemetry`.
+- Added `diffPressures(before, after)`.
+- Added `PressureDeltaEntry`.
+- Exported analytics APIs through `src/app/engine/analytics/index.ts` and
+  `src/app/engine/index.ts`.
+- Added focused tests for:
+  - canonical pressure order,
+  - signed positive and negative deltas,
+  - zero-delta filtering,
+  - local bot-run telemetry shape without persistence fields.
+- No harness behavior, gameplay behavior, persistence behavior, or remote telemetry changed.
+
+Verification passed:
+
+```bash
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/analytics/**/*.spec.ts'
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+git diff --check
+```
 
 ## Phase 2: Harness Telemetry Capture
 
