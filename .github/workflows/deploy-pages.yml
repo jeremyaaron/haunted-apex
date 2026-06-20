@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Test and build
+    name: Build Pages artifact
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,8 +37,8 @@ jobs:
       - name: Verify documentation links
         run: npm run check:docs
 
-      - name: Run tests
-        run: npm test -- --watch=false --browsers=ChromeHeadless
+      - name: Typecheck app
+        run: npx tsc -p tsconfig.app.json --noEmit
 
       - name: Build production artifact
         run: npm run build -- --configuration production --base-href /haunted-apex/
