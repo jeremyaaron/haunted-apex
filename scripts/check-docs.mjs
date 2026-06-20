@@ -10,7 +10,7 @@ const [readme, docsReadme, releaseEntries] = await Promise.all([
 ]);
 
 const releaseDirs = releaseEntries
-  .filter((entry) => entry.isDirectory() && /^v\d+\.\d+-/.test(entry.name))
+  .filter((entry) => entry.isDirectory() && /^v\d+\.\d+(?:\.\d+)?-/.test(entry.name))
   .map((entry) => entry.name)
   .sort();
 

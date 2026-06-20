@@ -72,3 +72,10 @@
 - [`Handler-TDD.md`](releases/v0.9-the-handler/Handler-TDD.md): technical design.
 - [`Handler-ImplementationPlan.md`](releases/v0.9-the-handler/Handler-ImplementationPlan.md): phased implementation plan.
 - [`Handler-ReleaseNotes.md`](releases/v0.9-the-handler/Handler-ReleaseNotes.md): release notes draft.
+
+## v0.9.1: Signal Clarity
+
+- [`v0.9.1.md`](releases/v0.9.1-signal-clarity/v0.9.1.md): release direction and product scope.
+- [`v0.9.1A.md`](releases/v0.9.1-signal-clarity/v0.9.1A.md): locked mechanical decisions.
+- [`SignalClarity-TDD.md`](releases/v0.9.1-signal-clarity/SignalClarity-TDD.md): technical design.
+- [`SignalClarity-ImplementationPlan.md`](releases/v0.9.1-signal-clarity/SignalClarity-ImplementationPlan.md): phased implementation plan.
