@@ -4,8 +4,13 @@ export { buildCommandUsageReports } from './command-usage-report';
 export type { CommandUsageReport } from './command-usage-report';
 export { diffPressures } from './pressure-attribution';
 export type { PressureDeltaEntry } from './pressure-attribution';
+export { buildSourceBreakdownReports } from './source-breakdown-report';
+export type { SourceBreakdownReport } from './source-breakdown-report';
+export { buildSystemEngagementReports } from './system-engagement-report';
+export type { SystemEngagementReport } from './system-engagement-report';
 export type {
   AnalyticsCampaignId,
+  AnalyticsRunOutcome,
   AnalyticsRunReportInput,
 } from './report-input';
 export { ALL_CAMPAIGNS_ID, ALL_CAMPAIGNS_NAME } from './report-input';

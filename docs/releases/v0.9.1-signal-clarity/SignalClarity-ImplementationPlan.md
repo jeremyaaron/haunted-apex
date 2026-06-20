@@ -532,7 +532,27 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added `buildSourceBreakdownReports()` with `all` campaign and per-Campaign Tension rows.
+- Source breakdown rows group by agent, campaign, pressure, source kind, and source id.
+- Source breakdown preserves signed `totalDelta`, `positiveDelta`, and `negativeDelta` values.
+- Added `buildSystemEngagementReports()` with run-level system usage counts.
+- System engagement counts Front investment, Front upgrade, Accord brokered, Ledger use, Contact
+  service, Bribe, and Lay Low once per run.
+- Winning-run diagnostics count wins without Fronts, Accords, Ledger, and Contacts.
+- Front upgrade counts as Front engagement for `winsWithNoFronts` diagnostics.
+- Added focused aggregation tests for pressure source totals, Heat relief, mixed positive/negative
+  deltas, per-campaign grouping, repeated system entries, and wins-without-system counts.
+- Verification passed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/analytics/**/*.spec.ts'
+npm run check:docs
+git diff --check
+```
 
 ## Phase 6: Strategic Fingerprint and Loop Warnings
 
