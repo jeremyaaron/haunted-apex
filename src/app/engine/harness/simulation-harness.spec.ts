@@ -1,7 +1,9 @@
 import {
   AGGRESSIVE_BOT,
   CAUTIOUS_BOT,
+  EXTENDED_STRATEGY_AGENTS,
   GREEDY_BOT,
+  HANDLER_BOT,
   OPERATOR_BOT,
   RANDOM_BOT,
   STRATEGY_AGENTS,
@@ -772,6 +774,71 @@ describe('simulation harness', () => {
       factionId: 'faction_helix_meridian',
       accordId: 'accord_helix_quiet_capital',
     });
+  });
+
+  it('keeps HandlerBot outside legacy strategy batches while exposing an extended set', () => {
+    expect(STRATEGY_AGENTS.map((agent) => agent.id)).not.toContain('handler');
+    expect(EXTENDED_STRATEGY_AGENTS.map((agent) => agent.id)).toContain('handler');
+  });
+
+  it('lets HandlerBot choose queueable orders through the advisor policy', () => {
+    const state = newGame({ seed: 'HARNESS-HANDLER-LEGAL' });
+    const options = getLegalOrderOptions(state);
+    const choice = HANDLER_BOT.chooseOrder(
+      state,
+      options,
+      createTestContext('HANDLER', 'bot'),
+    );
+
+    expect(choice).toBeDefined();
+    expect(choice ? options.includes(choice) : false).toBeTrue();
+    expect(
+      queueOrder(state, {
+        actionId: choice?.actionId ?? 'gather_intel',
+        assignedOperativeId: choice?.assignedOperativeId,
+        target: choice?.target,
+      }).ok,
+    ).toBeTrue();
+  });
+
+  it('can complete a HandlerBot training run without invalid recommendations', () => {
+    const run = simulateRun({
+      agent: HANDLER_BOT,
+      seed: 'HARNESS-HANDLER-COMPLETE',
+      runMode: 'training',
+      collectTrace: true,
+    });
+
+    expect(run.handlerStats).toBeDefined();
+    expect(run.handlerStats?.invalidRecommendationCount)
+      .withContext(run.trace.map((entry) => entry.message).join(' | '))
+      .toBe(0);
+    expect(run.reason).not.toBe('invalid_recommendation');
+    expect(run.reason).not.toBe('agent_stalled');
+    expect(run.reason).not.toBe('softlock');
+    expect(run.outcome).not.toBe('incomplete');
+    expect(run.trace.length).toBeGreaterThan(0);
+  });
+
+  it('reports HandlerBot validation sections when included in a batch', () => {
+    const report = simulateBatch({
+      agents: [HANDLER_BOT, OPERATOR_BOT],
+      runsPerAgent: 1,
+      runMode: 'training',
+      seedPrefix: 'HARNESS-HANDLER-REPORT',
+    });
+    const output = formatBatchReport(report);
+
+    expect(report.handlerValidationSummary.length).toBe(1);
+    expect(report.handlerTrainingValidation.length).toBe(1);
+    expect(report.handlerConfidenceDistribution.length).toBe(3);
+    expect(output).toContain('handler_validation_summary');
+    expect(output).toContain('handler_campaign_summary');
+    expect(output).toContain('handler_loss_causes');
+    expect(output).toContain('handler_invalid_recommendations');
+    expect(output).toContain('handler_confidence_distribution');
+    expect(output).toContain('handler_training_validation');
+    expect(output).toContain('handler_operator_delta');
   });
 
   it('runs 100 simulations per simple strategy and summarizes balance signals', () => {

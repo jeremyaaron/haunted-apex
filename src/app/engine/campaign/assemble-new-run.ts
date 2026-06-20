@@ -2,6 +2,7 @@ import {
   DISTRICT_ZERO_COMMAND_POINTS,
   DISTRICT_ZERO_INITIAL_PRESSURES,
   DISTRICT_ZERO_MAX_WEEKS,
+  DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
 } from '../content';
@@ -16,6 +17,7 @@ import type {
   NewGameConfig,
   RivalId,
   RivalState,
+  RunMode,
 } from '../model';
 import { createDefaultSeed, createRunId, normalizeSeed } from '../rng';
 import { generateRoster, materializeOperativeState } from '../roster';
@@ -25,6 +27,8 @@ import { getCampaignTensionDefinitionOrThrow, selectCampaignTension } from './se
 
 export function assembleNewRun(config: NewGameConfig = {}): GameState {
   const seed = normalizeSeed(config.seed ?? createDefaultSeed());
+  const runMode = config.runMode ?? 'standard';
+  const customSeed = config.customSeed ?? config.seed !== undefined;
   const campaignTension = config.campaignTensionId
     ? getCampaignTensionDefinitionOrThrow(config.campaignTensionId)
     : selectCampaignTension(seed);
@@ -44,7 +48,7 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
   const rivals = initializeRivals();
 
   const state: GameState = {
-    schemaVersion: 8,
+    schemaVersion: 9,
     id: createRunId(seed),
     seed,
     rngCursor: roster.rngCursor,
@@ -52,6 +56,7 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
     maxWeeks: DISTRICT_ZERO_MAX_WEEKS,
     phase: 'COMMAND',
     commandPointsPerWeek: DISTRICT_ZERO_COMMAND_POINTS,
+    run: createRunSettings(runMode, customSeed),
     campaign: createCampaignState({
       campaignTensionId: campaignTension.id,
       cityName: city.name,
@@ -90,6 +95,17 @@ export function assembleNewRun(config: NewGameConfig = {}): GameState {
   };
 
   return applyCampaignModifiersToRun(state, campaignTension);
+}
+
+function createRunSettings(mode: RunMode, customSeed: boolean): GameState['run'] {
+  return {
+    mode,
+    dominionTarget:
+      mode === 'training' ? 80 : DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory,
+    validationStatus:
+      mode === 'training' ? 'validated' : customSeed ? 'unvalidated' : 'harness_validated',
+    customSeed,
+  };
 }
 
 type CreateCampaignStateConfig = {

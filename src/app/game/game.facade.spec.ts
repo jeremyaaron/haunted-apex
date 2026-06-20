@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { getEventDefinition, newGame } from '../engine';
+import {
+  getActionTargetKey,
+  getEventDefinition,
+  newGame,
+  USER_PREFERENCES_STORAGE_KEY,
+} from '../engine';
 import {
   CURRENT_GAME_VERSION,
   CURRENT_RUN_STORAGE_KEY,
@@ -36,6 +41,145 @@ describe('GameFacade', () => {
     expect(facade.campaignHeader().tensionName).toBe('Ghostline Signal');
     expect(facade.campaignBriefing().favoredByTension).toContain('Ciro Moth');
     expect(readStoredState()).toEqual(state);
+  });
+
+  it('starts a Standard run and marks custom seeds as unvalidated', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startStandardRun('STANDARD-CUSTOM', 'campaign_dirty_capital');
+
+    expect(state.seed).toBe('STANDARD-CUSTOM');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
+    expect(state.run).toEqual({
+      mode: 'standard',
+      dominionTarget: 90,
+      validationStatus: 'unvalidated',
+      customSeed: true,
+    });
+    expect(readStoredState()).toEqual(state);
+  });
+
+  it('starts the fixed Training run and persists it', () => {
+    const facade = TestBed.inject(GameFacade);
+    const state = facade.startTrainingRun();
+
+    expect(state.seed).toBe('TRAINING-GLASS-CROWN-001');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
+    expect(state.run).toEqual({
+      mode: 'training',
+      dominionTarget: 80,
+      validationStatus: 'validated',
+      customSeed: false,
+    });
+    expect(facade.campaignBriefingOpen()).toBeTrue();
+    expect(facade.advisorMode()).toBe('handler');
+    expect(facade.advisorView().mode).toBe('handler');
+    expect(readStoredState()).toEqual(state);
+  });
+
+  it('defaults Standard runs to Coach when no Advisor preference exists', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    expect(facade.state().run.mode).toBe('standard');
+    expect(facade.advisorMode()).toBe('coach');
+    expect(facade.advisorView().title).toBe('Strategic Coach');
+  });
+
+  it('persists Advisor mode preferences for Standard runs', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    facade.setAdvisorMode('hints');
+
+    expect(facade.userPreferences().advisorMode).toBe('hints');
+    expect(facade.advisorMode()).toBe('hints');
+    expect(JSON.parse(localStorage.getItem(USER_PREFERENCES_STORAGE_KEY) ?? '{}')).toEqual({
+      advisorMode: 'hints',
+    });
+
+    facade.startStandardRun('ADVISOR-SAVED-PREFERENCE', 'campaign_dirty_capital');
+
+    expect(facade.advisorMode()).toBe('hints');
+  });
+
+  it('allows Training Advisor overrides but resets new Training runs to Handler', () => {
+    const facade = TestBed.inject(GameFacade);
+
+    facade.startTrainingRun();
+    facade.setAdvisorMode('off');
+
+    expect(facade.advisorMode()).toBe('off');
+
+    facade.startTrainingRun();
+
+    expect(facade.advisorMode()).toBe('handler');
+  });
+
+  it('exposes Handler recommendation highlights without auto-queueing orders', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startTrainingRun();
+    const before = facade.state();
+
+    const recommendations = facade.advisorView().recommendations;
+    const firstRecommendation = recommendations[0];
+
+    expect(recommendations.length).toBeGreaterThan(0);
+    expect(firstRecommendation.recommendedActionId).toBeDefined();
+    expect(
+      facade.isAdvisorRecommendedAction(firstRecommendation.recommendedActionId ?? 'gather_intel'),
+    ).toBeTrue();
+    expect(facade.state()).toBe(before);
+    expect(facade.state().queuedOrders).toEqual([]);
+    expect(facade.state().phase).toBe('COMMAND');
+
+    if (firstRecommendation.recommendedOperativeId) {
+      expect(facade.isAdvisorRecommendedOperative(firstRecommendation.recommendedOperativeId)).toBeTrue();
+    }
+
+    if (firstRecommendation.recommendedActionId && firstRecommendation.recommendedTargetKey) {
+      const matchingTarget = facade
+        .getTargetOptions(firstRecommendation.recommendedActionId)
+        .find((option) => getActionTargetKey(option.target) === firstRecommendation.recommendedTargetKey);
+
+      expect(matchingTarget).toBeDefined();
+      expect(facade.isAdvisorRecommendedTarget(matchingTarget?.target)).toBeTrue();
+    }
+  });
+
+  it('does not expose exact recommendation highlights outside Handler mode', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startStandardRun('ADVISOR-HIGHLIGHTS-COACH', 'campaign_dirty_capital');
+    const recommendation = facade.advisorView().recommendations[0];
+
+    expect(facade.advisorMode()).toBe('coach');
+    expect(recommendation.recommendedActionId).toBeUndefined();
+    expect(facade.advisorHighlights().actionIds.size).toBe(0);
+    expect(facade.isAdvisorRecommendedAction('gather_intel')).toBeFalse();
+  });
+
+  it('exposes Handler event-choice highlights without auto-resolving fallout', () => {
+    const facade = TestBed.inject(GameFacade);
+    facade.startTrainingRun();
+    const queued = facade.queueOrder('gather_intel');
+
+    if (!queued.ok) {
+      fail(`Expected queued order, got ${queued.error}`);
+      return;
+    }
+
+    const advanced = facade.advanceWeek();
+
+    if (!advanced.ok) {
+      fail(`Expected advanced week, got ${advanced.error}`);
+      return;
+    }
+
+    const pendingEvent = facade.state().pendingEvent;
+    const recommendedChoiceId = facade.advisorView().recommendations[0]?.recommendedEventChoiceId;
+
+    expect(pendingEvent).toBeDefined();
+    expect(recommendedChoiceId).toBeDefined();
+    expect(facade.isAdvisorRecommendedEventChoice(recommendedChoiceId)).toBeTrue();
+    expect(facade.state().phase).toBe('EVENT_CHOICE');
+    expect(facade.state().pendingEvent).toEqual(pendingEvent);
   });
 
   it('loads a valid current run on construction', () => {

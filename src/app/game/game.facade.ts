@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   advanceWeek,
   buildRunSummary,
+  getDefaultAdvisorMode,
   getActionPreview,
   getContactDefinition,
   getCommandPointsRemaining,
@@ -10,6 +11,7 @@ import {
   getEventChoicePreview,
   getFrontDefinition,
   getFactionDefinition,
+  getActionTargetKey,
   getLedgerEntryDefinition,
   getOperativeDefinition,
   getTraitDefinition,
@@ -18,9 +20,12 @@ import {
   queueOrder,
   removeQueuedOrder,
   resolveEventChoice,
+  saveUserPreferences,
+  loadUserPreferences,
   selectActionCards,
   selectActiveContacts,
   selectAssignmentOptions,
+  selectAdvisorViewModel,
   selectActionTargetOptions,
   selectCampaignBriefingView,
   selectCampaignHeaderView,
@@ -33,10 +38,13 @@ import {
   selectQueuedOrderViews,
   selectRivalTerritoryViews,
   selectRosterViews,
+  TRAINING_RUN_CONFIG,
   type ActionId,
   type ActionPreview,
   type ActionTarget,
   type ActionTargetOption,
+  type AdvisorMode,
+  type AdvisorViewModel,
   type CampaignBriefingView,
   type CampaignHeaderView,
   type CampaignTensionId,
@@ -54,11 +62,19 @@ import {
   type RemoveQueuedOrderResult,
   type ResolveEventChoiceResult,
   type RunSummaryReport,
+  type UserPreferences,
 } from '../engine';
 import { GameStorageService, type LoadCurrentRunResult } from './game-storage.service';
 
 export const SAVE_COMPATIBILITY_NOTICE =
-  'Detected an older save. v0.8.0 - The City Wakes changes the game state schema and requires a fresh run.';
+  'Detected an older save. v0.9.0 - The Handler changes the game state schema and requires a fresh run.';
+
+export type AdvisorHighlightSelectors = {
+  actionIds: ReadonlySet<ActionId>;
+  targetKeys: ReadonlySet<string>;
+  operativeIds: ReadonlySet<OperativeId>;
+  eventChoiceIds: ReadonlySet<string>;
+};
 
 @Injectable({
   providedIn: 'root',
@@ -69,12 +85,24 @@ export class GameFacade {
   private readonly stateSignal = signal<GameState>(
     this.initialLoadResult.status === 'loaded' ? this.initialLoadResult.state : newGame(),
   );
+  private readonly userPreferencesSignal = signal<UserPreferences>(loadUserPreferences());
+  private readonly advisorModeSignal = signal<AdvisorMode>(
+    getDefaultAdvisorMode(this.stateSignal().run.mode, this.userPreferencesSignal().advisorMode),
+  );
   private readonly selectedOperativeId = signal<OperativeId | undefined>(undefined);
   private readonly campaignBriefingOpenSignal = signal(
     !this.stateSignal().campaign.openingBriefingShown,
   );
 
   readonly state = this.stateSignal.asReadonly();
+  readonly userPreferences = this.userPreferencesSignal.asReadonly();
+  readonly advisorMode = this.advisorModeSignal.asReadonly();
+  readonly advisorView = computed<AdvisorViewModel>(() =>
+    selectAdvisorViewModel(this.stateSignal(), this.advisorModeSignal()),
+  );
+  readonly advisorHighlights = computed<AdvisorHighlightSelectors>(() =>
+    selectAdvisorHighlights(this.advisorView()),
+  );
   readonly compatibilityNotice = signal<string | undefined>(
     requiresCompatibilityNotice(this.initialLoadResult) ? SAVE_COMPATIBILITY_NOTICE : undefined,
   );
@@ -151,15 +179,25 @@ export class GameFacade {
     const state = newGame(config);
     this.selectedOperativeId.set(undefined);
     this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
+    this.resetAdvisorModeForRun(state);
     this.setAndSave(state);
     return state;
   }
 
   startNewRun(seed?: string, campaignTensionId?: CampaignTensionId): GameState {
+    return this.startStandardRun(seed, campaignTensionId);
+  }
+
+  startStandardRun(seed?: string, campaignTensionId?: CampaignTensionId): GameState {
     return this.startNewGame({
+      runMode: 'standard',
       ...(seed ? { seed } : {}),
       ...(campaignTensionId ? { campaignTensionId } : {}),
     });
+  }
+
+  startTrainingRun(): GameState {
+    return this.startNewGame(TRAINING_RUN_CONFIG);
   }
 
   loadCurrentRun(): boolean {
@@ -169,6 +207,7 @@ export class GameFacade {
       this.stateSignal.set(result.state);
       this.selectedOperativeId.set(undefined);
       this.campaignBriefingOpenSignal.set(!result.state.campaign.openingBriefingShown);
+      this.resetAdvisorModeForRun(result.state);
       return true;
     }
 
@@ -177,6 +216,7 @@ export class GameFacade {
       this.stateSignal.set(state);
       this.selectedOperativeId.set(undefined);
       this.campaignBriefingOpenSignal.set(!state.campaign.openingBriefingShown);
+      this.resetAdvisorModeForRun(state);
       this.compatibilityNotice.set(SAVE_COMPATIBILITY_NOTICE);
       this.storage.saveCurrentRun(state);
     }
@@ -199,6 +239,33 @@ export class GameFacade {
 
   dismissCompatibilityNotice(): void {
     this.compatibilityNotice.set(undefined);
+  }
+
+  setAdvisorMode(mode: AdvisorMode): void {
+    const preferences = {
+      ...this.userPreferencesSignal(),
+      advisorMode: mode,
+    };
+
+    this.advisorModeSignal.set(mode);
+    this.userPreferencesSignal.set(preferences);
+    saveUserPreferences(preferences);
+  }
+
+  isAdvisorRecommendedAction(actionId: ActionId): boolean {
+    return this.advisorHighlights().actionIds.has(actionId);
+  }
+
+  isAdvisorRecommendedTarget(target: ActionTarget | undefined): boolean {
+    return target ? this.advisorHighlights().targetKeys.has(getActionTargetKey(target)) : false;
+  }
+
+  isAdvisorRecommendedOperative(operativeId: OperativeId | undefined): boolean {
+    return operativeId ? this.advisorHighlights().operativeIds.has(operativeId) : false;
+  }
+
+  isAdvisorRecommendedEventChoice(choiceId: string | undefined): boolean {
+    return choiceId ? this.advisorHighlights().eventChoiceIds.has(choiceId) : false;
   }
 
   dismissCampaignBriefing(): void {
@@ -327,6 +394,12 @@ export class GameFacade {
     this.stateSignal.set(state);
     this.storage.saveCurrentRun(state);
   }
+
+  private resetAdvisorModeForRun(state: GameState): void {
+    this.advisorModeSignal.set(
+      getDefaultAdvisorMode(state.run.mode, this.userPreferencesSignal().advisorMode),
+    );
+  }
 }
 
 function renderPendingEventText(state: GameState, text: string): string {
@@ -359,4 +432,34 @@ function renderPendingEventText(state: GameState, text: string): string {
 
 function requiresCompatibilityNotice(result: LoadCurrentRunResult): boolean {
   return result.status === 'incompatible' || result.status === 'invalid';
+}
+
+function selectAdvisorHighlights(view: AdvisorViewModel): AdvisorHighlightSelectors {
+  return view.recommendations.reduce(
+    (highlights, recommendation) => {
+      if (recommendation.recommendedActionId) {
+        highlights.actionIds.add(recommendation.recommendedActionId);
+      }
+
+      if (recommendation.recommendedTargetKey) {
+        highlights.targetKeys.add(recommendation.recommendedTargetKey);
+      }
+
+      if (recommendation.recommendedOperativeId) {
+        highlights.operativeIds.add(recommendation.recommendedOperativeId);
+      }
+
+      if (recommendation.recommendedEventChoiceId) {
+        highlights.eventChoiceIds.add(recommendation.recommendedEventChoiceId);
+      }
+
+      return highlights;
+    },
+    {
+      actionIds: new Set<ActionId>(),
+      targetKeys: new Set<string>(),
+      operativeIds: new Set<OperativeId>(),
+      eventChoiceIds: new Set<string>(),
+    },
+  );
 }

@@ -53,7 +53,7 @@ describe('App', () => {
     expect(compiled.textContent).toContain('Command Board');
     expect(compiled.textContent).toContain('Operative Roster');
     expect(compiled.textContent).toContain('Event Feed');
-    expect(compiled.textContent).toContain('The Roster');
+    expect(compiled.textContent).toContain('The Handler');
     expect(compiled.textContent).toContain('Field Guide');
     expect(compiled.textContent).toContain('Risk: Low 10%');
     expect(compiled.textContent).toContain('Gather Intel');
@@ -584,6 +584,28 @@ describe('App', () => {
 
   it('should expose expanded target and territory harness reporting', () => {
     const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance as unknown as {
+      runHarnessBatch: () => void;
+      harnessOutput: { set: (value: string) => void };
+    };
+    spyOn(app, 'runHarnessBatch').and.callFake(() => {
+      app.harnessOutput.set(
+        [
+          'target_highlights',
+          'target_details',
+          'rival_pressure',
+          'district_state',
+          'loss_causes',
+          'contextual_events',
+          'ledger_summary',
+          'ledger_usage',
+          'ledger_outcomes',
+          'secret_discovery',
+          'ledger_events',
+          'Operator / Sane',
+        ].join('\n'),
+      );
+    });
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
 
@@ -653,7 +675,7 @@ describe('App', () => {
     clickButton(compiled, 'Advance Week');
     fixture.detectChanges();
 
-    expect(compiled.textContent).toContain('EVENT_CHOICE');
+    expect(compiled.textContent).toContain('Event Choice');
     expect(compiled.textContent).toContain('Intercepted Transmission');
     expect(compiled.querySelector('.choice-card')).toBeTruthy();
   });
@@ -940,7 +962,7 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
 
     selectValue(compiled, '.campaign-control select', 'campaign_ghostline_signal');
-    clickButton(compiled, 'New Run');
+    clickButton(compiled, 'Standard Run');
     fixture.detectChanges();
 
     expect(compiled.querySelector('.header-deck')?.textContent).toContain('Ghostline Signal');
@@ -1091,7 +1113,7 @@ describe('App', () => {
       'venue:venue_zero_mercy',
     );
 
-    clickButton(compiled, 'New Run');
+    clickButton(compiled, 'Standard Run');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();

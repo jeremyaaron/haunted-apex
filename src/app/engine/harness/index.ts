@@ -1,10 +1,14 @@
 export {
   AGGRESSIVE_BOT,
   CAUTIOUS_BOT,
+  EXTENDED_STRATEGY_AGENTS,
   GREEDY_BOT,
+  HANDLER_BOT,
   OPERATOR_BOT,
   RANDOM_BOT,
   STRATEGY_AGENTS,
+  chooseHandlerEventChoice,
+  chooseHandlerOrder,
   createEmptyActionUsage,
   getQueuedActionUsage,
 } from './agents';
@@ -16,8 +20,19 @@ export {
   simulateBatch,
   simulateRun,
 } from './simulation-harness';
+export {
+  formatHandlerValidationGateReport,
+  isPassingHandlerValidationResult,
+  runHandlerStandardValidation,
+  runHandlerTrainingValidation,
+  runHandlerValidationGate,
+  summarizeHandlerValidationRuns,
+  validateStandardValidationSeedSet,
+} from './handler-validation-runner';
 export type {
   AgentDecisionContext,
+  HandlerAgentEventDecision,
+  HandlerAgentOrderDecision,
   LegalEventChoiceOption,
   LegalOrderOption,
   StrategyAgent,
@@ -44,9 +59,18 @@ export type {
   DistrictAverage,
   HarnessBatchOptions,
   HarnessBatchReport,
+  HarnessFailureReason,
   HarnessRunOptions,
   HarnessRunResult,
   HarnessTraceEntry,
+  HandlerCampaignSummaryReport,
+  HandlerConfidenceDistributionReport,
+  HandlerInvalidRecommendationReport,
+  HandlerLossCauseReport,
+  HandlerOperatorDeltaReport,
+  HandlerRunStats,
+  HandlerTrainingValidationReport,
+  HandlerValidationSummaryReport,
   LedgerEventReport,
   LedgerOutcomeReport,
   LedgerRunStats,
@@ -57,3 +81,14 @@ export type {
   TargetReport,
   TargetRunStats,
 } from './simulation-harness';
+export type {
+  HandlerSeedSetCampaignValidation,
+  HandlerSeedSetValidation,
+  HandlerStandardValidationOptions,
+  HandlerTrainingValidationOptions,
+  HandlerValidationFailure,
+  HandlerValidationGateReport,
+  HandlerValidationKind,
+  HandlerValidationLossCause,
+  HandlerValidationReport,
+} from './handler-validation-runner';

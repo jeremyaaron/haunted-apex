@@ -25,17 +25,24 @@ import {
   STARTING_FRONT_ID,
 } from '../fronts';
 import { newGame } from './new-game';
+import { TRAINING_RUN_CONFIG } from './training-run';
 
 describe('newGame', () => {
   it('creates the expected starting campaign state', () => {
     const state = newGame({ seed: 'VIOLET-ASH-1047' });
 
     expect(state.seed).toBe('VIOLET-ASH-1047');
-    expect(state.schemaVersion).toBe(8);
+    expect(state.schemaVersion).toBe(9);
     expect(state.week).toBe(1);
     expect(state.maxWeeks).toBe(DISTRICT_ZERO_MAX_WEEKS);
     expect(state.phase).toBe('COMMAND');
     expect(state.commandPointsPerWeek).toBe(DISTRICT_ZERO_COMMAND_POINTS);
+    expect(state.run).toEqual({
+      mode: 'standard',
+      dominionTarget: 90,
+      validationStatus: 'unvalidated',
+      customSeed: true,
+    });
     expect(state.rngCursor).toBe(10);
     expect(state.queuedOrders).toEqual([]);
     expect(state.recentActivity).toEqual([]);
@@ -57,6 +64,30 @@ describe('newGame', () => {
     expect(state.seenSignatureEventIds).toEqual([]);
     expect(state.gameOver).toBeUndefined();
     expect(state.pendingEvent).toBeUndefined();
+  });
+
+  it('marks generated Standard runs as harness validated', () => {
+    const state = newGame();
+
+    expect(state.run).toEqual({
+      mode: 'standard',
+      dominionTarget: 90,
+      validationStatus: 'harness_validated',
+      customSeed: false,
+    });
+  });
+
+  it('creates Training runs with the Training Dominion target', () => {
+    const state = newGame(TRAINING_RUN_CONFIG);
+
+    expect(state.seed).toBe('TRAINING-GLASS-CROWN-001');
+    expect(state.campaign.tensionId).toBe('campaign_dirty_capital');
+    expect(state.run).toEqual({
+      mode: 'training',
+      dominionTarget: 80,
+      validationStatus: 'validated',
+      customSeed: false,
+    });
   });
 
   it('creates deterministic Campaign identity and run-start active-content audit', () => {

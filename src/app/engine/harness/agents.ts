@@ -21,16 +21,17 @@ import type {
   QueuedOrder,
   StressTier,
 } from '../model';
-import type { ActionPreview, QueueOrderRequest } from '../selectors';
+import type { ActionPreview } from '../selectors';
+import {
+  getActionTargetKey,
+  selectHandlerRecommendation,
+  type HandlerRecommendation,
+  type LegalEventChoiceOption,
+  type LegalOrderOption,
+} from '../advisor';
+import { getRunRules } from '../simulation/run-rules';
 
-export type LegalOrderOption = QueueOrderRequest & {
-  preview: ActionPreview;
-};
-
-export type LegalEventChoiceOption = {
-  eventId: string;
-  choice: EventChoiceDefinition;
-};
+export type { LegalEventChoiceOption, LegalOrderOption } from '../advisor';
 
 export type AgentDecisionContext = {
   nextInt: (minInclusive: number, maxInclusive: number) => number;
@@ -50,6 +51,18 @@ export type StrategyAgent = {
     options: readonly LegalEventChoiceOption[],
     context: AgentDecisionContext,
   ) => LegalEventChoiceOption | undefined;
+};
+
+export type HandlerAgentOrderDecision = {
+  recommendation: HandlerRecommendation;
+  order?: LegalOrderOption;
+  invalidRecommendationCount: number;
+};
+
+export type HandlerAgentEventDecision = {
+  recommendation: HandlerRecommendation;
+  eventChoice?: LegalEventChoiceOption;
+  invalidRecommendationCount: number;
 };
 
 type PressureWeights = Partial<Record<keyof PressureDelta, number>>;
@@ -166,6 +179,7 @@ export const OPERATOR_BOT: StrategyAgent = {
           state.pressures,
           getOrderNetDelta(option),
           option.preview.riskChance,
+          getRunRules(state).dominionTarget,
         ) +
         scoreOperatorTarget(state, option) +
         scoreOperatorRoster(state, option) +
@@ -177,10 +191,23 @@ export const OPERATOR_BOT: StrategyAgent = {
     ),
   chooseEventChoice: (state, options, context) =>
     chooseHighestScoring(options, context, (option) =>
-      scoreOperatorPressureMove(state.pressures, mergeChoiceDelta(option.choice), 0) +
+      scoreOperatorPressureMove(
+        state.pressures,
+        mergeChoiceDelta(option.choice),
+        0,
+        getRunRules(state).dominionTarget,
+      ) +
       scoreOperatorEventChoice(option.choice) +
       scoreOperatorCampaignEventChoice(state, option.choice),
     ),
+};
+
+export const HANDLER_BOT: StrategyAgent = {
+  id: 'handler',
+  label: 'HandlerBot',
+  chooseOrder: (state, options) => chooseHandlerOrder(state, options).order,
+  chooseEventChoice: (state, options) =>
+    chooseHandlerEventChoice(state, options).eventChoice,
 };
 
 export const STRATEGY_AGENTS = [
@@ -190,6 +217,50 @@ export const STRATEGY_AGENTS = [
   GREEDY_BOT,
   OPERATOR_BOT,
 ] as const;
+
+export const EXTENDED_STRATEGY_AGENTS = [...STRATEGY_AGENTS, HANDLER_BOT] as const;
+
+export function chooseHandlerOrder(
+  state: GameState,
+  options: readonly LegalOrderOption[],
+): HandlerAgentOrderDecision {
+  const recommendation = selectHandlerRecommendation(state, {
+    legalOrderOptions: options,
+  });
+  const recommendedOrder = recommendation.recommendedOrders[0];
+  const order = recommendedOrder
+    ? options.find((option) => isMatchingHandlerOrder(option, recommendedOrder))
+    : undefined;
+  const missingOrder = recommendedOrder && !order ? 1 : 0;
+
+  return {
+    recommendation,
+    order,
+    invalidRecommendationCount:
+      recommendation.invalidRecommendations.length + missingOrder,
+  };
+}
+
+export function chooseHandlerEventChoice(
+  state: GameState,
+  options: readonly LegalEventChoiceOption[],
+): HandlerAgentEventDecision {
+  const recommendation = selectHandlerRecommendation(state, {
+    legalEventChoiceOptions: options,
+  });
+  const eventRecommendation = recommendation.eventRecommendation;
+  const eventChoice = eventRecommendation
+    ? options.find((option) => option.choice.id === eventRecommendation.choiceId)
+    : undefined;
+  const missingChoice = eventRecommendation && !eventChoice ? 1 : 0;
+
+  return {
+    recommendation,
+    eventChoice,
+    invalidRecommendationCount:
+      recommendation.invalidRecommendations.length + missingChoice,
+  };
+}
 
 export function getQueuedActionUsage(
   queuedOrders: readonly QueuedOrder[],
@@ -201,6 +272,21 @@ export function getQueuedActionUsage(
     }),
     createEmptyActionUsage(),
   );
+}
+
+function isMatchingHandlerOrder(
+  option: LegalOrderOption,
+  recommendation: HandlerRecommendation['recommendedOrders'][number],
+): boolean {
+  return (
+    option.actionId === recommendation.actionId &&
+    option.assignedOperativeId === recommendation.assignedOperativeId &&
+    getOrderTargetKey(option.target) === getOrderTargetKey(recommendation.target)
+  );
+}
+
+function getOrderTargetKey(target: ActionTarget | undefined): string {
+  return target ? getActionTargetKey(target) : 'target:none';
 }
 
 export function createEmptyActionUsage(): Record<ActionId, number> {
@@ -438,9 +524,10 @@ function scoreAggressiveRoster(option: LegalOrderOption): number {
 
 function scoreOperatorTarget(state: GameState, option: LegalOrderOption): number {
   const rivalAttention = option.preview.rivalAttention;
+  const rules = getRunRules(state);
   const winsImmediately =
     state.pressures.dominion + (option.preview.adjustedEffects.dominion ?? 0) >=
-    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory;
+    rules.dominionTarget;
   const highPressurePenalty =
     rivalAttention && rivalAttention.currentPressure >= 60 && !winsImmediately ? -120 : 0;
   const districtId = option.preview.localImpact?.districtId;
@@ -586,9 +673,10 @@ function scoreAggressiveLedgerOrder(state: GameState, option: LegalOrderOption):
   const delta = ledger.resolvedDelta;
   const kind = ledger.definition.kind;
   const debtAge = state.week - ledger.entry.createdWeek;
+  const rules = getRunRules(state);
   const behindSchedule =
     state.pressures.dominion <
-    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / 8) * Math.max(1, state.week);
+    (rules.dominionTarget / state.maxWeeks) * Math.max(1, state.week);
   const dominionBias =
     kind === 'secret' && (delta.dominion ?? 0) > 0
       ? 72 + (delta.dominion ?? 0) * 9
@@ -664,9 +752,10 @@ function scoreOperatorLedgerOrder(state: GameState, option: LegalOrderOption): n
   const delta = ledger.resolvedDelta;
   const kind = ledger.definition.kind;
   const debtAge = state.week - ledger.entry.createdWeek;
+  const rules = getRunRules(state);
   const behindSchedule =
     state.pressures.dominion <
-    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / 8) * Math.max(1, state.week);
+    (rules.dominionTarget / state.maxWeeks) * Math.max(1, state.week);
   const heatRelief =
     state.pressures.heat >= 75 && (delta.heat ?? 0) < 0 ? 150 + Math.abs(delta.heat ?? 0) * 8 : 0;
   const debtBias = kind === 'debt' && debtAge >= 2 ? 88 + debtAge * 12 : 0;
@@ -697,9 +786,9 @@ function scoreAggressiveContactOrder(state: GameState, option: LegalOrderOption)
   const intelBias = (delta.intel ?? 0) * 1.6;
   const pressureBias = contact.kind === 'pressure' ? 22 : 0;
   const serviceBias = contact.kind === 'request_service' ? 18 : 0;
+  const rules = getRunRules(state);
   const victoryBias =
-    state.pressures.dominion + (delta.dominion ?? 0) >=
-    DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
+    state.pressures.dominion + (delta.dominion ?? 0) >= rules.dominionTarget
       ? 90
       : 0;
   const heatBrake =
@@ -824,6 +913,7 @@ function scoreOperatorContactOrder(state: GameState, option: LegalOrderOption): 
     state.pressures,
     contact.resolvedDelta,
     contact.riskChance,
+    getRunRules(state).dominionTarget,
   );
   const contactDelta = contact.resolvedContactEffects;
   const heatRelief =
@@ -1294,7 +1384,12 @@ function scoreOperatorAccordOrder(state: GameState, option: LegalOrderOption): n
 
   const delta = getAccordNetDelta(state, option);
   const next = applyDeltaForScoring(state.pressures, delta);
-  const pressureScore = scoreOperatorPressureMove(state.pressures, delta, option.preview.riskChance);
+  const pressureScore = scoreOperatorPressureMove(
+    state.pressures,
+    delta,
+    option.preview.riskChance,
+    getRunRules(state).dominionTarget,
+  );
   const heatRelief =
     state.pressures.heat >= 74 && (delta.heat ?? 0) < 0
       ? 180 + Math.abs(delta.heat ?? 0) * 13
@@ -1742,10 +1837,11 @@ function scaleDeltaForScoring(delta: PressureDelta, multiplier: number): Pressur
 }
 
 function isBehindDominionSchedule(state: GameState): boolean {
+  const rules = getRunRules(state);
+
   return (
     state.pressures.dominion <
-    (DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory / state.maxWeeks) *
-      Math.max(1, state.week)
+    (rules.dominionTarget / rules.maxWeeks) * Math.max(1, state.week)
   );
 }
 
@@ -1979,6 +2075,7 @@ function scoreOperatorPressureMove(
   pressures: Pressures,
   delta: PressureDelta,
   riskChance: number,
+  dominionTarget: number,
 ): number {
   const next = applyDeltaForScoring(pressures, delta);
 
@@ -1991,8 +2088,7 @@ function scoreOperatorPressureMove(
   const stabilityGain = (nextWorstMargin - currentWorstMargin) * 45;
   const stableEnough = currentWorstMargin >= 0.25;
   const weights = operatorWeights(pressures);
-  const dominionFinishBias =
-    next.dominion >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory ? 100 : 0;
+  const dominionFinishBias = next.dominion >= dominionTarget ? 100 : 0;
   const dominanceBias = stableEnough ? (delta.dominion ?? 0) * 3.5 : (delta.dominion ?? 0) * 1.4;
   const riskPenalty = riskChance * (stableEnough ? -0.12 : -0.3);
   const ruinBrake = next.ruin >= 25 ? (next.ruin - 24) * -2.5 : 0;

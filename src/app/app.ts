@@ -3,9 +3,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   PRESSURE_IDS,
-  STRATEGY_AGENTS,
+  EXTENDED_STRATEGY_AGENTS,
   CAMPAIGN_TENSION_DEFINITIONS,
-  DISTRICT_ZERO_WIN_LOSS_THRESHOLDS,
   formatBatchReport,
   generateRoster,
   getWeightedEvents,
@@ -17,6 +16,8 @@ import {
   type ActionTarget,
   type ActionTargetOption,
   type AppliedModifierSource,
+  type AdvisorMode,
+  type AdvisorMessage,
   type CampaignTensionId,
   type ContactEffectPreviewRow,
   type ContactCostRow,
@@ -35,6 +36,7 @@ import {
   type LedgerDeltaRow,
   type LedgerEntryView,
   type LedgerUseOptionView,
+  type OperativeOptionView,
   type OperativeId,
   type PressureDelta,
   type PressureDeltaView,
@@ -55,6 +57,11 @@ type CampaignSelectionOption = {
   label: string;
 };
 
+type AdvisorModeOption = {
+  id: AdvisorMode;
+  label: string;
+};
+
 @Component({
   selector: 'app-root',
   imports: [FormsModule, NgTemplateOutlet],
@@ -67,9 +74,16 @@ export class App {
   protected readonly selectedTargets = signal<Partial<Record<ActionId, ActionTarget>>>({});
   protected readonly harnessOutput = signal('');
   protected readonly debugVisible = signal(false);
+  protected readonly howToPlayOpen = signal(false);
   protected readonly copyReportStatus = signal<'idle' | 'success' | 'failure'>('idle');
   protected seedInput = 'VIOLET-ASH-1047';
   protected selectedCampaignTensionId: '' | CampaignTensionId = '';
+  protected readonly advisorModeOptions: AdvisorModeOption[] = [
+    { id: 'off', label: 'Off' },
+    { id: 'hints', label: 'Hints' },
+    { id: 'coach', label: 'Coach' },
+    { id: 'handler', label: 'Handler' },
+  ];
   protected readonly campaignSelectionOptions: CampaignSelectionOption[] = [
     {
       id: '',
@@ -95,6 +109,11 @@ export class App {
       statusLabel: this.getPressureStatusLabel(id, this.game.state().pressures[id]),
       targetLabel: this.getPressureTargetLabel(id),
     })),
+  );
+  protected readonly queuedOrderWarnings = computed(() =>
+    this.game
+      .advisorView()
+      .warnings.filter((warning) => warning.reasonCode === 'plan_warning'),
   );
   protected readonly debugView = computed(() => {
     const state = this.game.state();
@@ -122,7 +141,7 @@ export class App {
       seed: state.seed,
       rngCursor: state.rngCursor,
       phase: state.phase,
-      dominionTarget: DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory,
+      dominionTarget: state.run.dominionTarget,
       pendingEventId: state.pendingEvent?.definitionId ?? 'None',
       pressuresJson: JSON.stringify(state.pressures, null, 2),
       flagsJson: JSON.stringify(state.flags, null, 2),
@@ -183,6 +202,12 @@ export class App {
     this.game.startNewRun(this.normalizedSeed(), this.selectedCampaignTensionId || undefined);
   }
 
+  protected startTrainingRun(): void {
+    this.clearTransientSelections();
+    this.copyReportStatus.set('idle');
+    this.game.startTrainingRun();
+  }
+
   protected resetRun(): void {
     this.clearTransientSelections();
     this.copyReportStatus.set('idle');
@@ -196,6 +221,20 @@ export class App {
 
   protected dismissCampaignBriefing(): void {
     this.game.dismissCampaignBriefing();
+  }
+
+  protected openHowToPlay(): void {
+    this.howToPlayOpen.set(true);
+  }
+
+  protected closeHowToPlay(): void {
+    this.howToPlayOpen.set(false);
+  }
+
+  protected closeHowToPlayFromBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeHowToPlay();
+    }
   }
 
   protected openCampaignBriefing(): void {
@@ -244,6 +283,7 @@ export class App {
   protected targetOptionLabel(option: ActionTargetOption): string {
     const unavailable = this.targetOptionUnavailableText(option);
     const suffix = unavailable ? ` (${unavailable})` : '';
+    const prefix = this.isTargetRecommended(option) ? 'Handler Pick - ' : '';
 
     if (
       (option.targetType === 'venue' ||
@@ -251,10 +291,10 @@ export class App {
         option.targetType === 'front') &&
       option.districtName
     ) {
-      return `${option.districtName} / ${option.label}${suffix}`;
+      return `${prefix}${option.districtName} / ${option.label}${suffix}`;
     }
 
-    return `${option.label}${suffix}`;
+    return `${prefix}${option.label}${suffix}`;
   }
 
   protected targetOptionValue(option: ActionTargetOption): string {
@@ -320,7 +360,7 @@ export class App {
 
   protected runHarnessBatch(): void {
     const report = simulateBatch({
-      agents: STRATEGY_AGENTS,
+      agents: EXTENDED_STRATEGY_AGENTS,
       runsPerAgent: 100,
       seedPrefix: `UI-${this.game.state().seed}`,
     });
@@ -358,6 +398,50 @@ export class App {
 
   protected dismissCompatibilityNotice(): void {
     this.game.dismissCompatibilityNotice();
+  }
+
+  protected setAdvisorMode(mode: AdvisorMode): void {
+    this.game.setAdvisorMode(mode);
+  }
+
+  protected isActionRecommended(actionId: ActionId): boolean {
+    return this.game.isAdvisorRecommendedAction(actionId);
+  }
+
+  protected isTargetRecommended(option: ActionTargetOption): boolean {
+    return this.game.isAdvisorRecommendedTarget(option.target);
+  }
+
+  protected isOperativeRecommended(operativeId: string | undefined): boolean {
+    return this.game.isAdvisorRecommendedOperative(operativeId as OperativeId | undefined);
+  }
+
+  protected isEventChoiceRecommended(choiceId: string): boolean {
+    return this.game.isAdvisorRecommendedEventChoice(choiceId);
+  }
+
+  protected advisorMessageClass(message: AdvisorMessage): string {
+    return `tone-${message.tone}`;
+  }
+
+  protected runModeLabel(): string {
+    return this.game.state().run.mode === 'training' ? 'Training Run' : 'Standard Run';
+  }
+
+  protected validationStatusLabel(): string {
+    switch (this.game.state().run.validationStatus) {
+      case 'validated':
+        return 'Validated';
+      case 'harness_validated':
+        return 'Harness Validated';
+      case 'unvalidated':
+        return 'Unvalidated Custom Seed';
+    }
+  }
+
+  protected operativeOptionLabel(operative: OperativeOptionView): string {
+    const prefix = this.isOperativeRecommended(operative.id) ? 'Handler Pick - ' : '';
+    return `${prefix}${operative.name} · ${this.displayToken(operative.stressTier)}`;
   }
 
   private normalizedSeed(): string | undefined {
@@ -753,6 +837,7 @@ export class App {
 
   protected displayToken(value: string): string {
     return value
+      .toLowerCase()
       .replace(/^op_/, '')
       .split('_')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -855,11 +940,13 @@ export class App {
 
   private getPressureMeterValue(id: PressureId, value: number): number {
     if (id === 'dominion') {
+      const dominionTarget = this.game.state().run.dominionTarget;
+
       return Math.max(
         0,
         Math.min(
           100,
-          Math.round((value / DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory) * 100),
+          Math.round((value / dominionTarget) * 100),
         ),
       );
     }
@@ -877,7 +964,7 @@ export class App {
 
   private getPressureStatus(id: PressureId, value: number): 'stable' | 'warning' | 'critical' {
     if (id === 'dominion') {
-      return value >= DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory
+      return value >= this.game.state().run.dominionTarget
         ? 'critical'
         : value >= 60
           ? 'warning'
@@ -906,7 +993,7 @@ export class App {
   private getPressureTargetLabel(id: PressureId): string {
     switch (id) {
       case 'dominion':
-        return `Win at ${DISTRICT_ZERO_WIN_LOSS_THRESHOLDS.dominionVictory}`;
+        return `Win at ${this.game.state().run.dominionTarget}`;
       case 'heat':
         return 'Lose at 100';
       case 'loyalty':

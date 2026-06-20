@@ -43,14 +43,17 @@ import {
   type OperativeId,
   type Pressures,
   type RivalId,
+  type RunMode,
+  type RunValidationStatus,
   type TraitId,
   type TurnPhase,
   type VenueId,
 } from '../engine';
 
-export const CURRENT_SAVE_SCHEMA_VERSION = 8;
-export const CURRENT_GAME_VERSION = '0.8.0';
-export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.8:current-run';
+export const CURRENT_SAVE_SCHEMA_VERSION = 9;
+export const CURRENT_GAME_VERSION = '0.9.0';
+export const CURRENT_RUN_STORAGE_KEY = 'haunted-apex:v0.9:current-run';
+export const LEGACY_V08_STORAGE_KEY = 'haunted-apex:v0.8:current-run';
 export const LEGACY_V07_STORAGE_KEY = 'haunted-apex:v0.7:current-run';
 export const LEGACY_V06_STORAGE_KEY = 'haunted-apex:v0.6:current-run';
 export const LEGACY_V05_STORAGE_KEY = 'haunted-apex:v0.5:current-run';
@@ -108,6 +111,7 @@ export class GameStorageService implements GameStorage {
     const serialized = storage.getItem(CURRENT_RUN_STORAGE_KEY);
 
     if (serialized) {
+      storage.removeItem(LEGACY_V08_STORAGE_KEY);
       storage.removeItem(LEGACY_V07_STORAGE_KEY);
       storage.removeItem(LEGACY_V06_STORAGE_KEY);
       storage.removeItem(LEGACY_V05_STORAGE_KEY);
@@ -141,6 +145,20 @@ export class GameStorageService implements GameStorage {
         storage.removeItem(CURRENT_RUN_STORAGE_KEY);
         return { status: 'invalid' };
       }
+    }
+
+    if (storage.getItem(LEGACY_V08_STORAGE_KEY) !== null) {
+      storage.removeItem(LEGACY_V08_STORAGE_KEY);
+      storage.removeItem(LEGACY_V07_STORAGE_KEY);
+      storage.removeItem(LEGACY_V06_STORAGE_KEY);
+      storage.removeItem(LEGACY_V05_STORAGE_KEY);
+      storage.removeItem(LEGACY_V04_STORAGE_KEY);
+      storage.removeItem(LEGACY_V03_STORAGE_KEY);
+      storage.removeItem(LEGACY_V02_STORAGE_KEY);
+      return {
+        status: 'incompatible',
+        foundVersion: 8,
+      };
     }
 
     if (storage.getItem(LEGACY_V07_STORAGE_KEY) !== null) {
@@ -212,6 +230,7 @@ export class GameStorageService implements GameStorage {
   clearCurrentRun(): void {
     const storage = getLocalStorage();
     storage?.removeItem(CURRENT_RUN_STORAGE_KEY);
+    storage?.removeItem(LEGACY_V08_STORAGE_KEY);
     storage?.removeItem(LEGACY_V07_STORAGE_KEY);
     storage?.removeItem(LEGACY_V06_STORAGE_KEY);
     storage?.removeItem(LEGACY_V05_STORAGE_KEY);
@@ -235,7 +254,7 @@ function isGameState(value: unknown): value is GameState {
   }
 
   return (
-    value['schemaVersion'] === 8 &&
+    value['schemaVersion'] === 9 &&
     typeof value['id'] === 'string' &&
     typeof value['seed'] === 'string' &&
     isNonNegativeInteger(value['rngCursor']) &&
@@ -243,6 +262,7 @@ function isGameState(value: unknown): value is GameState {
     isPositiveInteger(value['maxWeeks']) &&
     isTurnPhase(value['phase']) &&
     isPositiveInteger(value['commandPointsPerWeek']) &&
+    isRunSettings(value['run']) &&
     isCampaignState(value['campaign']) &&
     isPressures(value['pressures']) &&
     isOperatives(value['operatives']) &&
@@ -261,6 +281,24 @@ function isGameState(value: unknown): value is GameState {
     isFlags(value['flags']) &&
     isGameOver(value['gameOver'])
   );
+}
+
+function isRunSettings(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    isRunMode(value['mode']) &&
+    isPositiveFiniteNumber(value['dominionTarget']) &&
+    isRunValidationStatus(value['validationStatus']) &&
+    typeof value['customSeed'] === 'boolean'
+  );
+}
+
+function isRunMode(value: unknown): value is RunMode {
+  return value === 'training' || value === 'standard';
+}
+
+function isRunValidationStatus(value: unknown): value is RunValidationStatus {
+  return value === 'validated' || value === 'harness_validated' || value === 'unvalidated';
 }
 
 function isCampaignState(campaign: unknown): boolean {
@@ -1445,6 +1483,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value > 0;
 }
 
 function isPositiveInteger(value: unknown): value is number {
