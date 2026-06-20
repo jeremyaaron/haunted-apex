@@ -599,7 +599,29 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added `buildLoopWarningReports()` with diagnostic-only warnings for:
+  - dominant command pair,
+  - top-two command share,
+  - wins without Fronts,
+  - wins without Accords,
+  - wins without Ledger,
+  - wins without Contacts.
+- Centralized the TDD warning thresholds in `LOOP_WARNING_THRESHOLDS`.
+- Warning thresholds use strict `>` behavior, so values exactly at threshold do not warn.
+- Added `buildStrategicFingerprintReports()` with compact per-agent/campaign summaries.
+- Strategic fingerprints select top command, top command pair, top Dominion source, top Heat relief
+  source, and the most dominant loop warning by threshold overage.
+- Added focused tests for warning thresholds, wins-without-system diagnostics, top source selection,
+  total/average command calculations, and empty-supporting-report behavior.
+- Verification passed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/analytics/**/*.spec.ts'
+```
 
 ## Phase 7: Harness Output Integration
 
