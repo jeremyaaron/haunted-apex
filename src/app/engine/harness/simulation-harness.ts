@@ -4,6 +4,7 @@ import {
   DISTRICT_ZERO_ACTIONS,
   FACTION_DEFINITIONS,
   FRONT_DEFINITIONS,
+  getActionDefinition,
   ROSTER_OPERATIVES,
   RIVAL_TERRITORY_DISTRICTS,
   RIVAL_TERRITORY_RIVALS,
@@ -23,6 +24,13 @@ import {
   selectLegalOrderOptions,
   type AdvisorConfidence,
 } from '../advisor';
+import type {
+  PressureAttributionEntry,
+  RunTelemetry,
+  StrategicSystemId,
+  TelemetryEntry,
+  PressureChangeSourceKind,
+} from '../analytics';
 import { deriveFactionStatus } from '../factions';
 import { deriveFrontStatus } from '../fronts';
 import type {
@@ -38,11 +46,13 @@ import type {
   FactionId,
   FactionStatus,
   FrontDefinitionId,
+  GameLogEntry,
   GameOverReason,
   GameState,
   LedgerEntryDefinitionId,
   LedgerEntryKind,
   OperativeId,
+  PressureDelta,
   PressureId,
   Pressures,
   RivalId,
@@ -108,6 +118,7 @@ export type HarnessRunResult = {
   frontStats: FrontRunStats;
   factionStats: FactionRunStats;
   handlerStats?: HandlerRunStats;
+  telemetry: RunTelemetry;
   trace: HarnessTraceEntry[];
 };
 
@@ -807,6 +818,14 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
   const contactStats = createEmptyContactRunStats(state);
   const frontStats = createEmptyFrontRunStats(state);
   const factionStats = createEmptyFactionRunStats(state);
+  const telemetry: RunTelemetry = {
+    runId: `${options.agent.id}:${state.seed}`,
+    actorType: 'bot',
+    botId: options.agent.id,
+    campaignTensionId: state.campaign.tensionId,
+    seed: state.seed,
+    entries: [],
+  };
   const trace: HarnessTraceEntry[] = [];
   const context = createAgentDecisionContext(`${state.seed}:${options.agent.id}`);
   const handlerStats = createHandlerRunStats();
@@ -825,6 +844,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         contactStats,
         frontStats,
         factionStats,
+        telemetry.entries,
         trace,
         options.collectTrace,
         handlerStats,
@@ -844,6 +864,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         break;
       }
 
+      const preAdvanceLogCount = state.eventLog.length;
       const advanced = advanceWeek(state);
 
       if (!advanced.ok) {
@@ -853,6 +874,8 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         break;
       }
 
+      recordOrderPressureAttribution(telemetry.entries, advanced.orderResolutions, state.week);
+      recordLogPressureAttribution(telemetry.entries, advanced.state, preAdvanceLogCount);
       recordOrderComplications(targetUsage, advanced.orderResolutions);
       recordOperativeOrderStats(operativeStats, advanced.orderResolutions, advanced.state);
       recordOperativeEventEligibility(
@@ -919,6 +942,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
         break;
       }
 
+      const preChoiceLogCount = state.eventLog.length;
       const resolved = resolveEventChoice(state, choice.eventId, choice.choice.id);
 
       if (!resolved.ok) {
@@ -930,6 +954,13 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
       }
 
       eventChoiceUsage[choice.choice.id] = (eventChoiceUsage[choice.choice.id] ?? 0) + 1;
+      recordEventChoiceTelemetry(
+        telemetry.entries,
+        resolved.state,
+        preChoiceLogCount,
+        choice.eventId,
+        choice.choice,
+      );
       recordOperativeEventChoiceContribution(operativeStats, state, choice.choice);
       state = resolved.state;
       recordFactionSnapshot(factionStats, state);
@@ -972,6 +1003,7 @@ export function simulateRun(options: HarnessRunOptions): HarnessRunResult {
     frontStats,
     factionStats,
     handlerStats: options.agent.id === 'handler' ? handlerStats : undefined,
+    telemetry,
     trace,
   };
 }
@@ -2143,6 +2175,7 @@ function queueAgentOrders(
   contactStats: ContactRunStats,
   frontStats: FrontRunStats,
   factionStats: FactionRunStats,
+  telemetryEntries: TelemetryEntry[],
   trace: HarnessTraceEntry[],
   collectTrace: boolean | undefined,
   handlerStats: HandlerRunStats,
@@ -2183,6 +2216,7 @@ function queueAgentOrders(
     }
 
     next = queued.state;
+    recordQueuedOrderTelemetry(telemetryEntries, next.week, decision);
     actionUsage[decision.actionId] += 1;
     recordTargetSelection(targetUsage, decision.target);
     recordLedgerOrderStats(ledgerStats, decision);
@@ -5157,6 +5191,267 @@ function recordTargetSelection(
   };
   current.selections += 1;
   targetUsage[key] = current;
+}
+
+function recordQueuedOrderTelemetry(
+  entries: TelemetryEntry[],
+  week: number,
+  decision: LegalOrderOption,
+): void {
+  entries.push({
+    kind: 'command_used',
+    week,
+    actionId: decision.actionId,
+    actionLabel: decision.actionLabel,
+    ...(decision.target ? { targetKey: getTargetKey(decision.target) } : {}),
+    ...(decision.assignedOperativeId
+      ? { assignedOperativeId: decision.assignedOperativeId as OperativeId }
+      : {}),
+  });
+
+  if (decision.assignedOperativeId) {
+    entries.push({
+      kind: 'operative_assigned',
+      week,
+      operativeId: decision.assignedOperativeId as OperativeId,
+      actionId: decision.actionId,
+    });
+  }
+
+  for (const system of getStrategicSystemsForOrder(decision)) {
+    entries.push({
+      kind: 'system_engaged',
+      week,
+      system,
+      sourceId: decision.target ? getTargetKey(decision.target) : decision.actionId,
+    });
+  }
+}
+
+function recordOrderPressureAttribution(
+  entries: TelemetryEntry[],
+  resolutions: readonly OrderResolutionDiagnostic[],
+  week: number,
+): void {
+  for (const resolution of resolutions) {
+    const source = getOrderPressureSource(resolution.order);
+    entries.push(
+      ...pressureDeltaToAttributionEntries({
+        week,
+        sourceKind: source.sourceKind,
+        sourceId: source.sourceId,
+        sourceLabel: source.sourceLabel,
+        pressureDelta: resolution.resolvedDelta,
+      }),
+    );
+  }
+}
+
+function recordLogPressureAttribution(
+  entries: TelemetryEntry[],
+  state: GameState,
+  preLogCount: number,
+): void {
+  for (const entry of state.eventLog.slice(preLogCount)) {
+    const source = getLogPressureSource(entry);
+
+    if (!source || !entry.pressureDelta) {
+      continue;
+    }
+
+    entries.push(
+      ...pressureDeltaToAttributionEntries({
+        week: entry.week,
+        sourceKind: source.sourceKind,
+        sourceId: source.sourceId,
+        sourceLabel: source.sourceLabel,
+        pressureDelta: entry.pressureDelta,
+      }),
+    );
+  }
+}
+
+function recordEventChoiceTelemetry(
+  entries: TelemetryEntry[],
+  state: GameState,
+  preLogCount: number,
+  eventId: string,
+  choice: EventChoiceDefinition,
+): void {
+  const eventDefinition = getEventDefinition(eventId);
+  const eventChoiceLog = state.eventLog
+    .slice(preLogCount)
+    .find((entry) => entry.type === 'event_choice');
+
+  entries.push({
+    kind: 'event_choice_used',
+    week: eventChoiceLog?.week ?? state.week,
+    eventId,
+    eventTitle: eventDefinition?.title ?? eventId,
+    choiceId: choice.id,
+    choiceLabel: choice.label,
+  });
+
+  if (!eventChoiceLog?.pressureDelta) {
+    return;
+  }
+
+  entries.push(
+    ...pressureDeltaToAttributionEntries({
+      week: eventChoiceLog.week,
+      sourceKind: 'event',
+      sourceId: eventId,
+      sourceLabel: choice.label,
+      pressureDelta: eventChoiceLog.pressureDelta,
+    }),
+  );
+}
+
+function getStrategicSystemsForOrder(decision: LegalOrderOption): StrategicSystemId[] {
+  switch (decision.actionId) {
+    case 'bribe_official':
+      return ['bribe'];
+    case 'lay_low':
+      return ['lay_low'];
+    case 'manage_contact':
+      return ['contact'];
+    case 'work_the_ledger':
+      return ['ledger'];
+    case 'broker_accord':
+      return ['accord'];
+    case 'invest_front':
+      return [decision.target?.type === 'front' ? 'front_upgrade' : 'front'];
+    default:
+      return [];
+  }
+}
+
+function getOrderPressureSource(order: OrderResolutionDiagnostic['order']): {
+  sourceKind: PressureChangeSourceKind;
+  sourceId: string;
+  sourceLabel: string;
+} {
+  const action = getActionDefinition(order.actionId);
+
+  if (order.actionId === 'manage_contact' && order.target?.type === 'contact') {
+    return {
+      sourceKind: 'contact',
+      sourceId: getTargetKey(order.target),
+      sourceLabel: getContactDefinition(order.target.contactId)?.name ?? action?.label ?? order.actionId,
+    };
+  }
+
+  if (order.actionId === 'work_the_ledger' && order.target?.type === 'ledger') {
+    return {
+      sourceKind: 'ledger',
+      sourceId: getTargetKey(order.target),
+      sourceLabel: action?.label ?? order.actionId,
+    };
+  }
+
+  if (order.actionId === 'invest_front' && order.target?.type === 'front_opportunity') {
+    const frontDefinitionId = order.target.id.replace(
+      /^front_opportunity_/,
+      '',
+    ) as FrontDefinitionId;
+
+    return {
+      sourceKind: 'front',
+      sourceId: getTargetKey(order.target),
+      sourceLabel: getFrontDefinition(frontDefinitionId)?.name ?? action?.label ?? order.actionId,
+    };
+  }
+
+  if (order.actionId === 'invest_front' && order.target?.type === 'front') {
+    const front = getFrontDefinition(order.target.id as FrontDefinitionId);
+
+    return {
+      sourceKind: 'front',
+      sourceId: getTargetKey(order.target),
+      sourceLabel: front?.name ?? action?.label ?? order.actionId,
+    };
+  }
+
+  if (order.actionId === 'broker_accord' && order.target?.type === 'faction') {
+    return {
+      sourceKind: 'accord',
+      sourceId: getTargetKey(order.target),
+      sourceLabel: getAccordDefinition(order.target.accordId)?.label ?? action?.label ?? order.actionId,
+    };
+  }
+
+  return {
+    sourceKind: 'action',
+    sourceId: order.actionId,
+    sourceLabel: action?.label ?? order.actionId,
+  };
+}
+
+function getLogPressureSource(entry: GameLogEntry): {
+  sourceKind: PressureChangeSourceKind;
+  sourceId: string;
+  sourceLabel: string;
+} | undefined {
+  switch (entry.type) {
+    case 'front_yield':
+      return {
+        sourceKind: 'front',
+        sourceId: 'front_network_yield',
+        sourceLabel: entry.title,
+      };
+    case 'accord':
+      return {
+        sourceKind: 'accord',
+        sourceId: 'accord_weekly_effects',
+        sourceLabel: entry.title,
+      };
+    case 'drift':
+      return {
+        sourceKind: 'drift',
+        sourceId: 'weekly_drift',
+        sourceLabel: entry.title,
+      };
+    case 'rival_effect':
+      return {
+        sourceKind: 'rival',
+        sourceId: entry.tags?.find((tag) => tag.startsWith('rival_')) ?? entry.id,
+        sourceLabel: entry.title,
+      };
+    default:
+      return undefined;
+  }
+}
+
+function pressureDeltaToAttributionEntries({
+  week,
+  sourceKind,
+  sourceId,
+  sourceLabel,
+  pressureDelta,
+}: {
+  week: number;
+  sourceKind: PressureChangeSourceKind;
+  sourceId: string;
+  sourceLabel: string;
+  pressureDelta: PressureDelta;
+}): PressureAttributionEntry[] {
+  return PRESSURE_IDS.flatMap((pressure) => {
+    const delta = pressureDelta[pressure] ?? 0;
+
+    return delta === 0
+      ? []
+      : [
+          {
+            kind: 'pressure_delta',
+            week,
+            sourceKind,
+            sourceId,
+            sourceLabel,
+            pressure,
+            delta,
+          },
+        ];
+  });
 }
 
 function recordOrderComplications(

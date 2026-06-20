@@ -8,6 +8,7 @@ import {
   RANDOM_BOT,
   STRATEGY_AGENTS,
   type AgentDecisionContext,
+  type StrategyAgent,
   formatBatchReport,
   getLegalOrderOptions,
   getRosterCompositionKey,
@@ -55,7 +56,54 @@ describe('simulation harness', () => {
     expect(first.operativeEventStats).toEqual(second.operativeEventStats);
     expect(first.contactStats).toEqual(second.contactStats);
     expect(first.frontStats).toEqual(second.frontStats);
+    expect(first.telemetry).toEqual(second.telemetry);
     expect(first.trace.length).toBeGreaterThan(0);
+  });
+
+  it('records local run telemetry for commands, pressure deltas, events, and drift', () => {
+    const run = simulateRun({
+      agent: AGGRESSIVE_BOT,
+      seed: 'HARNESS-TELEMETRY-BASIC',
+    });
+    const commandEntries = run.telemetry.entries.filter((entry) => entry.kind === 'command_used');
+    const eventEntries = run.telemetry.entries.filter((entry) => entry.kind === 'event_choice_used');
+    const pressureEntries = run.telemetry.entries.filter((entry) => entry.kind === 'pressure_delta');
+
+    expect(run.telemetry.actorType).toBe('bot');
+    expect(run.telemetry.botId).toBe('aggressive');
+    expect(run.telemetry.campaignTensionId).toBe(run.finalState.campaign.tensionId);
+    expect(commandEntries.length).toBe(
+      Object.values(run.actionUsage).reduce((total, count) => total + count, 0),
+    );
+    expect(eventEntries.length).toBe(
+      Object.values(run.eventChoiceUsage).reduce((total, count) => total + count, 0),
+    );
+    expect(pressureEntries.some((entry) => entry.sourceKind === 'action')).toBeTrue();
+    expect(pressureEntries.some((entry) => entry.sourceKind === 'event')).toBeTrue();
+    expect(pressureEntries.some((entry) => entry.sourceKind === 'drift')).toBeTrue();
+  });
+
+  it('records system engagement telemetry for command families', () => {
+    const run = simulateRun({
+      agent: LAY_LOW_TEST_BOT,
+      seed: 'HARNESS-TELEMETRY-LAY-LOW',
+    });
+    const systemEntries = run.telemetry.entries.filter((entry) => entry.kind === 'system_engaged');
+
+    expect(systemEntries.some((entry) => entry.system === 'lay_low')).toBeTrue();
+  });
+
+  it('attributes front command pressure to the front source kind', () => {
+    const run = simulateRun({
+      agent: FRONT_TEST_BOT,
+      seed: 'HARNESS-TELEMETRY-FRONT',
+    });
+
+    expect(
+      run.telemetry.entries.some(
+        (entry) => entry.kind === 'pressure_delta' && entry.sourceKind === 'front',
+      ),
+    ).toBeTrue();
   });
 
   it('can simulate a specific Campaign Tension directly', () => {
@@ -1002,6 +1050,35 @@ describe('simulation harness', () => {
     expect(simulateBatch(options)).toEqual(simulateBatch(options));
   });
 });
+
+const LAY_LOW_TEST_BOT: StrategyAgent = {
+  id: 'test_lay_low',
+  label: 'Test Lay Low',
+  chooseOrder(_state, options) {
+    return options.find((option) => option.actionId === 'lay_low') ?? options[0];
+  },
+  chooseEventChoice(_state, options) {
+    return options[0];
+  },
+};
+
+const FRONT_TEST_BOT: StrategyAgent = {
+  id: 'test_front',
+  label: 'Test Front',
+  chooseOrder(_state, options) {
+    return (
+      options.find(
+        (option) =>
+          option.actionId === 'invest_front' && option.target?.type === 'front_opportunity',
+      ) ??
+      options.find((option) => option.actionId === 'lay_low') ??
+      options[0]
+    );
+  },
+  chooseEventChoice(_state, options) {
+    return options[0];
+  },
+};
 
 function targetKey(target: ActionTarget): string {
   if (target.type === 'ledger') {

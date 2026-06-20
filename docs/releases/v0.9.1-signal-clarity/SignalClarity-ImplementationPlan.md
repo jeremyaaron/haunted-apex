@@ -308,7 +308,48 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added `HarnessRunResult.telemetry`.
+- `simulateRun()` now initializes local bot `RunTelemetry` with:
+  - run id,
+  - bot id,
+  - seed,
+  - Campaign Tension id,
+  - in-memory telemetry entries.
+- Queueing orders now records:
+  - `command_used`,
+  - `operative_assigned`,
+  - `system_engaged`.
+- System engagement is captured for:
+  - Bribe,
+  - Lay Low,
+  - Contact service,
+  - Ledger use,
+  - Front investment,
+  - Front upgrade,
+  - Accord brokered.
+- Resolved order deltas now produce `pressure_delta` telemetry.
+- Event choices now record `event_choice_used`.
+- Event-choice pressure deltas now produce `pressure_delta` telemetry attributed to `event`.
+- Added harness tests proving:
+  - telemetry is deterministic for repeated runs,
+  - command and event telemetry counts match existing run usage counters,
+  - action, event, and drift pressure attribution appears,
+  - command-family system engagement appears,
+  - front command pressure can be attributed to `front`.
+- No agent strategy, game resolution, persistence, or UI behavior changed.
+
+Verification completed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/harness/simulation-harness.spec.ts
+```
+
+The focused Karma run reported `45 SUCCESS`; the runner then hung after completion and was
+terminated with Ctrl-C so no browser process was left running.
 
 ## Phase 3: Weekly Major-Source Attribution
 
@@ -349,7 +390,36 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added major-source pressure attribution for harness-visible weekly systems.
+- Weekly event-log pressure deltas are now converted into telemetry for:
+  - `front_yield` as `front`,
+  - `accord` weekly effects as `accord`,
+  - `drift` as `drift`,
+  - `rival_effect` as `rival`.
+- Order pressure attribution now uses strategic source kinds where the current order makes the
+  source obvious:
+  - `manage_contact` with a Contact target -> `contact`,
+  - `work_the_ledger` with a Ledger target -> `ledger`,
+  - `invest_front` with Front/Front opportunity target -> `front`,
+  - `broker_accord` with Faction/Accord target -> `accord`,
+  - other command deltas -> `action`.
+- Source attribution remains major-source level. It does not split base action, operative, target,
+  campaign, trait, or affinity micro-deltas.
+- The implementation reuses existing simulation diagnostics and event-log pressure deltas rather
+  than changing `GameState` or resolver behavior.
+
+Verification completed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include=src/app/engine/harness/simulation-harness.spec.ts
+```
+
+The focused Karma run reported `45 SUCCESS`; the runner then hung after completion and was
+terminated with Ctrl-C so no browser process was left running.
 
 ## Phase 4: Command Usage and Command Pair Reports
 
