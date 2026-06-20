@@ -50,8 +50,13 @@ Play the current prototype:
 
 https://jeremyaaron.github.io/haunted-apex/
 
-The deployment workflow runs after pushes to `main` and can also be started manually from the
-repository's Actions tab.
+The Pages deployment workflow runs after pushes to `main` and can also be started manually from the
+repository's Actions tab. It verifies docs, typechecks the app, builds the production artifact with
+the `/haunted-apex/` base href, and deploys that static build.
+
+Browser tests run in a separate workflow for pull requests, feature-branch pushes, and manual
+dispatch. This keeps Chrome Headless flakes from blocking Pages deployment while preserving the
+browser suite as an explicit CI signal.
 
 ## Verification
 
