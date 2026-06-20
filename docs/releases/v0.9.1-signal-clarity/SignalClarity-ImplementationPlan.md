@@ -460,7 +460,29 @@ git diff --check
 
 ### Completion Record
 
-Pending.
+Completed June 20, 2026.
+
+- Added shared analytics report input types for agent/campaign telemetry aggregation.
+- Added `buildCommandUsageReports()` with `all` campaign and per-Campaign Tension rows.
+- Added `buildCommandPairReports()` with unordered same-week command pairs.
+- Command usage percentages use all commands in the agent/campaign group as the denominator.
+- Command pair percentages use resolved weeks with at least two commands in the group as the
+  denominator.
+- Reports reuse action definitions for display labels while preserving action ids.
+- Added focused aggregation tests for usage totals, per-campaign splits, pair ordering, three-command
+  weeks, and single-command week omission.
+- Verification passed:
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+npx tsc -p tsconfig.spec.json --noEmit
+npm test -- --watch=false --browsers=ChromeHeadless --include='src/app/engine/analytics/**/*.spec.ts' --include='src/app/engine/harness/simulation-harness.spec.ts'
+npm run check:docs
+git diff --check
+```
+
+- The focused browser run reported `TOTAL: 53 SUCCESS`; the Karma process remained attached after
+  success and was manually stopped so no test server or browser process was left running.
 
 ## Phase 5: Source Breakdown and System Engagement Reports
 
